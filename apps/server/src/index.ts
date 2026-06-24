@@ -9,11 +9,13 @@ import { authRoutes } from './routes/auth.js';
 import { symbolRoutes, chartRoutes } from './routes/symbols.js';
 import { billingRoutes } from './routes/billing.js';
 import { healthRoutes } from './routes/health.js';
-import { wsRoutes } from './routes/ws.js';
 import { adminRoutes } from './routes/admin.js';
+import { indicatorRoutes } from './routes/indicators.js';
+import { watchlistRoutes } from './routes/watchlists.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
 import { errorHandler } from './middleware/error.js';
+import { wsHandlers } from './services/ws.js';
 
 const env = loadEnv();
 
@@ -40,16 +42,28 @@ app.route('/admin', adminRoutes);
 app.use('/api/*', tenantContext({ db, redis }));
 app.route('/api', symbolRoutes);
 app.route('/api', chartRoutes);
+app.route('/api', indicatorRoutes);
+app.route('/api', watchlistRoutes);
 app.route('/api', billingRoutes);
-app.route('/ws', wsRoutes);
 
 const port = env.API_PORT;
 console.log(`tradingviu api listening on :${port}`);
 
-export default {
+const _server: ReturnType<typeof Bun.serve> = Bun.serve({
   port,
-  fetch: app.fetch,
+  fetch(req: Request) {
+    const url = new URL(req.url);
+    if (url.pathname === '/ws') {
+      const ok = _server.upgrade(req, { data: undefined });
+      if (ok) return undefined;
+    }
+    return app.fetch(req);
+  },
+  websocket: wsHandlers,
   idleTimeout: 120,
-};
+});
+const server = _server;
+
+export default server;
 
 export { app, db, redis };

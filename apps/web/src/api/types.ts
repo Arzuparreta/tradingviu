@@ -37,6 +37,50 @@ export interface Bar {
   volume: number;
 }
 
+export interface IndicatorDef {
+  id: string;
+  name: string;
+  category: string;
+  overlay: boolean;
+  defaults: Record<string, number>;
+  minBars: number;
+}
+
+export interface IndicatorPoint {
+  time: number;
+  value: number;
+}
+
+export interface IndicatorOutput {
+  name: string;
+  overlay: boolean;
+  lines: { key: string; color: string; type: 'line' | 'histogram' | 'band' | 'cloud' }[];
+  points: IndicatorPoint[];
+  bands?: { time: number; upper: number; middle: number; lower: number }[];
+  histogram?: IndicatorPoint[];
+}
+
+export interface Watchlist {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WatchlistItem {
+  id: string;
+  symbolId: string;
+  color: string | null;
+  note: string | null;
+  sortOrder: number;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}
+
 export interface Plan {
   code: string;
   name: string;

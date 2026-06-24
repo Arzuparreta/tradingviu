@@ -47,6 +47,9 @@ importers:
       '@tv/quotas':
         specifier: workspace:*
         version: link:../../packages/quotas
+      '@tv/ta-lib':
+        specifier: workspace:*
+        version: link:../../packages/ta-lib
       drizzle-orm:
         specifier: ^0.36.4
         version: 0.36.4(@types/react@18.3.31)(bun-types@1.3.14)(postgres@3.4.9)(react@18.3.1)
@@ -87,6 +90,9 @@ importers:
       '@tv/data-types':
         specifier: workspace:*
         version: link:../../packages/data-types
+      '@tv/ta-lib':
+        specifier: workspace:*
+        version: link:../../packages/ta-lib
       lightweight-charts:
         specifier: ^5.0.0
         version: 5.2.0
@@ -322,6 +328,22 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/ta-lib:
+    dependencies:
+      '@tv/data-types':
+        specifier: workspace:*
+        version: link:../data-types
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/bun':
+        specifier: ^1.1.14
+        version: 1.3.14
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

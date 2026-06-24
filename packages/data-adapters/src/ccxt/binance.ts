@@ -96,27 +96,35 @@ export class CcxtProvider implements DataProvider {
   }
 
   subscribe(symbol: Symbol, onBar: (b: Bar) => void): () => void {
-    if (!('watchOHLCV' in this.exchange)) {
-      throw new ProviderError(this.id, 'WebSocket not supported');
-    }
     let stopped = false;
-    const watch = async () => {
+    // Polling-based subscription. CCXT Binance doesn't expose watchOHLCV directly
+    // in this build; we poll every 5s, fetch the latest 2 bars, emit new ones.
+    // Cheap, reliable, and works without a long-lived WebSocket connection.
+    let lastTime = 0;
+    let backoffMs = 1000;
+    const tick = async () => {
       while (!stopped) {
         try {
-          const candles = await (this.exchange as unknown as { watchOHLCV: (s: string, tf: string) => Promise<number[][]> }).watchOHLCV(symbol.ticker, '1m');
-          for (const candle of candles) {
-            const [ts, o, h, l, c, v] = candle;
-            if (ts === undefined || o === undefined || h === undefined || l === undefined || c === undefined) continue;
-            onBar({ time: Math.floor(ts / 1000), open: o, high: h, low: l, close: c, volume: v ?? 0 });
+          const ohlcv = await this.exchange.fetchOHLCV(symbol.ticker, '1m', undefined, 2);
+          for (const c of ohlcv) {
+            const [ts, o, h, l, close, v] = c;
+            if (ts === undefined || o === undefined) continue;
+            const time = Math.floor(ts / 1000);
+            if (time > lastTime) {
+              onBar({ time, open: o, high: h ?? o, low: l ?? o, close: close ?? o, volume: v ?? 0 });
+              lastTime = time;
+            }
           }
+          backoffMs = 1000;
         } catch (e) {
-          if (stopped) break;
-          await new Promise((r) => setTimeout(r, 1000));
           void e;
+          await new Promise((r) => setTimeout(r, backoffMs));
+          backoffMs = Math.min(backoffMs * 2, 30_000);
         }
+        await new Promise((r) => setTimeout(r, 1000));
       }
     };
-    watch();
+    tick();
     return () => {
       stopped = true;
     };

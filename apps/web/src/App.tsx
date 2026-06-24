@@ -6,6 +6,7 @@ import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ChartPage } from './pages/ChartPage';
 import { AdminPage } from './pages/AdminPage';
+import { WatchlistsPage } from './pages/WatchlistsPage';
 
 function TopBar() {
   const { user, tenant } = useAuth();
@@ -18,6 +19,7 @@ function TopBar() {
           <nav>
             <Link to="/" className={loc.pathname === '/' ? 'active' : ''}>Dashboard</Link>
             <Link to="/chart" className={loc.pathname.startsWith('/chart') ? 'active' : ''}>Chart</Link>
+            <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>Watchlists</Link>
             {user.globalRole === 'super_admin' && (
               <Link to="/admin" className={loc.pathname === '/admin' ? 'active' : ''}>Admin</Link>
             )}
@@ -54,6 +56,7 @@ export function App() {
         <Route path="/" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/chart" element={<RequireAuth><ChartPage /></RequireAuth>} />
         <Route path="/chart/:symbol" element={<RequireAuth><ChartPage /></RequireAuth>} />
+        <Route path="/watchlists" element={<RequireAuth><WatchlistsPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
