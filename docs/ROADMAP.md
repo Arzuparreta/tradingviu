@@ -4,24 +4,24 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), and Slice 4 (alerts + portfolios + paper trading) are done and committed. Slice 5 is in progress — 5a (options engine) is done.** This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), and Slice 4 (alerts + portfolios + paper trading) are done and committed. Slice 5 is in progress — 5a (options engine) and 5b (broker adapters) are done.** This doc maps the full scope so you can keep building.
 
 ## Status
 
 > Slice numbers are 1-indexed and match the `docs/SLICE-N.md` files and the "What each slice delivers" section below.
 
-| Slice | Scope | Status |
-|---|---|---|
-| 1 | Foundation (monorepo, DB, auth, plans, charts) | ✅ done (`cf23b90`) |
-| 2 | Indicators (31), live WS bars, watchlists | ✅ done (`39a6465`) |
-| 3 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (`ac02b78`) |
-| 4 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ✅ done (`4fd3fd3`) |
-| 5 | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | 🚧 in progress — 5a options engine done |
-| 6 | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener | pending |
-| 7 | Social (ideas, comments, follows, scripts marketplace, paid spaces) | pending |
-| 8 | Desktop (Tauri) + Mobile (React Native) + push notifications | pending |
-| 9 | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns | pending |
-| 10 | Public API + plugin SDK + ecosystem | pending |
+| Slice | Scope                                                                                                      | Status                                                       |
+| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)                                          |
+| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)                                          |
+| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)                                          |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                                          |
+| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | 🚧 in progress — 5a options engine + 5b broker adapters done |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | pending                                                      |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                                                      |
+| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                                      |
+| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                                      |
+| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                                      |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -48,25 +48,25 @@ These are **decisions, not suggestions**. A new agent must not change them witho
 
 ## Stack (locked)
 
-| Layer | Tech | Why |
-|---|---|---|
-| Language | TypeScript | Same language everywhere |
-| Frontend | Vite + React 18 + Zustand + TanStack Query | Fast build, simple state, server state caching |
-| Editor (Pine) | Monaco | Same as VS Code |
-| Charts | `tradingview/lightweight-charts` + custom plugin layer (footprint, TPO, replay) | Apache 2.0, render canvas, fastest option |
-| Desktop | Tauri 2 | 80% lighter than Electron |
-| Mobile | React Native + lightweight-charts wrapper | Sync 100% |
-| Backend | Hono on Bun (HTTP + WebSocket same process) | One runtime, native WS, fast cold start |
-| DB | PostgreSQL 16 + TimescaleDB + RLS | RLS for multi-tenant, hypertables for time series |
-| Cache/pubsub | Redis 7 | RT tick fanout, rate limit |
-| Object storage | MinIO | S3-compatible, self-hosted |
-| Search | Meilisearch | Fast, typo-tolerant, easy |
-| ORM | Drizzle | Type-safe SQL, no heavy ORM |
-| Auth | Argon2id + jose (HS256 JWT) | Modern, no third-party lock-in |
-| Billing | Stripe (scaffolded, optional) | Disabled without keys |
-| Build | pnpm + Turborepo | Fast, monorepo-native |
-| Tests | bun test + Playwright | Bun-native, fast |
-| CI | GitHub Actions (not set up yet) | Add when repo is public |
+| Layer          | Tech                                                                            | Why                                               |
+| -------------- | ------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Language       | TypeScript                                                                      | Same language everywhere                          |
+| Frontend       | Vite + React 18 + Zustand + TanStack Query                                      | Fast build, simple state, server state caching    |
+| Editor (Pine)  | Monaco                                                                          | Same as VS Code                                   |
+| Charts         | `tradingview/lightweight-charts` + custom plugin layer (footprint, TPO, replay) | Apache 2.0, render canvas, fastest option         |
+| Desktop        | Tauri 2                                                                         | 80% lighter than Electron                         |
+| Mobile         | React Native + lightweight-charts wrapper                                       | Sync 100%                                         |
+| Backend        | Hono on Bun (HTTP + WebSocket same process)                                     | One runtime, native WS, fast cold start           |
+| DB             | PostgreSQL 16 + TimescaleDB + RLS                                               | RLS for multi-tenant, hypertables for time series |
+| Cache/pubsub   | Redis 7                                                                         | RT tick fanout, rate limit                        |
+| Object storage | MinIO                                                                           | S3-compatible, self-hosted                        |
+| Search         | Meilisearch                                                                     | Fast, typo-tolerant, easy                         |
+| ORM            | Drizzle                                                                         | Type-safe SQL, no heavy ORM                       |
+| Auth           | Argon2id + jose (HS256 JWT)                                                     | Modern, no third-party lock-in                    |
+| Billing        | Stripe (scaffolded, optional)                                                   | Disabled without keys                             |
+| Build          | pnpm + Turborepo                                                                | Fast, monorepo-native                             |
+| Tests          | bun test + Playwright                                                           | Bun-native, fast                                  |
+| CI             | GitHub Actions (not set up yet)                                                 | Add when repo is public                           |
 
 ## Monorepo layout
 
@@ -130,6 +130,7 @@ tradingviu/
 ## What each slice delivers
 
 ### Slice 1 (done) — Foundation
+
 - Multi-tenant DB with RLS (Postgres+TimescaleDB)
 - Signup/login (Argon2id + JWT)
 - Public sign-up with auto-provisioned tenant; first signup = super admin
@@ -142,6 +143,7 @@ tradingviu/
 - Docker Compose for self-hosting
 
 ### Slice 2 (done) — Indicators + Live bars + Watchlists
+
 - `packages/ta-lib` with 31 indicators (overlap, momentum, volatility, volume, trend)
 - Zod-validated parameters
 - 15 unit tests
@@ -153,7 +155,8 @@ tradingviu/
 - Chart UI: interval selector, indicator dropdown, multi-pane with bands, WS live updates
 
 ### Slice 3 (done) — Pine Script + Multi-chart + Search
-- **Pine Script v5 subset parser** — PEG grammar (peggy) → AST. Subset: indicators, plots, plotshape, inputs, request.security, ta.* builtins, simple strategies.
+
+- **Pine Script v5 subset parser** — PEG grammar (peggy) → AST. Subset: indicators, plots, plotshape, inputs, request.security, ta.\* builtins, simple strategies.
 - **Pine interpreter** — AST-walk in TS, sandboxed, no eval.
 - **Pine editor** — Monaco with autocomplete (LSP-style).
 - **Multi-chart layout** — 1/2/4/8/16 charts per tab, symbol/timeframe sync.
@@ -162,6 +165,7 @@ tradingviu/
 - **Layouts persistence** — save/load workspace configurations.
 
 ### Slice 4 (done) — Alerts + Portfolios + Paper trading
+
 - Alert engine: price, indicator, multi-condition evaluator
 - Channels: in-app delivered now; email/webhook recorded for future workers
 - Alerts CRUD + manual evaluation endpoint + alert history
@@ -171,12 +175,14 @@ tradingviu/
 - No DB migration was required: the foundation schema already contained the tenant-scoped tables.
 
 ### Slice 5 (in progress) — Brokers + DOM + Options
+
 - **5a (done) — Options engine:** Black-Scholes pricing, full greeks, implied volatility, option chain, 13-strategy builder (verticals, straddle/strangle, condors, butterflies), expiration payoff (max profit/loss, breakevens, net greeks). Pure `packages/options-engine` + `/api/options/*` + `OptionsPage`. See `docs/SLICE-5.md`.
-- 5b (pending) — Alpaca, IBKR (Client Portal API), Binance live trading adapters
+- **5b (done) — Broker adapters:** `packages/broker-adapters` with Alpaca, Binance Spot/Testnet, and IBKR Client Portal adapters; tenant-scoped `/api/brokers/*` connection routes; libsodium-encrypted credentials in `broker_connections.credentials_encrypted`; `BrokersPage` for connect/test/accounts/positions/orders.
 - 5c (pending) — DOM (depth of market) and chart trading
 - Later — volatility surface, P&L profile across time/vol (not just at expiration)
 
 ### Slice 6 — News + Calendars + Screener
+
 - News aggregator (NewsAPI, Finnhub, Benzinga)
 - Brand news by symbol
 - Calendars: earnings, economic, dividends
@@ -185,16 +191,19 @@ tradingviu/
 - Screener with 400+ filters, auto-refresh
 
 ### Slice 7 — Social
+
 - Ideas (chart snapshot + text)
 - Comments, likes, follows
 - Scripts marketplace (public/invite-only/protected/paid)
 - Paid Spaces (subscription channels)
 
 ### Slice 8 — Desktop + Mobile
+
 - Tauri 2: multi-monitor, system tray, native push
 - React Native: iOS + Android, full sync
 
 ### Slice 9 — Advanced TA
+
 - Volume Footprint (candle-by-candle volume distribution)
 - TPO (Time Price Opportunity)
 - Bar Replay multi-chart
@@ -203,6 +212,7 @@ tradingviu/
 - Ichimoku cloud rendering
 
 ### Slice 10 — Ecosystem
+
 - Public REST + WebSocket API
 - OpenAPI spec
 - Webhook out
@@ -212,6 +222,7 @@ tradingviu/
 ## Working with this codebase
 
 ### Quick local dev
+
 ```bash
 # 1. Start infrastructure
 docker compose -f infra/docker-compose.yml up -d postgres redis
@@ -232,6 +243,7 @@ pnpm dev
 ```
 
 ### Testing E2E
+
 ```bash
 # Run any .sh test script in /tmp/ for E2E
 bash /tmp/run-e2e.sh        # slice 1 tests
@@ -241,33 +253,33 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 
 ### Key files to know
 
-| File | What it does |
-|---|---|
-| `apps/server/src/index.ts` | Server entrypoint, route mounting, WS upgrade |
-| `apps/server/src/middleware/tenant.ts` | JWT verify + transactional RLS context (the most subtle code) |
-| `apps/server/src/middleware/super-admin.ts` | Same but bypasses RLS (gated by `claims.sa`) |
-| `apps/server/src/middleware/error.ts` | TvError → JSON response |
-| `apps/server/src/routes/auth.ts` | Signup, login, /me — uses admin connection for cross-tenant inserts |
-| `apps/server/src/routes/alerts.ts` | Alerts CRUD, evaluation, and history |
-| `apps/server/src/routes/portfolios.ts` | Portfolios, transactions, holdings rebuild, P&L metrics |
-| `apps/server/src/routes/paper.ts` | Paper accounts and market/limit paper orders |
-| `apps/server/src/routes/options.ts` | Stateless options pricing/chain/strategy endpoints |
-| `packages/options-engine/src/black-scholes.ts` | BS pricing, greeks, implied vol |
-| `packages/options-engine/src/strategy.ts` | Strategy templates + payoff/greeks analysis |
-| `apps/web/src/pages/OptionsPage.tsx` | Options strategy builder + SVG payoff diagram |
-| `apps/server/src/services/ws.ts` | WebSocket handlers, broadcast, CCXT subscribe |
-| `apps/server/src/services/alert-engine.ts` | Pure alert condition evaluator |
-| `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic |
-| `apps/server/src/services/paper-trading.ts` | Pure paper fill model |
-| `apps/server/src/services/data.ts` | CCXT provider registry |
-| `apps/web/src/pages/ChartPage.tsx` | The chart UI: indicators, live bars, multi-pane |
-| `apps/web/src/pages/WatchlistsPage.tsx` | Watchlist CRUD UI |
-| `packages/db/src/rls-policies.ts` | Full RLS policy definitions |
-| `packages/db/src/seed.ts` | Plan + exchange + symbol seed |
-| `packages/ta-lib/src/registry.ts` | All 31 indicators with their params |
-| `packages/auth/src/signup.ts` | Signup flow (chicken-and-egg tenant context) |
-| `infra/postgres-init/02-app-role.sql` | Creates the `tv_app` role that respects RLS |
-| `.env.example` | All env vars documented |
+| File                                           | What it does                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `apps/server/src/index.ts`                     | Server entrypoint, route mounting, WS upgrade                       |
+| `apps/server/src/middleware/tenant.ts`         | JWT verify + transactional RLS context (the most subtle code)       |
+| `apps/server/src/middleware/super-admin.ts`    | Same but bypasses RLS (gated by `claims.sa`)                        |
+| `apps/server/src/middleware/error.ts`          | TvError → JSON response                                             |
+| `apps/server/src/routes/auth.ts`               | Signup, login, /me — uses admin connection for cross-tenant inserts |
+| `apps/server/src/routes/alerts.ts`             | Alerts CRUD, evaluation, and history                                |
+| `apps/server/src/routes/portfolios.ts`         | Portfolios, transactions, holdings rebuild, P&L metrics             |
+| `apps/server/src/routes/paper.ts`              | Paper accounts and market/limit paper orders                        |
+| `apps/server/src/routes/options.ts`            | Stateless options pricing/chain/strategy endpoints                  |
+| `packages/options-engine/src/black-scholes.ts` | BS pricing, greeks, implied vol                                     |
+| `packages/options-engine/src/strategy.ts`      | Strategy templates + payoff/greeks analysis                         |
+| `apps/web/src/pages/OptionsPage.tsx`           | Options strategy builder + SVG payoff diagram                       |
+| `apps/server/src/services/ws.ts`               | WebSocket handlers, broadcast, CCXT subscribe                       |
+| `apps/server/src/services/alert-engine.ts`     | Pure alert condition evaluator                                      |
+| `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic                                     |
+| `apps/server/src/services/paper-trading.ts`    | Pure paper fill model                                               |
+| `apps/server/src/services/data.ts`             | CCXT provider registry                                              |
+| `apps/web/src/pages/ChartPage.tsx`             | The chart UI: indicators, live bars, multi-pane                     |
+| `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                   |
+| `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                         |
+| `packages/db/src/seed.ts`                      | Plan + exchange + symbol seed                                       |
+| `packages/ta-lib/src/registry.ts`              | All 31 indicators with their params                                 |
+| `packages/auth/src/signup.ts`                  | Signup flow (chicken-and-egg tenant context)                        |
+| `infra/postgres-init/02-app-role.sql`          | Creates the `tv_app` role that respects RLS                         |
+| `.env.example`                                 | All env vars documented                                             |
 
 ### Common pitfalls
 
@@ -307,9 +319,10 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 ## Success criteria for the next agent
 
 When you pick up this repo, you should be able to:
+
 1. Read this file and know exactly where the project is and where to go next.
 2. Run `pnpm install && pnpm dev` and see the dashboard, chart with live bars, and watchlists.
-3. Continue slice 5 — either 5b (broker adapters: Alpaca/IBKR/Binance live trading) or 5c (DOM + chart trading). Options analytics (5a) are done; reuse the `packages/options-engine` + stateless-route pattern.
+3. Continue slice 5 with 5c (DOM + chart trading). Options analytics (5a) and broker adapters/connections (5b) are done.
 4. Not have to re-discover the RLS/transactions gotcha — it's documented here.
 
 If something is unclear, fix the docs. If something is broken, fix the code. If something is missing, build it.

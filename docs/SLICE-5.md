@@ -3,10 +3,10 @@
 Slice 5 ("trading desk") is being delivered in sequenced pieces:
 
 1. **5a — Options engine (pricing + greeks + strategy builder + payoff)** ✅ (this commit)
-2. 5b — Broker adapters (Alpaca, IBKR Client Portal, Binance live) — pending
+2. **5b — Broker adapters (Alpaca, IBKR Client Portal, Binance live)** ✅
 3. 5c — DOM (depth of market) + chart trading — pending
 
-The options engine ships first because it is pure, deterministic math: no broker credentials, no live connections, fully unit-tested. The live-trading pieces (5b/5c) require real API keys and are scaffolded under `packages/broker-adapters` for later.
+The options engine shipped first because it is pure, deterministic math. Broker adapters are now in place behind encrypted tenant-scoped connections. The next trading-desk slice is DOM + chart trading on top of the broker connection surface.
 
 ---
 
@@ -20,13 +20,13 @@ A self-hosted options analytics stack: Black-Scholes-Merton pricing, the full gr
 
 Pure TypeScript, zero runtime dependencies. Mirrors the `@tv/ta-lib` shape (engine package consumed by a server route).
 
-| File | What it does |
-|---|---|
+| File                   | What it does                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/black-scholes.ts` | `normCdf` (A&S 26.2.17), `optionPrice`, `optionGreeks` (delta/gamma/theta/vega/rho with continuous dividend yield), `impliedVolatility` (bisection), `intrinsicValue` |
-| `src/chain.ts` | `buildChain` — call/put quotes (price, intrinsic, extrinsic, greeks) per strike per expiry; auto-generates "nice" strikes around spot when none given |
-| `src/strategy.ts` | 13 strategy templates, `priceLeg`, `analyzeStrategy` (payoff curve, net greeks, max profit/loss, breakevens), `buildAndAnalyze` |
-| `src/types.ts` | `OptionType`, `OptionSide`, `Greeks`, `BsInput` |
-| `src/options.test.ts` | 10 tests — textbook BS values, put-call parity, greeks, IV round-trip, chain symmetry, bull-call-spread + straddle payoff math |
+| `src/chain.ts`         | `buildChain` — call/put quotes (price, intrinsic, extrinsic, greeks) per strike per expiry; auto-generates "nice" strikes around spot when none given                 |
+| `src/strategy.ts`      | 13 strategy templates, `priceLeg`, `analyzeStrategy` (payoff curve, net greeks, max profit/loss, breakevens), `buildAndAnalyze`                                       |
+| `src/types.ts`         | `OptionType`, `OptionSide`, `Greeks`, `BsInput`                                                                                                                       |
+| `src/options.test.ts`  | 10 tests — textbook BS values, put-call parity, greeks, IV round-trip, chain symmetry, bull-call-spread + straddle payoff math                                        |
 
 **Greek units:** the engine returns canonical partials — `theta` per year, `vega`/`rho` per 1.00 (100%) move. The UI scales them for traders (theta ÷ 365, vega/rho ÷ 100).
 
@@ -62,11 +62,39 @@ import { buildAndAnalyze, optionPrice } from '@tv/options-engine';
 optionPrice({ type: 'call', spot: 100, strike: 100, timeToExpiry: 1, rate: 0.05, volatility: 0.2 });
 // → 10.4506 (textbook)
 
-buildAndAnalyze('iron_condor', { spot: 100, rate: 0.05, volatility: 0.3, timeToExpiry: 30 / 365, width: 5 });
+buildAndAnalyze('iron_condor', {
+  spot: 100,
+  rate: 0.05,
+  volatility: 0.3,
+  timeToExpiry: 30 / 365,
+  width: 5,
+});
 // → { legs, netDebit (credit), payoff, netGreeks, maxProfit, maxLoss, breakevens }
 ```
 
-## What's next (5b/5c)
+## 5b — Broker adapters
 
-- `packages/broker-adapters`: Alpaca (REST + WS), IBKR Client Portal Gateway, Binance live trading. Credentials encrypted with `CRED_ENC_KEY` (already in env).
-- DOM + chart trading: order ticket on the chart, depth ladder, bracket orders. Reuse the paper-trading fill model for simulated brokers.
+### What it delivers
+
+- `packages/broker-adapters` with a common `BrokerAdapter` contract.
+- Alpaca REST adapter for paper/live accounts, positions, orders, cancel, health.
+- Binance Spot adapter for testnet/live signed account, balance-as-position, orders, cancel, health.
+- IBKR Client Portal Gateway adapter for auth status, accounts, positions, orders, cancel.
+- Zod contracts in `packages/core/src/broker-schemas.ts`.
+- Tenant-scoped `/api/brokers/*` routes:
+  - `GET/POST /api/brokers/connections`
+  - `PATCH/DELETE /api/brokers/connections/:id`
+  - `POST /api/brokers/connections/:id/test`
+  - `GET /api/brokers/connections/:id/accounts`
+  - `GET /api/brokers/connections/:id/positions`
+  - `POST /api/brokers/connections/:id/orders`
+- Credentials are encrypted at rest with libsodium secretbox using `CRED_ENC_KEY` before writing `broker_connections.credentials_encrypted`.
+- `apps/web/src/pages/BrokersPage.tsx` provides connect/test/accounts/positions/order placement UI.
+
+### Tests
+
+`pnpm --filter @tv/broker-adapters test` uses mocked `fetch` only. No real broker network calls.
+
+## What's next (5c)
+
+- DOM + chart trading: order ticket on the chart, depth ladder, bracket orders. Reuse the paper-trading fill model for simulated brokers and the 5b broker connection routes for live submission.

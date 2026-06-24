@@ -218,6 +218,61 @@ export interface PaperOrder {
   };
 }
 
+export type BrokerId = 'alpaca' | 'ibkr' | 'binance';
+export type BrokerConnectionStatus = 'connected' | 'error' | 'disabled';
+
+export interface BrokerConnection {
+  id: string;
+  broker: BrokerId;
+  label: string | null;
+  accountId: string | null;
+  status: BrokerConnectionStatus;
+  lastSyncAt: string | null;
+  createdAt: string;
+}
+
+export interface BrokerHealth {
+  broker: BrokerId;
+  ok: boolean;
+  latencyMs: number;
+  message?: string;
+}
+
+export interface BrokerAccount {
+  id: string;
+  broker: BrokerId;
+  name: string;
+  currency: string;
+  equity: number;
+  cash: number;
+  buyingPower: number;
+  status: string;
+}
+
+export interface BrokerPosition {
+  broker: BrokerId;
+  accountId?: string;
+  symbol: string;
+  quantity: number;
+  averagePrice?: number;
+  marketPrice?: number;
+  marketValue?: number;
+  unrealizedPnl?: number;
+}
+
+export interface BrokerOrder {
+  id: string;
+  broker: BrokerId;
+  accountId?: string;
+  symbol: string;
+  side: 'buy' | 'sell';
+  type: 'market' | 'limit';
+  quantity: number;
+  limitPrice?: number;
+  status: 'new' | 'partially_filled' | 'filled' | 'canceled' | 'rejected' | 'expired';
+  submittedAt?: string;
+}
+
 export type OptionType = 'call' | 'put';
 export type OptionSide = 'long' | 'short';
 export type StrategyTemplate =

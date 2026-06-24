@@ -19,6 +19,7 @@ import { alertRoutes } from './routes/alerts.js';
 import { portfolioRoutes } from './routes/portfolios.js';
 import { paperRoutes } from './routes/paper.js';
 import { optionsRoutes } from './routes/options.js';
+import { brokerRoutes } from './routes/brokers.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
 import { errorHandler } from './middleware/error.js';
@@ -36,7 +37,14 @@ const app = new Hono();
 
 app.use('*', logger());
 app.use('*', secureHeaders());
-app.use('*', cors({ origin: env.CORS_ORIGIN, credentials: true, allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] }));
+app.use(
+  '*',
+  cors({
+    origin: env.CORS_ORIGIN,
+    credentials: true,
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  }),
+);
 
 app.onError(errorHandler);
 
@@ -59,6 +67,7 @@ app.route('/api', alertRoutes);
 app.route('/api', portfolioRoutes);
 app.route('/api', paperRoutes);
 app.route('/api', optionsRoutes);
+app.route('/api', brokerRoutes);
 app.route('/api', billingRoutes);
 
 const port = env.API_PORT;

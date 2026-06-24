@@ -32,6 +32,9 @@ importers:
       '@tv/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@tv/broker-adapters':
+        specifier: workspace:*
+        version: link:../../packages/broker-adapters
       '@tv/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -68,6 +71,9 @@ importers:
       hono:
         specifier: ^4.6.14
         version: 4.12.27
+      libsodium-wrappers:
+        specifier: ^0.8.4
+        version: 0.8.4
       meilisearch:
         specifier: ^0.45.0
         version: 0.45.0
@@ -217,6 +223,25 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/broker-adapters:
+    dependencies:
+      '@tv/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/bun':
+        specifier: ^1.1.14
+        version: 1.3.14
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/chart-engine:
     dependencies:
       lightweight-charts:
@@ -285,6 +310,9 @@ importers:
       ccxt:
         specifier: ^4.4.62
         version: 4.5.59
+      protobufjs:
+        specifier: ^8.6.5
+        version: 8.6.5
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -1534,8 +1562,17 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  libsodium-wrappers@0.8.4:
+    resolution: {integrity: sha512-mu8aAWucZjTB5O/BtGXtW4e1agy7uHxNYG7zPthmmD1jU43LCDmSWZLN4JhflbdPXj3yDO4lxM1O9hLDgIOXDw==}
+
+  libsodium@0.8.4:
+    resolution: {integrity: sha512-lMcYaRi0zcs7tarATsQUYC7rstliIXZuoq0c6zXSgNtSNtdvBgkSegjWhpMJAXzKX3SUSwIp7+zEsob+j3LuRw==}
+
   lightweight-charts@5.2.0:
     resolution: {integrity: sha512-ey3Vas8UhV06ni+LT9TA1nEe4y8So4Mi6CL/oarNHFMyTktz/xy8e8+oh04Q//eO3t6etvFXgayz2fClyFQb5w==}
+
+  long@5.3.2:
+    resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
@@ -1602,6 +1639,10 @@ packages:
     resolution: {integrity: sha512-N2MylSdi48+5N/6S5j+maeHbUSIzzZ5uOcX5Hm4QpV8Dkb1HFjfAKTKX6yNPJQD9AhcT3ifHNB66tWTTJDi11Q==}
     engines: {node: '>=14'}
     hasBin: true
+
+  protobufjs@8.6.5:
+    resolution: {integrity: sha512-zeE5LPpencAGXvsxyOYmEgJhxzHY8IsmPAFzstZVhDSVT8QH03q6gMZwZRaQGApevZbAL6u28ugs4CC+YKB2jQ==}
+    engines: {node: '>=12.0.0'}
 
   qs@6.15.2:
     resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
@@ -2667,9 +2708,17 @@ snapshots:
 
   json5@2.2.3: {}
 
+  libsodium-wrappers@0.8.4:
+    dependencies:
+      libsodium: 0.8.4
+
+  libsodium@0.8.4: {}
+
   lightweight-charts@5.2.0:
     dependencies:
       fancy-canvas: 2.1.0
+
+  long@5.3.2: {}
 
   loose-envify@1.4.0:
     dependencies:
@@ -2716,6 +2765,10 @@ snapshots:
   postgres@3.4.9: {}
 
   prettier@3.8.4: {}
+
+  protobufjs@8.6.5:
+    dependencies:
+      long: 5.3.2
 
   qs@6.15.2:
     dependencies:
