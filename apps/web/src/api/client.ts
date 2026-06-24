@@ -27,6 +27,9 @@ import type {
   NewsArticle,
   EarningsEvent,
   EconomicEvent,
+  ScreenerPreset,
+  ScreenerQuery,
+  ScreenerResult,
   PriceAlertCondition,
   OptionPriceResult,
   StrategyAnalysis,
@@ -80,10 +83,16 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return (await res.json()) as T;
 };
 
-const queryString = (params: Record<string, string | number | undefined>): string => {
+const queryString = (params: object): string => {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') search.set(key, String(value));
+    if (
+      (typeof value === 'string' && value !== '') ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      search.set(key, String(value));
+    }
   }
   const raw = search.toString();
   return raw ? `?${raw}` : '';
@@ -372,6 +381,22 @@ export const api = {
       limit?: number;
     } = {},
   ) => request<{ events: EconomicEvent[] }>(`/api/calendars/economic${queryString(params)}`),
+  screener: (params: ScreenerQuery = {}) =>
+    request<{ results: ScreenerResult[] }>(`/api/screener${queryString(params)}`),
+  screenerPresets: (params: { assetClass?: string } = {}) =>
+    request<{ presets: ScreenerPreset[] }>(`/api/screener/presets${queryString(params)}`),
+  createScreenerPreset: (body: {
+    name: string;
+    assetClass?: string;
+    query: ScreenerQuery;
+    isPublic?: boolean;
+  }) =>
+    request<{ id: string }>('/api/screener/presets', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteScreenerPreset: (id: string) =>
+    request<{ ok: true }>(`/api/screener/presets/${id}`, { method: 'DELETE' }),
 };
 
 export type {
@@ -389,6 +414,8 @@ export type {
   NewsArticle,
   EarningsEvent,
   EconomicEvent,
+  ScreenerPreset,
+  ScreenerResult,
 };
 
 export { ApiError };

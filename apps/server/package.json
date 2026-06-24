@@ -25,6 +25,7 @@
     "@tv/pine-parser": "workspace:*",
     "@tv/pine-runtime": "workspace:*",
     "@tv/quotas": "workspace:*",
+    "@tv/screener-engine": "workspace:*",
     "@tv/ta-lib": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.6.14",

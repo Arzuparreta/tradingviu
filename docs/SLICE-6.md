@@ -21,10 +21,28 @@ Notes:
 - No DB migration was required.
 - External provider ingestion is intentionally not part of 6a. The next cut should add deterministic adapter interfaces and mocked tests before wiring real providers.
 
+## 6b — Screener Engine + Saved Presets
+
+Status: done.
+
+Delivered:
+
+- `packages/screener-engine` with SQL filter builders, stable metric catalog, sort helpers, and metadata metric extraction.
+- `GET /api/screener` over global `symbols` joined to `exchanges`, with filters for text, asset class, exchange, country, sector, active state, and metric min/max ranges.
+- Tenant-scoped `/api/screener/presets` CRUD over the existing `screener_presets` table.
+- Zod schemas for screener queries and preset payloads in `packages/core/src/discovery-schemas.ts`.
+- `/discovery` web screener panel with compact filters, result table, save preset, load preset, and delete preset actions.
+- Seeded demo symbol metrics in `symbols.metadata` for AAPL/MSFT so clean installs show screener results without network access.
+
+Notes:
+
+- No DB migration was required. This cut intentionally reads fundamentals-like metrics from `symbols.metadata` until Slice 6 adds a dedicated fundamentals time-series table.
+- Presets are tenant-scoped and filtered by RLS like other tenant data.
+
 ## Remaining Slice 6 Work
 
 - News provider adapters and scheduled ingestion.
 - Dividend calendar.
 - Yield curves and macroeconomic series.
 - Fundamentals storage and API.
-- Screener engine and saved presets.
+- Expand screener to dedicated fundamentals storage once that table exists.

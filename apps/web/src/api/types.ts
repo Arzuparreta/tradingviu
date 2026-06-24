@@ -327,6 +327,67 @@ export interface EconomicEvent {
   previous: string | null;
 }
 
+export type ScreenerMetric =
+  | 'marketCap'
+  | 'peRatio'
+  | 'eps'
+  | 'revenue'
+  | 'dividendYield'
+  | 'roe'
+  | 'revenueGrowth'
+  | 'earningsGrowth'
+  | 'beta'
+  | '52WeekHigh'
+  | '52WeekLow';
+
+export type ScreenerSortField = 'ticker' | 'name' | 'exchange' | 'assetClass' | ScreenerMetric;
+
+export interface ScreenerQuery {
+  q?: string;
+  assetClass?: string;
+  exchange?: string;
+  country?: string;
+  sector?: string;
+  active?: boolean;
+  marketCapMin?: number;
+  marketCapMax?: number;
+  peRatioMin?: number;
+  peRatioMax?: number;
+  dividendYieldMin?: number;
+  dividendYieldMax?: number;
+  revenueGrowthMin?: number;
+  revenueGrowthMax?: number;
+  sort?: ScreenerSortField;
+  direction?: 'asc' | 'desc';
+  limit?: number;
+}
+
+export interface ScreenerResult {
+  id: string;
+  ticker: string;
+  name: string;
+  assetClass: string;
+  currency: string;
+  country: string | null;
+  sector: string | null;
+  industry: string | null;
+  active: boolean;
+  exchange: string;
+  metrics: Partial<Record<ScreenerMetric, number>>;
+}
+
+export interface ScreenerPreset {
+  id: string;
+  tenantId: string;
+  userId: string;
+  name: string;
+  assetClass: string;
+  query: ScreenerQuery;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type OptionType = 'call' | 'put';
 export type OptionSide = 'long' | 'short';
 export type StrategyTemplate =

@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { EconomicEvent, EarningsEvent, NewsArticle } from '../api/types';
+import type {
+  EconomicEvent,
+  EarningsEvent,
+  NewsArticle,
+  ScreenerQuery,
+  ScreenerResult,
+} from '../api/types';
 
 type Importance = '' | 'low' | 'medium' | 'high';
 
@@ -18,6 +24,43 @@ const timeOnly = (value: string): string =>
   );
 
 const compact = (value: string | null): string => value ?? '—';
+
+const metric = (value: number | undefined, mode: 'compact' | 'ratio' | 'percent' = 'ratio') => {
+  if (value === undefined) return '—';
+  if (mode === 'percent') return `${(value * 100).toFixed(1)}%`;
+  if (mode === 'compact') {
+    return new Intl.NumberFormat(undefined, {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(value);
+  }
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+};
+
+const numeric = (value: string): number | undefined => {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+function ScreenerRow({ result }: { result: ScreenerResult }) {
+  return (
+    <tr>
+      <td>
+        <strong>{result.ticker}</strong>
+        <div className="muted small">{result.exchange}</div>
+      </td>
+      <td>
+        {result.name}
+        <div className="muted small">{result.sector ?? result.assetClass}</div>
+      </td>
+      <td className="mono">{metric(result.metrics.marketCap, 'compact')}</td>
+      <td className="mono">{metric(result.metrics.peRatio)}</td>
+      <td className="mono">{metric(result.metrics.dividendYield, 'percent')}</td>
+      <td className="mono">{metric(result.metrics.revenueGrowth, 'percent')}</td>
+    </tr>
+  );
+}
 
 function ArticleRow({ article }: { article: NewsArticle }) {
   return (
@@ -95,14 +138,40 @@ function EconomicRow({ event }: { event: EconomicEvent }) {
 }
 
 export function DiscoveryPage() {
+  const queryClient = useQueryClient();
   const [symbol, setSymbol] = useState('');
   const [country, setCountry] = useState('US');
   const [importance, setImportance] = useState<Importance>('');
   const [query, setQuery] = useState('');
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
+  const [screenerText, setScreenerText] = useState('');
+  const [assetClass, setAssetClass] = useState('stock');
+  const [sector, setSector] = useState('');
+  const [marketCapMin, setMarketCapMin] = useState('1000000000');
+  const [peRatioMax, setPeRatioMax] = useState('40');
+  const [dividendYieldMin, setDividendYieldMin] = useState('');
+  const [presetName, setPresetName] = useState('Large cap quality');
 
   const range = useMemo(() => ({ from, to }), [from, to]);
+  const screenerParams = useMemo((): ScreenerQuery => {
+    const params: ScreenerQuery = {
+      assetClass,
+      sort: 'marketCap',
+      direction: 'desc',
+      limit: 50,
+    };
+    if (screenerText.trim()) params.q = screenerText.trim();
+    if (sector.trim()) params.sector = sector.trim();
+    const parsedMarketCapMin = numeric(marketCapMin);
+    const parsedPeRatioMax = numeric(peRatioMax);
+    const parsedDividendYieldMin = numeric(dividendYieldMin);
+    if (parsedMarketCapMin !== undefined) params.marketCapMin = parsedMarketCapMin;
+    if (parsedPeRatioMax !== undefined) params.peRatioMax = parsedPeRatioMax;
+    if (parsedDividendYieldMin !== undefined) params.dividendYieldMin = parsedDividendYieldMin;
+    return params;
+  }, [assetClass, dividendYieldMin, marketCapMin, peRatioMax, screenerText, sector]);
+
   const newsQ = useQuery({
     queryKey: ['news', symbol, query, range],
     queryFn: () => api.news({ symbol, q: query, ...range, limit: 40 }),
@@ -121,6 +190,36 @@ export function DiscoveryPage() {
         limit: 80,
       }),
   });
+  const screenerQ = useQuery({
+    queryKey: ['screener', screenerParams],
+    queryFn: () => api.screener(screenerParams),
+  });
+  const presetsQ = useQuery({
+    queryKey: ['screener-presets', assetClass],
+    queryFn: () => api.screenerPresets({ assetClass }),
+  });
+  const savePreset = useMutation({
+    mutationFn: () =>
+      api.createScreenerPreset({
+        name: presetName,
+        assetClass,
+        query: screenerParams,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['screener-presets'] }),
+  });
+  const deletePreset = useMutation({
+    mutationFn: (id: string) => api.deleteScreenerPreset(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['screener-presets'] }),
+  });
+
+  const applyPreset = (next: ScreenerQuery) => {
+    setScreenerText(next.q ?? '');
+    setAssetClass(next.assetClass ?? 'stock');
+    setSector(next.sector ?? '');
+    setMarketCapMin(next.marketCapMin === undefined ? '' : String(next.marketCapMin));
+    setPeRatioMax(next.peRatioMax === undefined ? '' : String(next.peRatioMax));
+    setDividendYieldMin(next.dividendYieldMin === undefined ? '' : String(next.dividendYieldMin));
+  };
 
   return (
     <div className="page discovery-page">
@@ -171,6 +270,118 @@ export function DiscoveryPage() {
           <label>To</label>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
+      </section>
+
+      <section className="card discovery-screener">
+        <div className="row discovery-section-head">
+          <div>
+            <h2>Screener</h2>
+            <p className="muted small">
+              Symbols filtered by reference fields and metadata metrics.
+            </p>
+          </div>
+          <span className="grow" />
+          <span className="muted small">{screenerQ.data?.results.length ?? 0}</span>
+        </div>
+        <div className="discovery-screener-filters">
+          <div>
+            <label>Search</label>
+            <input
+              value={screenerText}
+              onChange={(e) => setScreenerText(e.target.value)}
+              placeholder="AAPL, software..."
+            />
+          </div>
+          <div>
+            <label>Asset</label>
+            <select value={assetClass} onChange={(e) => setAssetClass(e.target.value)}>
+              <option value="stock">Stock</option>
+              <option value="crypto">Crypto</option>
+              <option value="index">Index</option>
+              <option value="forex">Forex</option>
+            </select>
+          </div>
+          <div>
+            <label>Sector</label>
+            <input value={sector} onChange={(e) => setSector(e.target.value)} />
+          </div>
+          <div>
+            <label>Min market cap</label>
+            <input value={marketCapMin} onChange={(e) => setMarketCapMin(e.target.value)} />
+          </div>
+          <div>
+            <label>Max P/E</label>
+            <input value={peRatioMax} onChange={(e) => setPeRatioMax(e.target.value)} />
+          </div>
+          <div>
+            <label>Min dividend yield</label>
+            <input
+              value={dividendYieldMin}
+              onChange={(e) => setDividendYieldMin(e.target.value)}
+              placeholder="0.01"
+            />
+          </div>
+        </div>
+
+        <div className="row discovery-preset-row">
+          <input
+            aria-label="Preset name"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => savePreset.mutate()}
+            disabled={savePreset.isPending || !presetName.trim()}
+          >
+            Save preset
+          </button>
+          <div className="row discovery-preset-list">
+            {presetsQ.data?.presets.map((preset) => (
+              <span key={preset.id} className="discovery-preset-pill">
+                <button type="button" className="ghost" onClick={() => applyPreset(preset.query)}>
+                  {preset.name}
+                </button>
+                <button
+                  type="button"
+                  className="ghost discovery-preset-delete"
+                  onClick={() => deletePreset.mutate(preset.id)}
+                  disabled={deletePreset.isPending}
+                  aria-label={`Delete ${preset.name}`}
+                >
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {screenerQ.isLoading && <div className="card muted">Loading screener...</div>}
+        {screenerQ.isError && <div className="card down">Could not load screener.</div>}
+        {screenerQ.data?.results.length === 0 && (
+          <div className="card muted">No symbols match these filters.</div>
+        )}
+        {(screenerQ.data?.results.length ?? 0) > 0 && (
+          <div className="discovery-table-wrap">
+            <table className="discovery-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Name</th>
+                  <th>Market cap</th>
+                  <th>P/E</th>
+                  <th>Yield</th>
+                  <th>Rev growth</th>
+                </tr>
+              </thead>
+              <tbody>
+                {screenerQ.data?.results.map((result) => (
+                  <ScreenerRow key={result.id} result={result} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <div className="discovery-grid">

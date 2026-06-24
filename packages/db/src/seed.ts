@@ -1,7 +1,14 @@
 import { createDb } from './client.js';
 import { applyRls } from './rls-policies.js';
 import { and, eq } from 'drizzle-orm';
-import { earningsCalendar, economicEvents, newsArticles, plans, exchanges, symbols } from './schema/index.js';
+import {
+  earningsCalendar,
+  economicEvents,
+  newsArticles,
+  plans,
+  exchanges,
+  symbols,
+} from './schema/index.js';
 import { DEFAULT_FREE_QUOTAS, UNLIMITED_QUOTAS } from './schema/plans.js';
 import { ulid } from 'ulid';
 import postgres from 'postgres';
@@ -157,12 +164,54 @@ console.log('seeding exchanges...');
 await db
   .insert(exchanges)
   .values([
-    { id: ulid(), code: 'BINANCE', name: 'Binance', type: 'crypto', country: 'KY', url: 'https://binance.com' },
-    { id: ulid(), code: 'COINBASE', name: 'Coinbase', type: 'crypto', country: 'US', url: 'https://coinbase.com' },
-    { id: ulid(), code: 'KRAKEN', name: 'Kraken', type: 'crypto', country: 'US', url: 'https://kraken.com' },
-    { id: ulid(), code: 'BYBIT', name: 'Bybit', type: 'crypto', country: 'AE', url: 'https://bybit.com' },
-    { id: ulid(), code: 'NASDAQ', name: 'NASDAQ', type: 'stock', country: 'US', url: 'https://nasdaq.com' },
-    { id: ulid(), code: 'NYSE', name: 'NYSE', type: 'stock', country: 'US', url: 'https://nyse.com' },
+    {
+      id: ulid(),
+      code: 'BINANCE',
+      name: 'Binance',
+      type: 'crypto',
+      country: 'KY',
+      url: 'https://binance.com',
+    },
+    {
+      id: ulid(),
+      code: 'COINBASE',
+      name: 'Coinbase',
+      type: 'crypto',
+      country: 'US',
+      url: 'https://coinbase.com',
+    },
+    {
+      id: ulid(),
+      code: 'KRAKEN',
+      name: 'Kraken',
+      type: 'crypto',
+      country: 'US',
+      url: 'https://kraken.com',
+    },
+    {
+      id: ulid(),
+      code: 'BYBIT',
+      name: 'Bybit',
+      type: 'crypto',
+      country: 'AE',
+      url: 'https://bybit.com',
+    },
+    {
+      id: ulid(),
+      code: 'NASDAQ',
+      name: 'NASDAQ',
+      type: 'stock',
+      country: 'US',
+      url: 'https://nasdaq.com',
+    },
+    {
+      id: ulid(),
+      code: 'NYSE',
+      name: 'NYSE',
+      type: 'stock',
+      country: 'US',
+      url: 'https://nyse.com',
+    },
     { id: ulid(), code: 'TVC', name: 'TradingView Custom', type: 'index', country: 'XX' },
     { id: ulid(), code: 'CRYPTOCAP', name: 'CryptoCap', type: 'crypto', country: 'XX' },
   ])
@@ -178,17 +227,108 @@ if (binanceId && coinbaseId && krakenId) {
   await db
     .insert(symbols)
     .values([
-      { id: ulid(), exchangeId: binanceId, ticker: 'BTCUSDT', name: 'Bitcoin / TetherUS', assetClass: 'crypto', baseCurrency: 'BTC', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'ETHUSDT', name: 'Ethereum / TetherUS', assetClass: 'crypto', baseCurrency: 'ETH', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'SOLUSDT', name: 'Solana / TetherUS', assetClass: 'crypto', baseCurrency: 'SOL', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'BNBUSDT', name: 'BNB / TetherUS', assetClass: 'crypto', baseCurrency: 'BNB', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'XRPUSDT', name: 'XRP / TetherUS', assetClass: 'crypto', baseCurrency: 'XRP', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'DOGEUSDT', name: 'Dogecoin / TetherUS', assetClass: 'crypto', baseCurrency: 'DOGE', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'ADAUSDT', name: 'Cardano / TetherUS', assetClass: 'crypto', baseCurrency: 'ADA', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: binanceId, ticker: 'AVAXUSDT', name: 'Avalanche / TetherUS', assetClass: 'crypto', baseCurrency: 'AVAX', quoteCurrency: 'USDT' },
-      { id: ulid(), exchangeId: coinbaseId, ticker: 'BTCUSD', name: 'Bitcoin / US Dollar', assetClass: 'crypto', baseCurrency: 'BTC', quoteCurrency: 'USD', currency: 'USD' },
-      { id: ulid(), exchangeId: coinbaseId, ticker: 'ETHUSD', name: 'Ethereum / US Dollar', assetClass: 'crypto', baseCurrency: 'ETH', quoteCurrency: 'USD', currency: 'USD' },
-      { id: ulid(), exchangeId: krakenId, ticker: 'BTCUSD', name: 'Bitcoin / US Dollar (Kraken)', assetClass: 'crypto', baseCurrency: 'BTC', quoteCurrency: 'USD', currency: 'USD' },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'BTCUSDT',
+        name: 'Bitcoin / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'BTC',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'ETHUSDT',
+        name: 'Ethereum / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'ETH',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'SOLUSDT',
+        name: 'Solana / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'SOL',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'BNBUSDT',
+        name: 'BNB / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'BNB',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'XRPUSDT',
+        name: 'XRP / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'XRP',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'DOGEUSDT',
+        name: 'Dogecoin / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'DOGE',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'ADAUSDT',
+        name: 'Cardano / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'ADA',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: binanceId,
+        ticker: 'AVAXUSDT',
+        name: 'Avalanche / TetherUS',
+        assetClass: 'crypto',
+        baseCurrency: 'AVAX',
+        quoteCurrency: 'USDT',
+      },
+      {
+        id: ulid(),
+        exchangeId: coinbaseId,
+        ticker: 'BTCUSD',
+        name: 'Bitcoin / US Dollar',
+        assetClass: 'crypto',
+        baseCurrency: 'BTC',
+        quoteCurrency: 'USD',
+        currency: 'USD',
+      },
+      {
+        id: ulid(),
+        exchangeId: coinbaseId,
+        ticker: 'ETHUSD',
+        name: 'Ethereum / US Dollar',
+        assetClass: 'crypto',
+        baseCurrency: 'ETH',
+        quoteCurrency: 'USD',
+        currency: 'USD',
+      },
+      {
+        id: ulid(),
+        exchangeId: krakenId,
+        ticker: 'BTCUSD',
+        name: 'Bitcoin / US Dollar (Kraken)',
+        assetClass: 'crypto',
+        baseCurrency: 'BTC',
+        quoteCurrency: 'USD',
+        currency: 'USD',
+      },
     ])
     .onConflictDoNothing();
 }
@@ -197,18 +337,114 @@ if (nasdaqId) {
   await db
     .insert(symbols)
     .values([
-      { id: ulid(), exchangeId: nasdaqId, ticker: 'AAPL', name: 'Apple Inc.', assetClass: 'stock', currency: 'USD', country: 'US', sector: 'Technology', industry: 'Consumer Electronics' },
-      { id: ulid(), exchangeId: nasdaqId, ticker: 'MSFT', name: 'Microsoft Corporation', assetClass: 'stock', currency: 'USD', country: 'US', sector: 'Technology', industry: 'Software' },
+      {
+        id: ulid(),
+        exchangeId: nasdaqId,
+        ticker: 'AAPL',
+        name: 'Apple Inc.',
+        assetClass: 'stock',
+        currency: 'USD',
+        country: 'US',
+        sector: 'Technology',
+        industry: 'Consumer Electronics',
+        metadata: {
+          marketCap: 3_250_000_000_000,
+          peRatio: 31.4,
+          eps: 6.43,
+          revenue: 391_000_000_000,
+          dividendYield: 0.0048,
+          roe: 1.47,
+          revenueGrowth: 0.061,
+          earningsGrowth: 0.073,
+          beta: 1.18,
+          '52WeekHigh': 238.1,
+          '52WeekLow': 164.08,
+        },
+      },
+      {
+        id: ulid(),
+        exchangeId: nasdaqId,
+        ticker: 'MSFT',
+        name: 'Microsoft Corporation',
+        assetClass: 'stock',
+        currency: 'USD',
+        country: 'US',
+        sector: 'Technology',
+        industry: 'Software',
+        metadata: {
+          marketCap: 3_540_000_000_000,
+          peRatio: 35.8,
+          eps: 13.3,
+          revenue: 281_700_000_000,
+          dividendYield: 0.0065,
+          roe: 0.36,
+          revenueGrowth: 0.15,
+          earningsGrowth: 0.17,
+          beta: 0.92,
+          '52WeekHigh': 468.35,
+          '52WeekLow': 344.77,
+        },
+      },
     ])
     .onConflictDoNothing();
+
+  await db
+    .update(symbols)
+    .set({
+      metadata: {
+        marketCap: 3_250_000_000_000,
+        peRatio: 31.4,
+        eps: 6.43,
+        revenue: 391_000_000_000,
+        dividendYield: 0.0048,
+        roe: 1.47,
+        revenueGrowth: 0.061,
+        earningsGrowth: 0.073,
+        beta: 1.18,
+        '52WeekHigh': 238.1,
+        '52WeekLow': 164.08,
+      },
+    })
+    .where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'AAPL')));
+
+  await db
+    .update(symbols)
+    .set({
+      metadata: {
+        marketCap: 3_540_000_000_000,
+        peRatio: 35.8,
+        eps: 13.3,
+        revenue: 281_700_000_000,
+        dividendYield: 0.0065,
+        roe: 0.36,
+        revenueGrowth: 0.15,
+        earningsGrowth: 0.17,
+        beta: 0.92,
+        '52WeekHigh': 468.35,
+        '52WeekLow': 344.77,
+      },
+    })
+    .where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'MSFT')));
 }
 
 console.log('seeding discovery demo data...');
 const aapl = nasdaqId
-  ? (await db.select().from(symbols).where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'AAPL'))).limit(1))[0]
+  ? (
+      await db
+        .select()
+        .from(symbols)
+        .where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'AAPL')))
+        .limit(1)
+    )[0]
   : undefined;
 const msft = nasdaqId
-  ? (await db.select().from(symbols).where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'MSFT'))).limit(1))[0]
+  ? (
+      await db
+        .select()
+        .from(symbols)
+        .where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'MSFT')))
+        .limit(1)
+    )[0]
   : undefined;
 
 await db
@@ -241,8 +477,20 @@ if (aapl && msft) {
   await db
     .insert(earningsCalendar)
     .values([
-      { id: ulid(), symbolId: aapl.id, date: new Date('2026-07-02T20:00:00.000Z'), epsEstimate: '1.42', revenueEstimate: '89.3B' },
-      { id: ulid(), symbolId: msft.id, date: new Date('2026-07-09T20:00:00.000Z'), epsEstimate: '3.21', revenueEstimate: '69.8B' },
+      {
+        id: ulid(),
+        symbolId: aapl.id,
+        date: new Date('2026-07-02T20:00:00.000Z'),
+        epsEstimate: '1.42',
+        revenueEstimate: '89.3B',
+      },
+      {
+        id: ulid(),
+        symbolId: msft.id,
+        date: new Date('2026-07-09T20:00:00.000Z'),
+        epsEstimate: '3.21',
+        revenueEstimate: '69.8B',
+      },
     ])
     .onConflictDoNothing();
 }
@@ -251,7 +499,13 @@ const demoEconomicAt = new Date('2026-06-26T12:30:00.000Z');
 const [existingEconomicDemo] = await db
   .select({ id: economicEvents.id })
   .from(economicEvents)
-  .where(and(eq(economicEvents.country, 'US'), eq(economicEvents.eventAt, demoEconomicAt), eq(economicEvents.name, 'Core PCE Price Index')))
+  .where(
+    and(
+      eq(economicEvents.country, 'US'),
+      eq(economicEvents.eventAt, demoEconomicAt),
+      eq(economicEvents.name, 'Core PCE Price Index'),
+    ),
+  )
   .limit(1);
 
 if (!existingEconomicDemo) {
