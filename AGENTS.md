@@ -73,8 +73,6 @@ src/
 - Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
 - `pnpm lint && pnpm typecheck && pnpm test` must pass before work is considered done.
 
-Branching, PRs, merges, and pushes are left to the operator/harness — this doc does not prescribe a branch workflow.
-
 ## Testing
 
 - Unit tests with `bun test` (Bun native, fast).
