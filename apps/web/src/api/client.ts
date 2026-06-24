@@ -24,6 +24,7 @@ import type {
   BrokerHealth,
   BrokerOrder,
   BrokerPosition,
+  DividendEvent,
   NewsArticle,
   EarningsEvent,
   EconomicEvent,
@@ -372,6 +373,9 @@ export const api = {
   earningsCalendar: (
     params: { symbol?: string; from?: string; to?: string; limit?: number } = {},
   ) => request<{ events: EarningsEvent[] }>(`/api/calendars/earnings${queryString(params)}`),
+  dividendCalendar: (
+    params: { symbol?: string; from?: string; to?: string; limit?: number } = {},
+  ) => request<{ events: DividendEvent[] }>(`/api/calendars/dividends${queryString(params)}`),
   economicCalendar: (
     params: {
       country?: string;
@@ -411,6 +415,7 @@ export type {
   PortfolioRow,
   PaperAccount,
   BrokerConnection,
+  DividendEvent,
   NewsArticle,
   EarningsEvent,
   EconomicEvent,

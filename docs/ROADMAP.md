@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news, earnings/economic calendars, screener presets, and dividend calendar delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -17,7 +17,7 @@
 | 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)      |
 | 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)      |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                  |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b done) |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b/6c done) |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                  |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
 | 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                  |
@@ -185,6 +185,7 @@ tradingviu/
 
 - **6a (done) — News + calendars read surface:** Zod-validated `/api/news`, `/api/calendars/earnings`, and `/api/calendars/economic` endpoints over the existing global tables, seeded demo rows, and a `/discovery` web page with symbol/country/range filters. See `docs/SLICE-6.md`.
 - **6b (done) — Screener + saved presets:** `packages/screener-engine`, Zod-validated `/api/screener`, tenant-scoped `/api/screener/presets` CRUD, and a screener panel in `/discovery` backed by seeded demo symbol metrics. See `docs/SLICE-6.md`.
+- **6c (done) — Dividend calendar:** Global `dividend_calendar` table, RLS policies, Zod-validated `/api/calendars/dividends`, seeded AAPL/MSFT demo rows, and `/discovery` dividend panel. See `docs/SLICE-6.md`.
 - News aggregator (NewsAPI, Finnhub, Benzinga)
 - Brand news by symbol
 - Calendars: earnings, economic, dividends

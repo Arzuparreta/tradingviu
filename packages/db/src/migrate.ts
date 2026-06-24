@@ -1,9 +1,9 @@
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { createDb } from './client.js';
 
-const url = process.env.DATABASE_URL;
+const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
 if (!url) {
-  console.error('DATABASE_URL is required');
+  console.error('DATABASE_URL_ADMIN is required (or DATABASE_URL fallback)');
   process.exit(1);
 }
 

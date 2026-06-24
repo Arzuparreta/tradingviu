@@ -31,6 +31,8 @@ ALTER TABLE news_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news_articles FORCE ROW LEVEL SECURITY;
 ALTER TABLE earnings_calendar ENABLE ROW LEVEL SECURITY;
 ALTER TABLE earnings_calendar FORCE ROW LEVEL SECURITY;
+ALTER TABLE dividend_calendar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dividend_calendar FORCE ROW LEVEL SECURITY;
 ALTER TABLE economic_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE economic_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE provider_health ENABLE ROW LEVEL SECURITY;
@@ -69,9 +71,21 @@ CREATE POLICY news_write ON news_articles FOR ALL
 
 DROP POLICY IF EXISTS earnings_read ON earnings_calendar;
 CREATE POLICY earnings_read ON earnings_calendar FOR SELECT USING (true);
+DROP POLICY IF EXISTS earnings_write ON earnings_calendar;
+CREATE POLICY earnings_write ON earnings_calendar FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
+
+DROP POLICY IF EXISTS dividends_read ON dividend_calendar;
+CREATE POLICY dividends_read ON dividend_calendar FOR SELECT USING (true);
+DROP POLICY IF EXISTS dividends_write ON dividend_calendar;
+CREATE POLICY dividends_write ON dividend_calendar FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
 
 DROP POLICY IF EXISTS economic_read ON economic_events;
 CREATE POLICY economic_read ON economic_events FOR SELECT USING (true);
+DROP POLICY IF EXISTS economic_write ON economic_events;
+CREATE POLICY economic_write ON economic_events FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
 
 DROP POLICY IF EXISTS provider_health_read ON provider_health;
 CREATE POLICY provider_health_read ON provider_health FOR SELECT USING (is_super_admin());

@@ -39,10 +39,22 @@ Notes:
 - No DB migration was required. This cut intentionally reads fundamentals-like metrics from `symbols.metadata` until Slice 6 adds a dedicated fundamentals time-series table.
 - Presets are tenant-scoped and filtered by RLS like other tenant data.
 
+## 6c — Dividend Calendar
+
+Status: done.
+
+Delivered:
+
+- Global `dividend_calendar` table with symbol linkage, ex-date, record/payment/declaration dates, amount, currency, and frequency.
+- RLS policies matching the other global discovery tables: public read, super-admin write.
+- `GET /api/calendars/dividends` with symbol/date filters and symbol/exchange joins.
+- Zod query schema in `packages/core/src/discovery-schemas.ts`.
+- `/discovery` dividend calendar panel using the existing symbol/date filters.
+- Seeded demo dividend rows for AAPL/MSFT.
+
 ## Remaining Slice 6 Work
 
 - News provider adapters and scheduled ingestion.
-- Dividend calendar.
 - Yield curves and macroeconomic series.
 - Fundamentals storage and API.
 - Expand screener to dedicated fundamentals storage once that table exists.

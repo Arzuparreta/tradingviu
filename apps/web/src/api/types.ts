@@ -316,6 +316,23 @@ export interface EarningsEvent {
   };
 }
 
+export interface DividendEvent {
+  id: string;
+  exDate: string;
+  paymentDate: string | null;
+  recordDate: string | null;
+  declarationDate: string | null;
+  amount: string;
+  currency: string;
+  frequency: string | null;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}
+
 export interface EconomicEvent {
   id: string;
   country: string;

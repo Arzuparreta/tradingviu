@@ -2,11 +2,19 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from 'drizzle-orm';
 import {
+  DividendCalendarQuerySchema,
   EconomicCalendarQuerySchema,
   EarningsCalendarQuerySchema,
   NewsQuerySchema,
 } from '@tv/core';
-import { earningsCalendar, economicEvents, exchanges, newsArticles, symbols } from '@tv/db/schema';
+import {
+  dividendCalendar,
+  earningsCalendar,
+  economicEvents,
+  exchanges,
+  newsArticles,
+  symbols,
+} from '@tv/db/schema';
 
 const maybeWhere = (filters: readonly SQL[]): SQL | undefined =>
   filters.length > 0 ? and(...filters) : undefined;
@@ -87,6 +95,46 @@ export const discoveryRoutes = new Hono()
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
       .where(maybeWhere(filters))
       .orderBy(asc(earningsCalendar.date))
+      .limit(q.limit);
+
+    return c.json({ events: rows });
+  })
+  .get('/calendars/dividends', zValidator('query', DividendCalendarQuerySchema), async (c) => {
+    const q = c.req.valid('query');
+    const db = c.get('db');
+    const filters: SQL[] = [];
+
+    if (q.from) filters.push(gte(dividendCalendar.exDate, q.from));
+    if (q.to) filters.push(lte(dividendCalendar.exDate, q.to));
+    if (q.symbol) {
+      const like = `%${q.symbol}%`;
+      filters.push(
+        or(eq(symbols.id, q.symbol), ilike(symbols.ticker, like), ilike(symbols.name, like))!,
+      );
+    }
+
+    const rows = await db
+      .select({
+        id: dividendCalendar.id,
+        exDate: dividendCalendar.exDate,
+        paymentDate: dividendCalendar.paymentDate,
+        recordDate: dividendCalendar.recordDate,
+        declarationDate: dividendCalendar.declarationDate,
+        amount: dividendCalendar.amount,
+        currency: dividendCalendar.currency,
+        frequency: dividendCalendar.frequency,
+        symbol: {
+          id: symbols.id,
+          ticker: symbols.ticker,
+          name: symbols.name,
+          exchange: exchanges.code,
+        },
+      })
+      .from(dividendCalendar)
+      .innerJoin(symbols, eq(symbols.id, dividendCalendar.symbolId))
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(maybeWhere(filters))
+      .orderBy(asc(dividendCalendar.exDate))
       .limit(q.limit);
 
     return c.json({ events: rows });

@@ -396,6 +396,25 @@ export const earningsCalendar = pgTable(
   }),
 );
 
+export const dividendCalendar = pgTable(
+  'dividend_calendar',
+  {
+    id: id(),
+    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    exDate: timestamp('ex_date', { withTimezone: true, mode: 'date' }).notNull(),
+    paymentDate: timestamp('payment_date', { withTimezone: true, mode: 'date' }),
+    recordDate: timestamp('record_date', { withTimezone: true, mode: 'date' }),
+    declarationDate: timestamp('declaration_date', { withTimezone: true, mode: 'date' }),
+    amount: text('amount').notNull(),
+    currency: text('currency').notNull().default('USD'),
+    frequency: text('frequency'),
+  },
+  (t) => ({
+    symbolExDateIdx: uniqueIndex('dividends_symbol_ex_date_uq').on(t.symbolId, t.exDate),
+    exDateIdx: index('dividends_ex_date_idx').on(t.exDate),
+  }),
+);
+
 export const economicEvents = pgTable(
   'economic_events',
   {

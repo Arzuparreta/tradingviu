@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type {
+  DividendEvent,
   EconomicEvent,
   EarningsEvent,
   NewsArticle,
@@ -112,6 +113,37 @@ function EarningsRow({ event }: { event: EarningsEvent }) {
   );
 }
 
+function DividendRow({ event }: { event: DividendEvent }) {
+  return (
+    <div className="card row discovery-event">
+      <div className="mono discovery-date">{dateOnly(event.exDate)}</div>
+      <div className="grow">
+        <div>
+          <strong>{event.symbol.ticker}</strong>
+          <span className="muted small"> {event.symbol.exchange}</span>
+        </div>
+        <div className="muted small">
+          {event.symbol.name}
+          {event.frequency ? ` · ${event.frequency}` : ''}
+        </div>
+      </div>
+      <div className="row small" style={{ gap: 14 }}>
+        <span>
+          Div{' '}
+          <span className="mono">
+            {event.amount} {event.currency}
+          </span>
+        </span>
+        {event.paymentDate && (
+          <span>
+            Pay <span className="mono">{dateOnly(event.paymentDate)}</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EconomicRow({ event }: { event: EconomicEvent }) {
   return (
     <div className="card row discovery-event">
@@ -179,6 +211,10 @@ export function DiscoveryPage() {
   const earningsQ = useQuery({
     queryKey: ['earnings-calendar', symbol, range],
     queryFn: () => api.earningsCalendar({ symbol, ...range, limit: 80 }),
+  });
+  const dividendsQ = useQuery({
+    queryKey: ['dividend-calendar', symbol, range],
+    queryFn: () => api.dividendCalendar({ symbol, ...range, limit: 80 }),
   });
   const economicQ = useQuery({
     queryKey: ['economic-calendar', country, importance, range],
@@ -414,6 +450,20 @@ export function DiscoveryPage() {
           )}
           {earningsQ.data?.events.map((event) => (
             <EarningsRow key={event.id} event={event} />
+          ))}
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <h2>Dividends</h2>
+            <span className="grow" />
+            <span className="muted small">{dividendsQ.data?.events.length ?? 0}</span>
+          </div>
+          {dividendsQ.isLoading && <div className="card muted">Loading dividends...</div>}
+          {dividendsQ.isError && <div className="card down">Could not load dividends.</div>}
+          {dividendsQ.data?.events.length === 0 && (
+            <div className="card muted">No dividends match this range.</div>
+          )}
+          {dividendsQ.data?.events.map((event) => (
+            <DividendRow key={event.id} event={event} />
           ))}
 
           <div className="row" style={{ marginTop: 8 }}>

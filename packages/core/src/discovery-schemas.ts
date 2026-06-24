@@ -101,6 +101,14 @@ export const EarningsCalendarQuerySchema = z.object({
 });
 export type EarningsCalendarQuery = z.infer<typeof EarningsCalendarQuerySchema>;
 
+export const DividendCalendarQuerySchema = z.object({
+  symbol: z.string().trim().min(1).max(80).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  limit: z.coerce.number().int().positive().max(200).default(100),
+});
+export type DividendCalendarQuery = z.infer<typeof DividendCalendarQuerySchema>;
+
 export const EconomicCalendarQuerySchema = z.object({
   country: z.string().trim().min(1).max(80).optional(),
   importance: z.enum(['low', 'medium', 'high']).optional(),

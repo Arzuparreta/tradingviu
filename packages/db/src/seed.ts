@@ -3,6 +3,7 @@ import { applyRls } from './rls-policies.js';
 import { and, eq } from 'drizzle-orm';
 import {
   earningsCalendar,
+  dividendCalendar,
   economicEvents,
   newsArticles,
   plans,
@@ -490,6 +491,34 @@ if (aapl && msft) {
         date: new Date('2026-07-09T20:00:00.000Z'),
         epsEstimate: '3.21',
         revenueEstimate: '69.8B',
+      },
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(dividendCalendar)
+    .values([
+      {
+        id: ulid(),
+        symbolId: aapl.id,
+        exDate: new Date('2026-08-11T04:00:00.000Z'),
+        paymentDate: new Date('2026-08-18T04:00:00.000Z'),
+        recordDate: new Date('2026-08-12T04:00:00.000Z'),
+        declarationDate: new Date('2026-07-31T20:00:00.000Z'),
+        amount: '0.26',
+        currency: 'USD',
+        frequency: 'quarterly',
+      },
+      {
+        id: ulid(),
+        symbolId: msft.id,
+        exDate: new Date('2026-08-20T04:00:00.000Z'),
+        paymentDate: new Date('2026-09-10T04:00:00.000Z'),
+        recordDate: new Date('2026-08-21T04:00:00.000Z'),
+        declarationDate: new Date('2026-06-17T20:00:00.000Z'),
+        amount: '0.83',
+        currency: 'USD',
+        frequency: 'quarterly',
       },
     ])
     .onConflictDoNothing();
