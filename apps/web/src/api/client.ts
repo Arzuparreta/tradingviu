@@ -28,6 +28,7 @@ import type {
   NewsArticle,
   EarningsEvent,
   EconomicEvent,
+  FundamentalSnapshot,
   ScreenerPreset,
   ScreenerQuery,
   ScreenerResult,
@@ -385,6 +386,9 @@ export const api = {
       limit?: number;
     } = {},
   ) => request<{ events: EconomicEvent[] }>(`/api/calendars/economic${queryString(params)}`),
+  fundamentals: (
+    params: { symbol?: string; fiscalPeriod?: string; latestOnly?: boolean; limit?: number } = {},
+  ) => request<{ snapshots: FundamentalSnapshot[] }>(`/api/fundamentals${queryString(params)}`),
   screener: (params: ScreenerQuery = {}) =>
     request<{ results: ScreenerResult[] }>(`/api/screener${queryString(params)}`),
   screenerPresets: (params: { assetClass?: string } = {}) =>
@@ -419,6 +423,7 @@ export type {
   NewsArticle,
   EarningsEvent,
   EconomicEvent,
+  FundamentalSnapshot,
   ScreenerPreset,
   ScreenerResult,
 };

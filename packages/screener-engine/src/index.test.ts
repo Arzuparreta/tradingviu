@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readScreenerMetrics, screenerMetricKeys } from './index.js';
 
 describe('screener metrics', () => {
-  test('keeps only finite supported metadata metrics', () => {
+  test('keeps only finite supported fundamental metrics', () => {
     const metrics = readScreenerMetrics({
       marketCap: 3_000_000,
       peRatio: 24.5,

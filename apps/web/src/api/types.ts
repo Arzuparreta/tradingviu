@@ -344,6 +344,33 @@ export interface EconomicEvent {
   previous: string | null;
 }
 
+export interface FundamentalSnapshot {
+  id: string;
+  fiscalPeriod: string;
+  periodEnd: string;
+  source: string;
+  currency: string;
+  isLatest: boolean;
+  marketCap: number | null;
+  peRatio: number | null;
+  eps: number | null;
+  revenue: number | null;
+  dividendYield: number | null;
+  roe: number | null;
+  revenueGrowth: number | null;
+  earningsGrowth: number | null;
+  beta: number | null;
+  week52High: number | null;
+  week52Low: number | null;
+  fetchedAt: string;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}
+
 export type ScreenerMetric =
   | 'marketCap'
   | 'peRatio'
@@ -370,10 +397,24 @@ export interface ScreenerQuery {
   marketCapMax?: number;
   peRatioMin?: number;
   peRatioMax?: number;
+  epsMin?: number;
+  epsMax?: number;
+  revenueMin?: number;
+  revenueMax?: number;
   dividendYieldMin?: number;
   dividendYieldMax?: number;
+  roeMin?: number;
+  roeMax?: number;
   revenueGrowthMin?: number;
   revenueGrowthMax?: number;
+  earningsGrowthMin?: number;
+  earningsGrowthMax?: number;
+  betaMin?: number;
+  betaMax?: number;
+  '52WeekHighMin'?: number;
+  '52WeekHighMax'?: number;
+  '52WeekLowMin'?: number;
+  '52WeekLowMax'?: number;
   sort?: ScreenerSortField;
   direction?: 'asc' | 'desc';
   limit?: number;

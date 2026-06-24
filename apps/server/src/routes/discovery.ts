@@ -5,6 +5,7 @@ import {
   DividendCalendarQuerySchema,
   EconomicCalendarQuerySchema,
   EarningsCalendarQuerySchema,
+  FundamentalsQuerySchema,
   NewsQuerySchema,
 } from '@tv/core';
 import {
@@ -12,6 +13,7 @@ import {
   earningsCalendar,
   economicEvents,
   exchanges,
+  fundamentalSnapshots,
   newsArticles,
   symbols,
 } from '@tv/db/schema';
@@ -166,4 +168,53 @@ export const discoveryRoutes = new Hono()
       .limit(q.limit);
 
     return c.json({ events: rows });
+  })
+  .get('/fundamentals', zValidator('query', FundamentalsQuerySchema), async (c) => {
+    const q = c.req.valid('query');
+    const db = c.get('db');
+    const filters: SQL[] = [eq(fundamentalSnapshots.fiscalPeriod, q.fiscalPeriod)];
+
+    if (q.latestOnly) filters.push(eq(fundamentalSnapshots.isLatest, true));
+    if (q.symbol) {
+      const like = `%${q.symbol}%`;
+      filters.push(
+        or(eq(symbols.id, q.symbol), ilike(symbols.ticker, like), ilike(symbols.name, like))!,
+      );
+    }
+
+    const rows = await db
+      .select({
+        id: fundamentalSnapshots.id,
+        fiscalPeriod: fundamentalSnapshots.fiscalPeriod,
+        periodEnd: fundamentalSnapshots.periodEnd,
+        source: fundamentalSnapshots.source,
+        currency: fundamentalSnapshots.currency,
+        isLatest: fundamentalSnapshots.isLatest,
+        marketCap: fundamentalSnapshots.marketCap,
+        peRatio: fundamentalSnapshots.peRatio,
+        eps: fundamentalSnapshots.eps,
+        revenue: fundamentalSnapshots.revenue,
+        dividendYield: fundamentalSnapshots.dividendYield,
+        roe: fundamentalSnapshots.roe,
+        revenueGrowth: fundamentalSnapshots.revenueGrowth,
+        earningsGrowth: fundamentalSnapshots.earningsGrowth,
+        beta: fundamentalSnapshots.beta,
+        week52High: fundamentalSnapshots.week52High,
+        week52Low: fundamentalSnapshots.week52Low,
+        fetchedAt: fundamentalSnapshots.fetchedAt,
+        symbol: {
+          id: symbols.id,
+          ticker: symbols.ticker,
+          name: symbols.name,
+          exchange: exchanges.code,
+        },
+      })
+      .from(fundamentalSnapshots)
+      .innerJoin(symbols, eq(symbols.id, fundamentalSnapshots.symbolId))
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(maybeWhere(filters))
+      .orderBy(desc(fundamentalSnapshots.periodEnd), symbols.ticker)
+      .limit(q.limit);
+
+    return c.json({ snapshots: rows });
   });

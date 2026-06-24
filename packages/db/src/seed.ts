@@ -5,6 +5,7 @@ import {
   earningsCalendar,
   dividendCalendar,
   economicEvents,
+  fundamentalSnapshots,
   newsArticles,
   plans,
   exchanges,
@@ -475,6 +476,52 @@ await db
   .onConflictDoNothing();
 
 if (aapl && msft) {
+  await db
+    .insert(fundamentalSnapshots)
+    .values([
+      {
+        id: ulid(),
+        symbolId: aapl.id,
+        fiscalPeriod: 'ttm',
+        periodEnd: new Date('2026-06-30T00:00:00.000Z'),
+        source: 'Tradingviu Demo',
+        currency: 'USD',
+        isLatest: true,
+        marketCap: 3_250_000_000_000,
+        peRatio: 31.4,
+        eps: 6.43,
+        revenue: 391_000_000_000,
+        dividendYield: 0.0048,
+        roe: 1.47,
+        revenueGrowth: 0.061,
+        earningsGrowth: 0.073,
+        beta: 1.18,
+        week52High: 238.1,
+        week52Low: 164.08,
+      },
+      {
+        id: ulid(),
+        symbolId: msft.id,
+        fiscalPeriod: 'ttm',
+        periodEnd: new Date('2026-06-30T00:00:00.000Z'),
+        source: 'Tradingviu Demo',
+        currency: 'USD',
+        isLatest: true,
+        marketCap: 3_540_000_000_000,
+        peRatio: 35.8,
+        eps: 13.3,
+        revenue: 281_700_000_000,
+        dividendYield: 0.0065,
+        roe: 0.36,
+        revenueGrowth: 0.15,
+        earningsGrowth: 0.17,
+        beta: 0.92,
+        week52High: 468.35,
+        week52Low: 344.77,
+      },
+    ])
+    .onConflictDoNothing();
+
   await db
     .insert(earningsCalendar)
     .values([

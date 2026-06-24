@@ -69,8 +69,25 @@ Notes:
 - The only provider implemented in this cut is `mock`; real NewsAPI/Finnhub/Benzinga adapters should plug into the same interface with mocked tests first.
 - No DB migration was required because 6a already added the `news_articles` read surface and table.
 
+## 6e — Fundamentals Storage + API
+
+Status: done.
+
+Delivered:
+
+- Global `fundamental_snapshots` table for symbol fundamentals, including TTM/latest flags and screener metrics.
+- RLS policies matching other global discovery tables: public read, super-admin write.
+- Zod-validated `GET /api/fundamentals` endpoint with symbol, period, latest-only, and limit filters.
+- Screener metric filters and sorting now read from dedicated fundamentals storage instead of `symbols.metadata`.
+- `/discovery` fundamentals panel showing latest market cap, revenue, valuation, growth, ROE, and 52-week range.
+- Seeded AAPL/MSFT demo fundamentals for clean installs.
+
+Notes:
+
+- `symbols.metadata` still contains demo values for compatibility, but screener metrics now use `fundamental_snapshots`.
+- Real provider ingestion is not part of this cut; future adapters should write snapshots with super-admin RLS context.
+
 ## Remaining Slice 6 Work
 
 - Yield curves and macroeconomic series.
-- Fundamentals storage and API.
-- Expand screener to dedicated fundamentals storage once that table exists.
+- Real fundamentals provider ingestion.

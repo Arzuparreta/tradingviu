@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import type { ScreenerMetric, ScreenerQuery, ScreenerSortField } from '@tv/core';
-import { exchanges, symbols } from '@tv/db/schema';
+import { exchanges, fundamentalSnapshots, symbols } from '@tv/db/schema';
 
 export interface ScreenerSymbolRow {
   readonly id: string;
@@ -32,22 +32,32 @@ export const screenerMetricKeys = [
 
 type ScreenerMetricKey = (typeof screenerMetricKeys)[number];
 
-const metricJsonKey: Record<ScreenerMetric, string> = {
-  marketCap: 'marketCap',
-  peRatio: 'peRatio',
-  eps: 'eps',
-  revenue: 'revenue',
-  dividendYield: 'dividendYield',
-  roe: 'roe',
-  revenueGrowth: 'revenueGrowth',
-  earningsGrowth: 'earningsGrowth',
-  beta: 'beta',
-  '52WeekHigh': '52WeekHigh',
-  '52WeekLow': '52WeekLow',
+const metricExpr = (metric: ScreenerMetric): SQL<number | null> => {
+  switch (metric) {
+    case 'marketCap':
+      return sql`${fundamentalSnapshots.marketCap}`;
+    case 'peRatio':
+      return sql`${fundamentalSnapshots.peRatio}`;
+    case 'eps':
+      return sql`${fundamentalSnapshots.eps}`;
+    case 'revenue':
+      return sql`${fundamentalSnapshots.revenue}`;
+    case 'dividendYield':
+      return sql`${fundamentalSnapshots.dividendYield}`;
+    case 'roe':
+      return sql`${fundamentalSnapshots.roe}`;
+    case 'revenueGrowth':
+      return sql`${fundamentalSnapshots.revenueGrowth}`;
+    case 'earningsGrowth':
+      return sql`${fundamentalSnapshots.earningsGrowth}`;
+    case 'beta':
+      return sql`${fundamentalSnapshots.beta}`;
+    case '52WeekHigh':
+      return sql`${fundamentalSnapshots.week52High}`;
+    case '52WeekLow':
+      return sql`${fundamentalSnapshots.week52Low}`;
+  }
 };
-
-const metricExpr = (metric: ScreenerMetric): SQL<number> =>
-  sql<number>`NULLIF(${symbols.metadata}->>${metricJsonKey[metric]}, '')::double precision`;
 
 export const maybeWhere = (filters: readonly SQL[]): SQL | undefined =>
   filters.length > 0 ? and(...filters) : undefined;

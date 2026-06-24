@@ -35,6 +35,8 @@ ALTER TABLE dividend_calendar ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dividend_calendar FORCE ROW LEVEL SECURITY;
 ALTER TABLE economic_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE economic_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE fundamental_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fundamental_snapshots FORCE ROW LEVEL SECURITY;
 ALTER TABLE provider_health ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_health FORCE ROW LEVEL SECURITY;
 
@@ -85,6 +87,12 @@ DROP POLICY IF EXISTS economic_read ON economic_events;
 CREATE POLICY economic_read ON economic_events FOR SELECT USING (true);
 DROP POLICY IF EXISTS economic_write ON economic_events;
 CREATE POLICY economic_write ON economic_events FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
+
+DROP POLICY IF EXISTS fundamentals_read ON fundamental_snapshots;
+CREATE POLICY fundamentals_read ON fundamental_snapshots FOR SELECT USING (true);
+DROP POLICY IF EXISTS fundamentals_write ON fundamental_snapshots;
+CREATE POLICY fundamentals_write ON fundamental_snapshots FOR ALL
   USING (is_super_admin()) WITH CHECK (is_super_admin());
 
 DROP POLICY IF EXISTS provider_health_read ON provider_health;

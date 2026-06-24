@@ -5,6 +5,7 @@ import type {
   DividendEvent,
   EconomicEvent,
   EarningsEvent,
+  FundamentalSnapshot,
   NewsArticle,
   ScreenerQuery,
   ScreenerResult,
@@ -37,6 +38,9 @@ const metric = (value: number | undefined, mode: 'compact' | 'ratio' | 'percent'
   }
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 };
+
+const nullableMetric = (value: number | null, mode: 'compact' | 'ratio' | 'percent' = 'ratio') =>
+  metric(value === null ? undefined : value, mode);
 
 const numeric = (value: string): number | undefined => {
   if (!value.trim()) return undefined;
@@ -169,6 +173,52 @@ function EconomicRow({ event }: { event: EconomicEvent }) {
   );
 }
 
+function FundamentalsRow({ snapshot }: { snapshot: FundamentalSnapshot }) {
+  return (
+    <div className="card col discovery-fundamentals-row">
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <div className="grow">
+          <div>
+            <strong>{snapshot.symbol.ticker}</strong>
+            <span className="muted small"> {snapshot.symbol.exchange}</span>
+          </div>
+          <div className="muted small">
+            {snapshot.symbol.name} · {snapshot.fiscalPeriod.toUpperCase()} ·{' '}
+            {dateOnly(snapshot.periodEnd)}
+          </div>
+        </div>
+        <span className="muted small">{snapshot.source}</span>
+      </div>
+      <div className="discovery-metric-grid">
+        <span>
+          Market cap <strong>{nullableMetric(snapshot.marketCap, 'compact')}</strong>
+        </span>
+        <span>
+          Revenue <strong>{nullableMetric(snapshot.revenue, 'compact')}</strong>
+        </span>
+        <span>
+          P/E <strong>{nullableMetric(snapshot.peRatio)}</strong>
+        </span>
+        <span>
+          EPS <strong>{nullableMetric(snapshot.eps)}</strong>
+        </span>
+        <span>
+          ROE <strong>{nullableMetric(snapshot.roe, 'percent')}</strong>
+        </span>
+        <span>
+          Revenue growth <strong>{nullableMetric(snapshot.revenueGrowth, 'percent')}</strong>
+        </span>
+        <span>
+          52W high <strong>{nullableMetric(snapshot.week52High)}</strong>
+        </span>
+        <span>
+          52W low <strong>{nullableMetric(snapshot.week52Low)}</strong>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function DiscoveryPage() {
   const queryClient = useQueryClient();
   const [symbol, setSymbol] = useState('');
@@ -225,6 +275,10 @@ export function DiscoveryPage() {
         ...range,
         limit: 80,
       }),
+  });
+  const fundamentalsQ = useQuery({
+    queryKey: ['fundamentals', symbol],
+    queryFn: () => api.fundamentals({ symbol, fiscalPeriod: 'ttm', latestOnly: true, limit: 8 }),
   });
   const screenerQ = useQuery({
     queryKey: ['screener', screenerParams],
@@ -464,6 +518,20 @@ export function DiscoveryPage() {
           )}
           {dividendsQ.data?.events.map((event) => (
             <DividendRow key={event.id} event={event} />
+          ))}
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <h2>Fundamentals</h2>
+            <span className="grow" />
+            <span className="muted small">{fundamentalsQ.data?.snapshots.length ?? 0}</span>
+          </div>
+          {fundamentalsQ.isLoading && <div className="card muted">Loading fundamentals...</div>}
+          {fundamentalsQ.isError && <div className="card down">Could not load fundamentals.</div>}
+          {fundamentalsQ.data?.snapshots.length === 0 && (
+            <div className="card muted">No fundamentals match this symbol.</div>
+          )}
+          {fundamentalsQ.data?.snapshots.map((snapshot) => (
+            <FundamentalsRow key={snapshot.id} snapshot={snapshot} />
           ))}
 
           <div className="row" style={{ marginTop: 8 }}>

@@ -1,18 +1,37 @@
-import { pgTable, text, timestamp, jsonb, boolean, index, integer, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  text,
+  timestamp,
+  jsonb,
+  boolean,
+  index,
+  integer,
+  uniqueIndex,
+  doublePrecision,
+} from 'drizzle-orm/pg-core';
 import { ulid } from 'ulid';
 import { tenants, users } from './tenants';
 import { symbols } from './symbols';
 
-const id = () => text('id').primaryKey().$defaultFn(() => ulid());
+const id = () =>
+  text('id')
+    .primaryKey()
+    .$defaultFn(() => ulid());
 const ts = (name: string) =>
-  timestamp(name, { withTimezone: true, mode: 'date' }).$defaultFn(() => new Date()).notNull();
+  timestamp(name, { withTimezone: true, mode: 'date' })
+    .$defaultFn(() => new Date())
+    .notNull();
 
 export const layouts = pgTable(
   'layouts',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     isDefault: boolean('is_default').notNull().default(false),
     config: jsonb('config').$type<unknown>().notNull(),
@@ -28,9 +47,15 @@ export const drawings = pgTable(
   'drawings',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     interval: text('interval').notNull(),
     kind: text('kind').notNull(),
     geometry: jsonb('geometry').$type<unknown>().notNull(),
@@ -47,9 +72,15 @@ export const alerts = pgTable(
   'alerts',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     kind: text('kind').notNull(),
     condition: jsonb('condition').$type<unknown>().notNull(),
@@ -71,8 +102,12 @@ export const alertHistory = pgTable(
   'alert_history',
   {
     id: id(),
-    alertId: text('alert_id').notNull().references(() => alerts.id, { onDelete: 'cascade' }),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    alertId: text('alert_id')
+      .notNull()
+      .references(() => alerts.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
     firedAt: timestamp('fired_at', { withTimezone: true, mode: 'date' }).notNull(),
     price: text('price'),
     payload: jsonb('payload').$type<unknown>(),
@@ -88,8 +123,12 @@ export const screenerPresets = pgTable(
   'screener_presets',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     assetClass: text('asset_class').notNull(),
     query: jsonb('query').$type<unknown>().notNull(),
@@ -106,8 +145,12 @@ export const userIndicators = pgTable(
   'user_indicators',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     kind: text('kind').notNull(),
     source: text('source'),
@@ -125,10 +168,16 @@ export const backtests = pgTable(
   'backtests',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     interval: text('interval').notNull(),
     fromAt: timestamp('from_at', { withTimezone: true, mode: 'date' }).notNull(),
     toAt: timestamp('to_at', { withTimezone: true, mode: 'date' }).notNull(),
@@ -149,8 +198,12 @@ export const ideas = pgTable(
   'ideas',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     symbolId: text('symbol_id').references(() => symbols.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     body: text('body'),
@@ -172,8 +225,12 @@ export const comments = pgTable(
   'comments',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     targetType: text('target_type').notNull(),
     targetId: text('target_id').notNull(),
     parentId: text('parent_id'),
@@ -189,9 +246,15 @@ export const follows = pgTable(
   'follows',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    followerId: text('follower_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    followedId: text('followed_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    followerId: text('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followedId: text('followed_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     createdAt: ts('created_at'),
   },
   (t) => ({
@@ -203,8 +266,12 @@ export const publishedScripts = pgTable(
   'published_scripts',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
     source: text('source').notNull(),
@@ -225,8 +292,12 @@ export const portfolios = pgTable(
   'portfolios',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     baseCurrency: text('base_currency').notNull().default('USD'),
     createdAt: ts('created_at'),
@@ -241,9 +312,15 @@ export const holdings = pgTable(
   'holdings',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    portfolioId: text('portfolio_id').notNull().references(() => portfolios.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    portfolioId: text('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     quantity: text('quantity').notNull(),
     avgCost: text('avg_cost'),
     openedAt: timestamp('opened_at', { withTimezone: true, mode: 'date' }).notNull(),
@@ -257,9 +334,15 @@ export const transactions = pgTable(
   'transactions',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    portfolioId: text('portfolio_id').notNull().references(() => portfolios.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    portfolioId: text('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     side: text('side').notNull(),
     quantity: text('quantity').notNull(),
     price: text('price').notNull(),
@@ -276,8 +359,12 @@ export const watchlists = pgTable(
   'watchlists',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     createdAt: ts('created_at'),
     updatedAt: ts('updated_at'),
@@ -291,9 +378,15 @@ export const watchlistItems = pgTable(
   'watchlist_items',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    watchlistId: text('watchlist_id').notNull().references(() => watchlists.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    watchlistId: text('watchlist_id')
+      .notNull()
+      .references(() => watchlists.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     color: text('color'),
     note: text('note'),
     sortOrder: integer('sort_order').notNull().default(0),
@@ -307,8 +400,12 @@ export const paperAccounts = pgTable(
   'paper_accounts',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     balance: text('balance').notNull().default('100000'),
     currency: text('currency').notNull().default('USD'),
@@ -324,9 +421,15 @@ export const paperOrders = pgTable(
   'paper_orders',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    accountId: text('account_id').notNull().references(() => paperAccounts.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => paperAccounts.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     side: text('side').notNull(),
     type: text('type').notNull(),
     quantity: text('quantity').notNull(),
@@ -346,8 +449,12 @@ export const brokerConnections = pgTable(
   'broker_connections',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     broker: text('broker').notNull(),
     label: text('label'),
     accountId: text('account_id'),
@@ -384,7 +491,9 @@ export const earningsCalendar = pgTable(
   'earnings_calendar',
   {
     id: id(),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     date: timestamp('date', { withTimezone: true, mode: 'date' }).notNull(),
     epsEstimate: text('eps_estimate'),
     epsActual: text('eps_actual'),
@@ -400,7 +509,9 @@ export const dividendCalendar = pgTable(
   'dividend_calendar',
   {
     id: id(),
-    symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
     exDate: timestamp('ex_date', { withTimezone: true, mode: 'date' }).notNull(),
     paymentDate: timestamp('payment_date', { withTimezone: true, mode: 'date' }),
     recordDate: timestamp('record_date', { withTimezone: true, mode: 'date' }),
@@ -432,11 +543,54 @@ export const economicEvents = pgTable(
   }),
 );
 
+export const fundamentalSnapshots = pgTable(
+  'fundamental_snapshots',
+  {
+    id: id(),
+    symbolId: text('symbol_id')
+      .notNull()
+      .references(() => symbols.id, { onDelete: 'cascade' }),
+    fiscalPeriod: text('fiscal_period').notNull().default('ttm'),
+    periodEnd: timestamp('period_end', { withTimezone: true, mode: 'date' }).notNull(),
+    source: text('source').notNull().default('manual'),
+    currency: text('currency').notNull().default('USD'),
+    isLatest: boolean('is_latest').notNull().default(true),
+    marketCap: doublePrecision('market_cap'),
+    peRatio: doublePrecision('pe_ratio'),
+    eps: doublePrecision('eps'),
+    revenue: doublePrecision('revenue'),
+    dividendYield: doublePrecision('dividend_yield'),
+    roe: doublePrecision('roe'),
+    revenueGrowth: doublePrecision('revenue_growth'),
+    earningsGrowth: doublePrecision('earnings_growth'),
+    beta: doublePrecision('beta'),
+    week52High: doublePrecision('week_52_high'),
+    week52Low: doublePrecision('week_52_low'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    fetchedAt: ts('fetched_at'),
+  },
+  (t) => ({
+    symbolPeriodIdx: index('fundamentals_symbol_period_idx').on(
+      t.symbolId,
+      t.fiscalPeriod,
+      t.periodEnd,
+    ),
+    latestIdx: index('fundamentals_latest_idx').on(t.symbolId, t.fiscalPeriod, t.isLatest),
+    uniqueSnapshot: uniqueIndex('fundamentals_symbol_period_end_uq').on(
+      t.symbolId,
+      t.fiscalPeriod,
+      t.periodEnd,
+    ),
+  }),
+);
+
 export const auditLog = pgTable(
   'audit_log',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
     action: text('action').notNull(),
     targetType: text('target_type'),

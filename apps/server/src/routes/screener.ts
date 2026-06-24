@@ -10,7 +10,7 @@ import {
   UpdateScreenerPresetSchema,
   type TenantContext,
 } from '@tv/core';
-import { exchanges, screenerPresets, symbols } from '@tv/db/schema';
+import { exchanges, fundamentalSnapshots, screenerPresets, symbols } from '@tv/db/schema';
 import { buildScreenerFilters, maybeWhere, readScreenerMetrics, sortBy } from '@tv/screener-engine';
 
 export const screenerRoutes = new Hono()
@@ -29,20 +29,65 @@ export const screenerRoutes = new Hono()
         sector: symbols.sector,
         industry: symbols.industry,
         active: symbols.active,
-        metadata: symbols.metadata,
+        marketCap: fundamentalSnapshots.marketCap,
+        peRatio: fundamentalSnapshots.peRatio,
+        eps: fundamentalSnapshots.eps,
+        revenue: fundamentalSnapshots.revenue,
+        dividendYield: fundamentalSnapshots.dividendYield,
+        roe: fundamentalSnapshots.roe,
+        revenueGrowth: fundamentalSnapshots.revenueGrowth,
+        earningsGrowth: fundamentalSnapshots.earningsGrowth,
+        beta: fundamentalSnapshots.beta,
+        '52WeekHigh': fundamentalSnapshots.week52High,
+        '52WeekLow': fundamentalSnapshots.week52Low,
         exchange: exchanges.code,
       })
       .from(symbols)
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .leftJoin(
+        fundamentalSnapshots,
+        and(
+          eq(fundamentalSnapshots.symbolId, symbols.id),
+          eq(fundamentalSnapshots.fiscalPeriod, 'ttm'),
+          eq(fundamentalSnapshots.isLatest, true),
+        ),
+      )
       .where(maybeWhere(buildScreenerFilters(q)))
       .orderBy(sortBy(q.sort, q.direction), symbols.ticker)
       .limit(q.limit);
 
     return c.json({
-      results: rows.map(({ metadata, ...row }) => ({
-        ...row,
-        metrics: readScreenerMetrics(metadata),
-      })),
+      results: rows.map(
+        ({
+          marketCap,
+          peRatio,
+          eps,
+          revenue,
+          dividendYield,
+          roe,
+          revenueGrowth,
+          earningsGrowth,
+          beta,
+          '52WeekHigh': week52High,
+          '52WeekLow': week52Low,
+          ...row
+        }) => ({
+          ...row,
+          metrics: readScreenerMetrics({
+            marketCap,
+            peRatio,
+            eps,
+            revenue,
+            dividendYield,
+            roe,
+            revenueGrowth,
+            earningsGrowth,
+            beta,
+            '52WeekHigh': week52High,
+            '52WeekLow': week52Low,
+          }),
+        }),
+      ),
     });
   })
   .get('/screener/presets', zValidator('query', ScreenerPresetQuerySchema), async (c) => {

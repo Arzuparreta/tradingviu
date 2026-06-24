@@ -127,6 +127,14 @@ export const NewsIngestQuerySchema = z.object({
 });
 export type NewsIngestQuery = z.infer<typeof NewsIngestQuerySchema>;
 
+export const FundamentalsQuerySchema = z.object({
+  symbol: z.string().trim().min(1).max(80).optional(),
+  fiscalPeriod: z.string().trim().min(1).max(20).default('ttm'),
+  latestOnly: z.coerce.boolean().default(true),
+  limit: z.coerce.number().int().positive().max(200).default(50),
+});
+export type FundamentalsQuery = z.infer<typeof FundamentalsQuerySchema>;
+
 export const EarningsCalendarQuerySchema = z.object({
   symbol: z.string().trim().min(1).max(80).optional(),
   from: z.coerce.date().optional(),
