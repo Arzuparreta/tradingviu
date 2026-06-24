@@ -12,7 +12,7 @@
 |---|---|---|
 | 0 | Cimientos (monorepo, DB, auth, plans, charts) | ✅ done (`cf23b90`) |
 | 1 | Indicators (31), live WS bars, watchlists | ✅ done (`39a6465`) |
-| 2 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (slice-3 branches) |
+| 2 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (`ac02b78`) |
 | 3 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ⏳ next |
 | 4 | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | pending |
 | 5 | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener | pending |
