@@ -20,6 +20,7 @@
     "@tv/billing": "workspace:*",
     "@tv/data-adapters": "workspace:*",
     "@tv/ta-lib": "workspace:*",
+    "@tv/options-engine": "workspace:*",
     "@tv/layout-sync": "workspace:*",
     "@tv/pine-parser": "workspace:*",
     "@tv/pine-runtime": "workspace:*",

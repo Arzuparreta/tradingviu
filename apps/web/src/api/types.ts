@@ -217,3 +217,62 @@ export interface PaperOrder {
     exchange: string;
   };
 }
+
+export type OptionType = 'call' | 'put';
+export type OptionSide = 'long' | 'short';
+export type StrategyTemplate =
+  | 'long_call'
+  | 'long_put'
+  | 'short_call'
+  | 'short_put'
+  | 'bull_call_spread'
+  | 'bear_call_spread'
+  | 'bull_put_spread'
+  | 'bear_put_spread'
+  | 'straddle'
+  | 'strangle'
+  | 'iron_condor'
+  | 'iron_butterfly'
+  | 'call_butterfly';
+
+export interface Greeks {
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  rho: number;
+}
+
+export interface OptionPriceResult {
+  price: number;
+  intrinsic: number;
+  extrinsic: number;
+  greeks: Greeks;
+}
+
+export interface PricedLeg {
+  type: OptionType;
+  side: OptionSide;
+  strike: number;
+  quantity: number;
+  expiry: number;
+  premium: number;
+  greeks: Greeks;
+}
+
+export interface PayoffPoint {
+  price: number;
+  pnl: number;
+}
+
+export interface StrategyAnalysis {
+  legs: PricedLeg[];
+  netDebit: number;
+  netGreeks: Greeks;
+  payoff: PayoffPoint[];
+  maxProfit: number | null;
+  maxLoss: number | null;
+  unlimitedProfit: boolean;
+  unlimitedLoss: boolean;
+  breakevens: number[];
+}
