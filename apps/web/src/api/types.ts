@@ -577,3 +577,26 @@ export interface CommentRow {
   createdAt: string;
   author: IdeaAuthor;
 }
+
+export type ScriptVisibility = 'public' | 'protected' | 'private';
+export type ScriptsSort = 'recent' | 'popular';
+
+export interface ScriptRow {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: ScriptVisibility;
+  license: string;
+  priceCents: number;
+  downloads: number;
+  favoritesCount: number;
+  favorited: boolean;
+  createdAt: string;
+  updatedAt: string;
+  author: IdeaAuthor;
+}
+
+export interface ScriptDetail extends ScriptRow {
+  source: string | null;
+  locked: boolean;
+}

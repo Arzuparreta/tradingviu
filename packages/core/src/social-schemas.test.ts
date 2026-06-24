@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { CreateIdeaSchema, IdeasQuerySchema, UpdateIdeaSchema } from './social-schemas.js';
+import {
+  CreateIdeaSchema,
+  IdeasQuerySchema,
+  PublishScriptSchema,
+  ScriptsQuerySchema,
+  UpdateIdeaSchema,
+} from './social-schemas.js';
 
 describe('social schemas', () => {
   test('CreateIdea defaults visibility to public and trims title', () => {
@@ -24,5 +30,23 @@ describe('social schemas', () => {
 
   test('UpdateIdea allows partial updates', () => {
     expect(UpdateIdeaSchema.parse({ visibility: 'private' })).toEqual({ visibility: 'private' });
+  });
+
+  test('PublishScript defaults visibility/license/price and requires source', () => {
+    const s = PublishScriptSchema.parse({ name: '  RSI Pro  ', source: 'indicator("x")' });
+    expect(s.name).toBe('RSI Pro');
+    expect(s.visibility).toBe('public');
+    expect(s.license).toBe('AGPL-3.0');
+    expect(s.priceCents).toBe(0);
+    expect(() => PublishScriptSchema.parse({ name: 'x', source: '   ' })).toThrow();
+    expect(() => PublishScriptSchema.parse({ name: 'x', source: 's', visibility: 'paid' })).toThrow();
+  });
+
+  test('ScriptsQuery coerces price filter and defaults sort to recent', () => {
+    expect(ScriptsQuerySchema.parse({}).sort).toBe('recent');
+    expect(ScriptsQuerySchema.parse({ free: 'true', sort: 'popular' })).toMatchObject({
+      free: true,
+      sort: 'popular',
+    });
   });
 });

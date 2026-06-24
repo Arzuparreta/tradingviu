@@ -18,7 +18,7 @@
 | 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                        |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                                    |
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6j done)                   |
-| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7c done)                   |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7d done)                   |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
 | 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                    |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                    |
@@ -204,7 +204,8 @@ tradingviu/
 - **7a (done) — Ideas CRUD + feed:** tenant-scoped `/api/ideas` (feed/detail/create/update/delete) with public/private visibility, symbol/author/direction filters, author + symbol joins, owner-enforced mutations, Zod schemas in `packages/core/src/social-schemas.ts`, and a web `IdeasPage` at `/ideas`. See `docs/SLICE-7.md`.
 - **7b (done) — Comments + likes on ideas:** new target-based `likes` table (migration `0005`, idempotent unique index), comments/likes endpoints under `/api/ideas/:id`, transactional `likesCount`/`commentsCount` counters, per-caller `liked` flag, and like/comment UI on `IdeasPage`. See `docs/SLICE-7.md`.
 - **7c (done) — Follows + followed-authors feed:** tenant-scoped `/api/follows` (following/followers/suggestions lists + idempotent follow/unfollow), tenant-membership-validated follow targets, per-caller `author.following` flag on ideas, a `GET /api/ideas?author=following` followed-authors feed, and `IdeasPage` Following tab + per-card Follow button + People panel. No migration (the `follows` table shipped with the foundation schema). See `docs/SLICE-7.md`.
-- Scripts marketplace, paid Spaces
+- **7d (done) — Scripts marketplace:** tenant-scoped `/api/scripts` (feed/detail/publish/update/delete/install + favorite/unfavorite over `published_scripts`), public/protected/private visibility with a source-access rule (protected/private source hidden from non-authors), download counting on install, favorites reusing the target-based `likes` table (`target_type='script'`), `priceCents` for paid listings, and a `ScriptsPage` marketplace (filters, sort, favorite, install, owner delete). No migration. See `docs/SLICE-7.md`.
+- Paid Spaces
 - Scripts marketplace (public/invite-only/protected/paid)
 - Paid Spaces (subscription channels)
 

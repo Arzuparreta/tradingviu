@@ -39,3 +39,43 @@ export const CreateCommentSchema = z.object({
   parentId: z.string().trim().min(1).max(40).optional(),
 });
 export type CreateComment = z.infer<typeof CreateCommentSchema>;
+
+// Marketplace scripts.
+// public   → open-source, source readable by anyone in the tenant
+// protected → closed-source, listed + installable, source hidden from non-authors
+// private   → only the author can see or install it
+export const ScriptVisibilitySchema = z.enum(['public', 'protected', 'private']);
+export type ScriptVisibility = z.infer<typeof ScriptVisibilitySchema>;
+
+export const ScriptsSortSchema = z.enum(['recent', 'popular']);
+export type ScriptsSort = z.infer<typeof ScriptsSortSchema>;
+
+export const ScriptsQuerySchema = z.object({
+  q: z.string().trim().min(1).max(120).optional(),
+  author: z.string().trim().min(1).max(80).optional(),
+  visibility: ScriptVisibilitySchema.optional(),
+  free: z.coerce.boolean().optional(),
+  sort: ScriptsSortSchema.default('recent'),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+});
+export type ScriptsQuery = z.infer<typeof ScriptsQuerySchema>;
+
+export const PublishScriptSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(4000).optional(),
+  source: z.string().trim().min(1).max(100_000),
+  visibility: ScriptVisibilitySchema.default('public'),
+  license: z.string().trim().min(1).max(80).default('AGPL-3.0'),
+  priceCents: z.coerce.number().int().min(0).max(10_000_00).default(0),
+});
+export type PublishScript = z.infer<typeof PublishScriptSchema>;
+
+export const UpdateScriptSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  description: z.string().trim().min(1).max(4000).optional(),
+  source: z.string().trim().min(1).max(100_000).optional(),
+  visibility: ScriptVisibilitySchema.optional(),
+  license: z.string().trim().min(1).max(80).optional(),
+  priceCents: z.coerce.number().int().min(0).max(10_000_00).optional(),
+});
+export type UpdateScript = z.infer<typeof UpdateScriptSchema>;

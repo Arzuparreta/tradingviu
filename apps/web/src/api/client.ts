@@ -43,6 +43,10 @@ import type {
   IdeaVisibility,
   CommentRow,
   FollowUser,
+  ScriptRow,
+  ScriptDetail,
+  ScriptVisibility,
+  ScriptsSort,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -482,6 +486,48 @@ export const api = {
     request<{ following: boolean }>(`/api/follows/${userId}`, { method: 'POST' }),
   unfollowUser: (userId: string) =>
     request<{ following: boolean }>(`/api/follows/${userId}`, { method: 'DELETE' }),
+  scripts: (
+    params: {
+      q?: string;
+      author?: string;
+      visibility?: ScriptVisibility;
+      free?: boolean;
+      sort?: ScriptsSort;
+      limit?: number;
+    } = {},
+  ) => request<{ scripts: ScriptRow[] }>(`/api/scripts${queryString(params)}`),
+  script: (id: string) => request<{ script: ScriptDetail }>(`/api/scripts/${id}`),
+  publishScript: (body: {
+    name: string;
+    description?: string;
+    source: string;
+    visibility?: ScriptVisibility;
+    license?: string;
+    priceCents?: number;
+  }) => request<{ id: string }>('/api/scripts', { method: 'POST', body: JSON.stringify(body) }),
+  updateScript: (
+    id: string,
+    body: {
+      name?: string;
+      description?: string;
+      source?: string;
+      visibility?: ScriptVisibility;
+      license?: string;
+      priceCents?: number;
+    },
+  ) =>
+    request<{ ok: true }>(`/api/scripts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteScript: (id: string) =>
+    request<{ ok: true }>(`/api/scripts/${id}`, { method: 'DELETE' }),
+  installScript: (id: string) =>
+    request<{ downloads: number; source: string | null; locked: boolean }>(
+      `/api/scripts/${id}/install`,
+      { method: 'POST' },
+    ),
+  favoriteScript: (id: string) =>
+    request<{ favorited: boolean }>(`/api/scripts/${id}/favorite`, { method: 'POST' }),
+  unfavoriteScript: (id: string) =>
+    request<{ favorited: boolean }>(`/api/scripts/${id}/favorite`, { method: 'DELETE' }),
 };
 
 export type {

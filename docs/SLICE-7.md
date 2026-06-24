@@ -101,6 +101,54 @@ Notes:
 - Followed-authors only surfaces ideas inside the caller's tenant, so the feed
   respects tenant isolation even when an author is followed.
 
+## 7d — Scripts Marketplace
+
+Status: done.
+
+Delivered:
+
+- Tenant-scoped `/api/scripts` routes over the existing `published_scripts` table:
+  marketplace feed (`GET /scripts`), detail (`GET /scripts/:id`), publish
+  (`POST /scripts`), owner update (`PATCH /scripts/:id`), owner delete
+  (`DELETE /scripts/:id`), install (`POST /scripts/:id/install`), and favorite /
+  unfavorite (`POST`/`DELETE /scripts/:id/favorite`).
+- Visibility model on the existing `visibility` column:
+  - `public` — open-source, listed, source readable by anyone in the tenant.
+  - `protected` — closed-source, listed + installable, source hidden from
+    non-authors (returned as `null` with `locked: true`).
+  - `private` — only the author can see, open, or install it (404 for others).
+- Source-access rule (`canReadSource`): the author always reads their own source;
+  everyone else reads source only for `public` scripts. Detail and install both
+  honor it, so protected/paid source never leaks.
+- Marketplace feed lists `public` + `protected` (and the caller's own `private`),
+  never includes `source`, and supports `q` (name/description), `author`
+  (`me`/user id), `visibility`, `free` (price = 0), and `sort` (`recent` |
+  `popular` by downloads).
+- Install counts a download (`downloads++`) and returns the source only when
+  readable — closed-source scripts still install (added to library) but keep their
+  source hidden.
+- Favorites reuse the target-based `likes` table with `target_type = 'script'`
+  (idempotent via the existing `likes_user_target_uq` index); the feed/detail
+  surface `favoritesCount` (correlated subquery) and a per-caller `favorited`
+  flag.
+- `priceCents` carries a price for paid scripts (default free); actual purchase /
+  payment is deferred to paid Spaces.
+- Zod schemas in `packages/core/src/social-schemas.ts` (`PublishScript`,
+  `UpdateScript`, `ScriptsQuery`, visibility/sort enums) with unit tests.
+- Web `ScriptsPage` at `/scripts` (linked from the top nav): publish form
+  (name, description, source, visibility, price) and a marketplace with
+  All/Mine/Free filters, Newest/Popular sort, per-card favorite toggle, install
+  (reveals source inline when unlocked, otherwise an "installed, closed-source"
+  note), and owner-only delete.
+
+Notes:
+
+- No DB migration was required — `published_scripts` and `likes` both already
+  shipped with the foundation schema and are in the RLS tenant-isolation set.
+- `author=me` is a reserved selector (ULIDs never collide with `me`), matching the
+  ideas feed.
+
 ## Remaining Slice 7 Work
 
-- Scripts marketplace (public/invite-only/protected/paid) and paid Spaces.
+- Paid Spaces (subscription channels) and a real purchase/entitlement flow for
+  paid scripts.
