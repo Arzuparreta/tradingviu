@@ -70,9 +70,10 @@ src/
 
 ## Git
 
-- Branch per slice. Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
-- PRs must pass: `pnpm lint && pnpm typecheck && pnpm test`.
-- No force-push to main.
+- Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
+- `pnpm lint && pnpm typecheck && pnpm test` must pass before work is considered done.
+
+Branching, PRs, merges, and pushes are left to the operator/harness — this doc does not prescribe a branch workflow.
 
 ## Testing
 
