@@ -135,6 +135,26 @@ export const FundamentalsQuerySchema = z.object({
 });
 export type FundamentalsQuery = z.infer<typeof FundamentalsQuerySchema>;
 
+export const YieldCurveQuerySchema = z.object({
+  country: z.string().trim().min(1).max(80).optional(),
+  source: z.string().trim().min(1).max(80).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  latestOnly: z.coerce.boolean().default(true),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+});
+export type YieldCurveQuery = z.infer<typeof YieldCurveQuerySchema>;
+
+export const MacroSeriesQuerySchema = z.object({
+  country: z.string().trim().min(1).max(80).optional(),
+  metricCode: z.string().trim().min(1).max(80).optional(),
+  source: z.string().trim().min(1).max(80).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+});
+export type MacroSeriesQuery = z.infer<typeof MacroSeriesQuerySchema>;
+
 export const EarningsCalendarQuerySchema = z.object({
   symbol: z.string().trim().min(1).max(80).optional(),
   from: z.coerce.date().optional(),

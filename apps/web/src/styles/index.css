@@ -549,6 +549,31 @@ label {
   font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
   font-weight: 600;
 }
+.discovery-yield-curve {
+  gap: 14px;
+}
+.discovery-yield-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 10px;
+  min-height: 160px;
+  align-items: end;
+}
+.discovery-yield-bar {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 6px;
+  height: 150px;
+  min-width: 0;
+  text-align: center;
+}
+.discovery-yield-fill {
+  align-self: end;
+  width: 100%;
+  min-height: 8px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #22c55e, #38bdf8);
+}
 .discovery-importance {
   border-radius: 999px;
   padding: 2px 8px;

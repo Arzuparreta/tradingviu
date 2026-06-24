@@ -6,9 +6,11 @@ import type {
   EconomicEvent,
   EarningsEvent,
   FundamentalSnapshot,
+  MacroSeriesObservation,
   NewsArticle,
   ScreenerQuery,
   ScreenerResult,
+  YieldCurvePoint,
 } from '../api/types';
 
 type Importance = '' | 'low' | 'medium' | 'high';
@@ -41,6 +43,11 @@ const metric = (value: number | undefined, mode: 'compact' | 'ratio' | 'percent'
 
 const nullableMetric = (value: number | null, mode: 'compact' | 'ratio' | 'percent' = 'ratio') =>
   metric(value === null ? undefined : value, mode);
+
+const tenorLabel = (months: number): string => {
+  if (months < 12) return `${months}M`;
+  return `${months / 12}Y`;
+};
 
 const numeric = (value: string): number | undefined => {
   if (!value.trim()) return undefined;
@@ -219,6 +226,57 @@ function FundamentalsRow({ snapshot }: { snapshot: FundamentalSnapshot }) {
   );
 }
 
+function YieldCurvePanel({ points }: { points: readonly YieldCurvePoint[] }) {
+  const maxRate = points.reduce((max, point) => Math.max(max, point.rate), 0);
+
+  return (
+    <div className="card col discovery-yield-curve">
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <div className="grow">
+          <strong>{points[0]?.country ?? '—'} yield curve</strong>
+          <div className="muted small">
+            {points[0] ? `${dateOnly(points[0].curveDate)} · ${points[0].source}` : 'No points'}
+          </div>
+        </div>
+        <span className="muted small">{points[0]?.currency ?? ''}</span>
+      </div>
+      <div className="discovery-yield-bars">
+        {points.map((point) => (
+          <div key={point.id} className="discovery-yield-bar">
+            <div
+              className="discovery-yield-fill"
+              style={{ height: `${Math.max(8, (point.rate / Math.max(maxRate, 1)) * 100)}%` }}
+            />
+            <span className="mono small">{point.rate.toFixed(2)}%</span>
+            <strong className="mono small">{tenorLabel(point.tenorMonths)}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MacroObservationRow({ observation }: { observation: MacroSeriesObservation }) {
+  return (
+    <div className="card row discovery-event">
+      <div className="mono discovery-date">{dateOnly(observation.observedAt)}</div>
+      <div className="grow">
+        <div>
+          <strong>{observation.metricName}</strong>
+          <span className="muted small"> {observation.country}</span>
+        </div>
+        <div className="muted small">
+          {observation.metricCode} · {observation.frequency} · {observation.source}
+        </div>
+      </div>
+      <span className="mono">
+        {observation.value.toFixed(2)}
+        {observation.unit}
+      </span>
+    </div>
+  );
+}
+
 export function DiscoveryPage() {
   const queryClient = useQueryClient();
   const [symbol, setSymbol] = useState('');
@@ -279,6 +337,14 @@ export function DiscoveryPage() {
   const fundamentalsQ = useQuery({
     queryKey: ['fundamentals', symbol],
     queryFn: () => api.fundamentals({ symbol, fiscalPeriod: 'ttm', latestOnly: true, limit: 8 }),
+  });
+  const yieldCurvesQ = useQuery({
+    queryKey: ['yield-curves', country],
+    queryFn: () => api.yieldCurves({ country, latestOnly: true, limit: 16 }),
+  });
+  const macroSeriesQ = useQuery({
+    queryKey: ['macro-series', country, range],
+    queryFn: () => api.macroSeries({ country, ...range, limit: 20 }),
   });
   const screenerQ = useQuery({
     queryKey: ['screener', screenerParams],
@@ -532,6 +598,31 @@ export function DiscoveryPage() {
           )}
           {fundamentalsQ.data?.snapshots.map((snapshot) => (
             <FundamentalsRow key={snapshot.id} snapshot={snapshot} />
+          ))}
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <h2>Rates & macro</h2>
+            <span className="grow" />
+            <span className="muted small">
+              {(yieldCurvesQ.data?.points.length ?? 0) +
+                (macroSeriesQ.data?.observations.length ?? 0)}
+            </span>
+          </div>
+          {yieldCurvesQ.isLoading && <div className="card muted">Loading yield curve...</div>}
+          {yieldCurvesQ.isError && <div className="card down">Could not load yield curve.</div>}
+          {yieldCurvesQ.data?.points.length === 0 && (
+            <div className="card muted">No yield curve points match this country.</div>
+          )}
+          {(yieldCurvesQ.data?.points.length ?? 0) > 0 && (
+            <YieldCurvePanel points={yieldCurvesQ.data?.points ?? []} />
+          )}
+          {macroSeriesQ.isLoading && <div className="card muted">Loading macro series...</div>}
+          {macroSeriesQ.isError && <div className="card down">Could not load macro series.</div>}
+          {macroSeriesQ.data?.observations.length === 0 && (
+            <div className="card muted">No macro observations match this range.</div>
+          )}
+          {macroSeriesQ.data?.observations.map((observation) => (
+            <MacroObservationRow key={observation.id} observation={observation} />
           ))}
 
           <div className="row" style={{ marginTop: 8 }}>

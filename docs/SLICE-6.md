@@ -87,7 +87,25 @@ Notes:
 - `symbols.metadata` still contains demo values for compatibility, but screener metrics now use `fundamental_snapshots`.
 - Real provider ingestion is not part of this cut; future adapters should write snapshots with super-admin RLS context.
 
+## 6f — Yield Curves + Macro Series
+
+Status: done.
+
+Delivered:
+
+- Global `yield_curves` table for country/date/tenor rate points.
+- Global `macro_series_observations` table for country/metric/date macro observations.
+- RLS policies matching other global discovery tables: public read, super-admin write.
+- Zod-validated `GET /api/macro/yield-curves` endpoint with country, source, date range, latest-only, and limit filters.
+- Zod-validated `GET /api/macro/series` endpoint with country, metric, source, date range, and limit filters.
+- `/discovery` rates & macro panel showing the latest yield curve and matching macro observations.
+- Seeded demo US yield curve and CPI/unemployment/GDP/Fed Funds observations for clean installs.
+
+Notes:
+
+- Provider ingestion is intentionally not part of this cut. Future adapters should write these global tables through the admin connection with super-admin RLS context, following the news ingest pattern.
+
 ## Remaining Slice 6 Work
 
-- Yield curves and macroeconomic series.
 - Real fundamentals provider ingestion.
+- Real yield curve and macro provider ingestion.

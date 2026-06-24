@@ -29,9 +29,11 @@ import type {
   EarningsEvent,
   EconomicEvent,
   FundamentalSnapshot,
+  MacroSeriesObservation,
   ScreenerPreset,
   ScreenerQuery,
   ScreenerResult,
+  YieldCurvePoint,
   PriceAlertCondition,
   OptionPriceResult,
   StrategyAnalysis,
@@ -389,6 +391,27 @@ export const api = {
   fundamentals: (
     params: { symbol?: string; fiscalPeriod?: string; latestOnly?: boolean; limit?: number } = {},
   ) => request<{ snapshots: FundamentalSnapshot[] }>(`/api/fundamentals${queryString(params)}`),
+  yieldCurves: (
+    params: {
+      country?: string;
+      source?: string;
+      from?: string;
+      to?: string;
+      latestOnly?: boolean;
+      limit?: number;
+    } = {},
+  ) => request<{ points: YieldCurvePoint[] }>(`/api/macro/yield-curves${queryString(params)}`),
+  macroSeries: (
+    params: {
+      country?: string;
+      metricCode?: string;
+      source?: string;
+      from?: string;
+      to?: string;
+      limit?: number;
+    } = {},
+  ) =>
+    request<{ observations: MacroSeriesObservation[] }>(`/api/macro/series${queryString(params)}`),
   screener: (params: ScreenerQuery = {}) =>
     request<{ results: ScreenerResult[] }>(`/api/screener${queryString(params)}`),
   screenerPresets: (params: { assetClass?: string } = {}) =>
@@ -424,8 +447,10 @@ export type {
   EarningsEvent,
   EconomicEvent,
   FundamentalSnapshot,
+  MacroSeriesObservation,
   ScreenerPreset,
   ScreenerResult,
+  YieldCurvePoint,
 };
 
 export { ApiError };

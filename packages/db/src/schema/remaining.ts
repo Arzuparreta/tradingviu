@@ -584,6 +584,62 @@ export const fundamentalSnapshots = pgTable(
   }),
 );
 
+export const yieldCurves = pgTable(
+  'yield_curves',
+  {
+    id: id(),
+    country: text('country').notNull(),
+    curveDate: timestamp('curve_date', { withTimezone: true, mode: 'date' }).notNull(),
+    tenorMonths: integer('tenor_months').notNull(),
+    rate: doublePrecision('rate').notNull(),
+    currency: text('currency').notNull().default('USD'),
+    source: text('source').notNull().default('manual'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (t) => ({
+    countryDateIdx: index('yield_curves_country_date_idx').on(t.country, t.curveDate),
+    pointUq: uniqueIndex('yield_curves_point_uq').on(
+      t.country,
+      t.curveDate,
+      t.tenorMonths,
+      t.source,
+    ),
+  }),
+);
+
+export const macroSeriesObservations = pgTable(
+  'macro_series_observations',
+  {
+    id: id(),
+    country: text('country').notNull(),
+    metricCode: text('metric_code').notNull(),
+    metricName: text('metric_name').notNull(),
+    observedAt: timestamp('observed_at', { withTimezone: true, mode: 'date' }).notNull(),
+    value: doublePrecision('value').notNull(),
+    unit: text('unit').notNull(),
+    frequency: text('frequency').notNull(),
+    source: text('source').notNull().default('manual'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (t) => ({
+    countryMetricDateIdx: index('macro_series_country_metric_date_idx').on(
+      t.country,
+      t.metricCode,
+      t.observedAt,
+    ),
+    pointUq: uniqueIndex('macro_series_point_uq').on(
+      t.country,
+      t.metricCode,
+      t.observedAt,
+      t.source,
+    ),
+  }),
+);
+
 export const auditLog = pgTable(
   'audit_log',
   {

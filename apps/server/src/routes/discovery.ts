@@ -6,7 +6,9 @@ import {
   EconomicCalendarQuerySchema,
   EarningsCalendarQuerySchema,
   FundamentalsQuerySchema,
+  MacroSeriesQuerySchema,
   NewsQuerySchema,
+  YieldCurveQuerySchema,
 } from '@tv/core';
 import {
   dividendCalendar,
@@ -14,8 +16,10 @@ import {
   economicEvents,
   exchanges,
   fundamentalSnapshots,
+  macroSeriesObservations,
   newsArticles,
   symbols,
+  yieldCurves,
 } from '@tv/db/schema';
 
 const maybeWhere = (filters: readonly SQL[]): SQL | undefined =>
@@ -217,4 +221,74 @@ export const discoveryRoutes = new Hono()
       .limit(q.limit);
 
     return c.json({ snapshots: rows });
+  })
+  .get('/macro/yield-curves', zValidator('query', YieldCurveQuerySchema), async (c) => {
+    const q = c.req.valid('query');
+    const db = c.get('db');
+    const filters: SQL[] = [];
+
+    if (q.country) filters.push(ilike(yieldCurves.country, q.country));
+    if (q.source) filters.push(ilike(yieldCurves.source, q.source));
+    if (q.from) filters.push(gte(yieldCurves.curveDate, q.from));
+    if (q.to) filters.push(lte(yieldCurves.curveDate, q.to));
+    if (q.latestOnly) {
+      filters.push(sql`${yieldCurves.curveDate} = (
+        SELECT max(yc.curve_date)
+        FROM yield_curves yc
+        WHERE yc.country = ${yieldCurves.country}
+      )`);
+    }
+
+    const rows = await db
+      .select({
+        id: yieldCurves.id,
+        country: yieldCurves.country,
+        curveDate: yieldCurves.curveDate,
+        tenorMonths: yieldCurves.tenorMonths,
+        rate: yieldCurves.rate,
+        currency: yieldCurves.currency,
+        source: yieldCurves.source,
+        fetchedAt: yieldCurves.fetchedAt,
+      })
+      .from(yieldCurves)
+      .where(maybeWhere(filters))
+      .orderBy(asc(yieldCurves.country), desc(yieldCurves.curveDate), asc(yieldCurves.tenorMonths))
+      .limit(q.limit);
+
+    return c.json({ points: rows });
+  })
+  .get('/macro/series', zValidator('query', MacroSeriesQuerySchema), async (c) => {
+    const q = c.req.valid('query');
+    const db = c.get('db');
+    const filters: SQL[] = [];
+
+    if (q.country) filters.push(ilike(macroSeriesObservations.country, q.country));
+    if (q.metricCode) filters.push(ilike(macroSeriesObservations.metricCode, q.metricCode));
+    if (q.source) filters.push(ilike(macroSeriesObservations.source, q.source));
+    if (q.from) filters.push(gte(macroSeriesObservations.observedAt, q.from));
+    if (q.to) filters.push(lte(macroSeriesObservations.observedAt, q.to));
+
+    const rows = await db
+      .select({
+        id: macroSeriesObservations.id,
+        country: macroSeriesObservations.country,
+        metricCode: macroSeriesObservations.metricCode,
+        metricName: macroSeriesObservations.metricName,
+        observedAt: macroSeriesObservations.observedAt,
+        value: macroSeriesObservations.value,
+        unit: macroSeriesObservations.unit,
+        frequency: macroSeriesObservations.frequency,
+        source: macroSeriesObservations.source,
+        fetchedAt: macroSeriesObservations.fetchedAt,
+      })
+      .from(macroSeriesObservations)
+      .where(maybeWhere(filters))
+      .orderBy(
+        asc(macroSeriesObservations.country),
+        asc(macroSeriesObservations.metricCode),
+        asc(macroSeriesObservations.observedAt),
+      )
+      .limit(q.limit);
+
+    return c.json({ observations: rows });
   });

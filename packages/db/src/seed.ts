@@ -6,10 +6,12 @@ import {
   dividendCalendar,
   economicEvents,
   fundamentalSnapshots,
+  macroSeriesObservations,
   newsArticles,
   plans,
   exchanges,
   symbols,
+  yieldCurves,
 } from './schema/index.js';
 import { DEFAULT_FREE_QUOTAS, UNLIMITED_QUOTAS } from './schema/plans.js';
 import { ulid } from 'ulid';
@@ -595,6 +597,108 @@ if (!existingEconomicDemo) {
     previous: '0.2%',
   });
 }
+
+const demoCurveDate = new Date('2026-06-23T00:00:00.000Z');
+await db
+  .insert(yieldCurves)
+  .values([
+    {
+      id: ulid(),
+      country: 'US',
+      curveDate: demoCurveDate,
+      tenorMonths: 3,
+      rate: 4.82,
+      currency: 'USD',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      curveDate: demoCurveDate,
+      tenorMonths: 24,
+      rate: 4.61,
+      currency: 'USD',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      curveDate: demoCurveDate,
+      tenorMonths: 60,
+      rate: 4.43,
+      currency: 'USD',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      curveDate: demoCurveDate,
+      tenorMonths: 120,
+      rate: 4.38,
+      currency: 'USD',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      curveDate: demoCurveDate,
+      tenorMonths: 360,
+      rate: 4.72,
+      currency: 'USD',
+      source: 'Tradingviu Demo',
+    },
+  ])
+  .onConflictDoNothing();
+
+await db
+  .insert(macroSeriesObservations)
+  .values([
+    {
+      id: ulid(),
+      country: 'US',
+      metricCode: 'CPI_YOY',
+      metricName: 'Consumer Price Index YoY',
+      observedAt: new Date('2026-05-31T00:00:00.000Z'),
+      value: 2.8,
+      unit: '%',
+      frequency: 'monthly',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      metricCode: 'UNRATE',
+      metricName: 'Unemployment Rate',
+      observedAt: new Date('2026-05-31T00:00:00.000Z'),
+      value: 4.1,
+      unit: '%',
+      frequency: 'monthly',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      metricCode: 'GDP_QOQ',
+      metricName: 'Real GDP QoQ',
+      observedAt: new Date('2026-03-31T00:00:00.000Z'),
+      value: 1.4,
+      unit: '%',
+      frequency: 'quarterly',
+      source: 'Tradingviu Demo',
+    },
+    {
+      id: ulid(),
+      country: 'US',
+      metricCode: 'FEDFUNDS',
+      metricName: 'Effective Federal Funds Rate',
+      observedAt: new Date('2026-05-31T00:00:00.000Z'),
+      value: 4.83,
+      unit: '%',
+      frequency: 'monthly',
+      source: 'Tradingviu Demo',
+    },
+  ])
+  .onConflictDoNothing();
 
 console.log('seed done');
 process.exit(0);

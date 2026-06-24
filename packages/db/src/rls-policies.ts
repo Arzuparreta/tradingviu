@@ -37,6 +37,10 @@ ALTER TABLE economic_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE economic_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE fundamental_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fundamental_snapshots FORCE ROW LEVEL SECURITY;
+ALTER TABLE yield_curves ENABLE ROW LEVEL SECURITY;
+ALTER TABLE yield_curves FORCE ROW LEVEL SECURITY;
+ALTER TABLE macro_series_observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE macro_series_observations FORCE ROW LEVEL SECURITY;
 ALTER TABLE provider_health ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_health FORCE ROW LEVEL SECURITY;
 
@@ -93,6 +97,18 @@ DROP POLICY IF EXISTS fundamentals_read ON fundamental_snapshots;
 CREATE POLICY fundamentals_read ON fundamental_snapshots FOR SELECT USING (true);
 DROP POLICY IF EXISTS fundamentals_write ON fundamental_snapshots;
 CREATE POLICY fundamentals_write ON fundamental_snapshots FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
+
+DROP POLICY IF EXISTS yield_curves_read ON yield_curves;
+CREATE POLICY yield_curves_read ON yield_curves FOR SELECT USING (true);
+DROP POLICY IF EXISTS yield_curves_write ON yield_curves;
+CREATE POLICY yield_curves_write ON yield_curves FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
+
+DROP POLICY IF EXISTS macro_series_read ON macro_series_observations;
+CREATE POLICY macro_series_read ON macro_series_observations FOR SELECT USING (true);
+DROP POLICY IF EXISTS macro_series_write ON macro_series_observations;
+CREATE POLICY macro_series_write ON macro_series_observations FOR ALL
   USING (is_super_admin()) WITH CHECK (is_super_admin());
 
 DROP POLICY IF EXISTS provider_health_read ON provider_health;

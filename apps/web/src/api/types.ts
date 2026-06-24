@@ -371,6 +371,30 @@ export interface FundamentalSnapshot {
   };
 }
 
+export interface YieldCurvePoint {
+  id: string;
+  country: string;
+  curveDate: string;
+  tenorMonths: number;
+  rate: number;
+  currency: string;
+  source: string;
+  fetchedAt: string;
+}
+
+export interface MacroSeriesObservation {
+  id: string;
+  country: string;
+  metricCode: string;
+  metricName: string;
+  observedAt: string;
+  value: number;
+  unit: string;
+  frequency: string;
+  source: string;
+  fetchedAt: string;
+}
+
 export type ScreenerMetric =
   | 'marketCap'
   | 'peRatio'
