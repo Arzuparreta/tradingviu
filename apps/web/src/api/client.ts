@@ -1,6 +1,7 @@
 import type {
   AuthResponse,
   Bar,
+  DomBook,
   IndicatorDef,
   IndicatorOutput,
   LayoutRow,
@@ -104,6 +105,18 @@ export const api = {
     }>(
       `/api/chart/history?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
     ),
+  dom: (symbol: string, levels = 16) =>
+    request<{
+      symbol: {
+        id: string;
+        exchange: string;
+        ticker: string;
+        name: string;
+        assetClass: string;
+        currency: string;
+      };
+      book: DomBook;
+    }>(`/api/chart/dom?symbol=${encodeURIComponent(symbol)}&levels=${levels}`),
   plans: () => request<{ plans: Plan[] }>('/api/billing/plans'),
   quotas: () =>
     request<{ planCode: string; quotas: Record<string, unknown> }>('/api/billing/quotas'),
@@ -328,6 +341,7 @@ export const api = {
 
 export type {
   Bar,
+  DomBook,
   IndicatorDef,
   IndicatorOutput,
   Watchlist,

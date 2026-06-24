@@ -48,6 +48,22 @@ export interface Bar {
   volume: number;
 }
 
+export interface DomLevel {
+  price: number;
+  size: number;
+  cumulative: number;
+}
+
+export interface DomBook {
+  mid: number;
+  spread: number;
+  tickSize: number;
+  bids: DomLevel[];
+  asks: DomLevel[];
+  imbalance: number;
+  generatedAt: string;
+}
+
 export interface IndicatorDef {
   id: string;
   name: string;

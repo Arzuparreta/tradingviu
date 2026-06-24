@@ -4,9 +4,9 @@ Slice 5 ("trading desk") is being delivered in sequenced pieces:
 
 1. **5a — Options engine (pricing + greeks + strategy builder + payoff)** ✅ (this commit)
 2. **5b — Broker adapters (Alpaca, IBKR Client Portal, Binance live)** ✅
-3. 5c — DOM (depth of market) + chart trading — pending
+3. **5c — DOM (depth of market) + chart trading** ✅
 
-The options engine shipped first because it is pure, deterministic math. Broker adapters are now in place behind encrypted tenant-scoped connections. The next trading-desk slice is DOM + chart trading on top of the broker connection surface.
+The options engine shipped first because it is pure, deterministic math. Broker adapters are now in place behind encrypted tenant-scoped connections. DOM + chart trading now uses that broker surface plus paper trading for chart-side order entry.
 
 ---
 
@@ -95,6 +95,27 @@ buildAndAnalyze('iron_condor', {
 
 `pnpm --filter @tv/broker-adapters test` uses mocked `fetch` only. No real broker network calls.
 
-## What's next (5c)
+## 5c — DOM + chart trading
 
-- DOM + chart trading: order ticket on the chart, depth ladder, bracket orders. Reuse the paper-trading fill model for simulated brokers and the 5b broker connection routes for live submission.
+### What it delivers
+
+- Zod contracts in `packages/core/src/dom-schemas.ts`.
+- Pure deterministic DOM builder in `apps/server/src/services/depth.ts`.
+- `GET /api/chart/dom` for a recent-bar-derived bid/ask ladder with spread, tick size, cumulative depth, and imbalance.
+- `ChartPage` right-side trading panel:
+  - DOM ladder with bid/ask depth bars.
+  - Click ask rows to stage buy limits; click bid rows to stage sell limits.
+  - Market/limit order ticket.
+  - Destination selector for paper accounts or broker connections.
+  - Submits through existing `/api/paper/accounts/:id/orders` and `/api/brokers/connections/:id/orders`.
+
+The DOM is intentionally deterministic from recent bars, not persisted fake L2 data. It gives the product a complete trading workflow now and can be replaced by a real L2 provider later without changing the chart ticket contract.
+
+### Tests
+
+`apps/server/src/services/depth.test.ts` covers monotonic bid/ask ladder construction, cumulative depth, imbalance bounds, and tick-size estimation.
+
+## What's next
+
+- Slice 6: news, earnings/economic/dividend calendars, yield curves, fundamentals, and screener.
+- Later trading-desk expansion: real L2 adapters, bracket/OCO orders, open-order management, drag orders directly on the chart.

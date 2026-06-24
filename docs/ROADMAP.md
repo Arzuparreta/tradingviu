@@ -4,24 +4,24 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), and Slice 4 (alerts + portfolios + paper trading) are done and committed. Slice 5 is in progress — 5a (options engine) and 5b (broker adapters) are done.** This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** This doc maps the full scope so you can keep building.
 
 ## Status
 
 > Slice numbers are 1-indexed and match the `docs/SLICE-N.md` files and the "What each slice delivers" section below.
 
-| Slice | Scope                                                                                                      | Status                                                       |
-| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)                                          |
-| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)                                          |
-| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)                                          |
-| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                                          |
-| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | 🚧 in progress — 5a options engine + 5b broker adapters done |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | pending                                                      |
-| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                                                      |
-| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                                      |
-| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                                      |
-| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                                      |
+| Slice | Scope                                                                                                      | Status              |
+| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`) |
+| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`) |
+| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`) |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`) |
+| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done             |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | pending             |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending             |
+| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending             |
+| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending             |
+| 10    | Public API + plugin SDK + ecosystem                                                                        | pending             |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -174,11 +174,11 @@ tradingviu/
 - Web app pages: Alerts, Portfolios, Paper
 - No DB migration was required: the foundation schema already contained the tenant-scoped tables.
 
-### Slice 5 (in progress) — Brokers + DOM + Options
+### Slice 5 (done) — Brokers + DOM + Options
 
 - **5a (done) — Options engine:** Black-Scholes pricing, full greeks, implied volatility, option chain, 13-strategy builder (verticals, straddle/strangle, condors, butterflies), expiration payoff (max profit/loss, breakevens, net greeks). Pure `packages/options-engine` + `/api/options/*` + `OptionsPage`. See `docs/SLICE-5.md`.
 - **5b (done) — Broker adapters:** `packages/broker-adapters` with Alpaca, Binance Spot/Testnet, and IBKR Client Portal adapters; tenant-scoped `/api/brokers/*` connection routes; libsodium-encrypted credentials in `broker_connections.credentials_encrypted`; `BrokersPage` for connect/test/accounts/positions/orders.
-- 5c (pending) — DOM (depth of market) and chart trading
+- **5c (done) — DOM + chart trading:** `/api/chart/dom` returns a deterministic depth ladder from recent market bars; `ChartPage` adds a DOM ladder and order ticket; users can click bid/ask levels to prepare limit orders and submit to paper accounts or live broker connections.
 - Later — volatility surface, P&L profile across time/vol (not just at expiration)
 
 ### Slice 6 — News + Calendars + Screener
@@ -322,7 +322,7 @@ When you pick up this repo, you should be able to:
 
 1. Read this file and know exactly where the project is and where to go next.
 2. Run `pnpm install && pnpm dev` and see the dashboard, chart with live bars, and watchlists.
-3. Continue slice 5 with 5c (DOM + chart trading). Options analytics (5a) and broker adapters/connections (5b) are done.
+3. Continue with Slice 6: news, earnings/economic/dividend calendars, yield curves, fundamentals, and screener.
 4. Not have to re-discover the RLS/transactions gotcha — it's documented here.
 
 If something is unclear, fix the docs. If something is broken, fix the code. If something is missing, build it.
