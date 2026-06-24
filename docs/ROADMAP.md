@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), and Slice 3 (Pine Script + multi-chart + search) are done and committed.** This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), and Slice 4 (alerts + portfolios + paper trading) are done and committed.** This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -13,7 +13,7 @@
 | 0 | Cimientos (monorepo, DB, auth, plans, charts) | ✅ done (`cf23b90`) |
 | 1 | Indicators (31), live WS bars, watchlists | ✅ done (`39a6465`) |
 | 2 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (`ac02b78`) |
-| 3 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ⏳ next |
+| 3 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ✅ done |
 | 4 | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | pending |
 | 5 | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener | pending |
 | 6 | Social (ideas, comments, follows, scripts marketplace, paid spaces) | pending |
@@ -146,7 +146,7 @@ tradingviu/
 - Watchlists full CRUD with RLS isolation
 - Chart UI: interval selector, indicator dropdown, multi-pane with bands, WS live updates
 
-### Slice 3 (next) — Pine Script + Multi-chart + Search
+### Slice 3 (done) — Pine Script + Multi-chart + Search
 - **Pine Script v5 subset parser** — PEG grammar (peggy) → AST. Subset: indicators, plots, plotshape, inputs, request.security, ta.* builtins, simple strategies.
 - **Pine interpreter** — AST-walk in TS, sandboxed, no eval.
 - **Pine editor** — Monaco with autocomplete (LSP-style).
@@ -155,12 +155,14 @@ tradingviu/
 - **Meilisearch** — full-text search on symbols, ideas, scripts.
 - **Layouts persistence** — save/load workspace configurations.
 
-### Slice 4 — Alerts + Portfolios + Paper trading
-- Alert engine: price, indicator, multi-condition
-- Channels: in-app, email (Postmark), webhook
-- Portfolios CRUD with P&L, transactions, dividends
-- Paper trading engine with fill models (instant, partial, slippage)
-- Risk metrics (Sharpe, drawdown, win rate)
+### Slice 4 (done) — Alerts + Portfolios + Paper trading
+- Alert engine: price, indicator, multi-condition evaluator
+- Channels: in-app delivered now; email/webhook recorded for future workers
+- Alerts CRUD + manual evaluation endpoint + alert history
+- Portfolios CRUD with transactions, holdings rebuild, dividends, fees, realized P&L
+- Paper accounts + market/limit paper orders with instant/pending fills, fees, slippage, buying-power check
+- Web app pages: Alerts, Portfolios, Paper
+- No DB migration was required: the foundation schema already contained the tenant-scoped tables.
 
 ### Slice 5 — Brokers + DOM + Options
 - Alpaca, IBKR (Client Portal API), Binance live trading adapters
@@ -241,7 +243,13 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 | `apps/server/src/middleware/super-admin.ts` | Same but bypasses RLS (gated by `claims.sa`) |
 | `apps/server/src/middleware/error.ts` | TvError → JSON response |
 | `apps/server/src/routes/auth.ts` | Signup, login, /me — uses admin connection for cross-tenant inserts |
+| `apps/server/src/routes/alerts.ts` | Alerts CRUD, evaluation, and history |
+| `apps/server/src/routes/portfolios.ts` | Portfolios, transactions, holdings rebuild, P&L metrics |
+| `apps/server/src/routes/paper.ts` | Paper accounts and market/limit paper orders |
 | `apps/server/src/services/ws.ts` | WebSocket handlers, broadcast, CCXT subscribe |
+| `apps/server/src/services/alert-engine.ts` | Pure alert condition evaluator |
+| `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic |
+| `apps/server/src/services/paper-trading.ts` | Pure paper fill model |
 | `apps/server/src/services/data.ts` | CCXT provider registry |
 | `apps/web/src/pages/ChartPage.tsx` | The chart UI: indicators, live bars, multi-pane |
 | `apps/web/src/pages/WatchlistsPage.tsx` | Watchlist CRUD UI |

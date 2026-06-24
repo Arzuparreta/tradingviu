@@ -105,3 +105,115 @@ export interface Plan {
   isPublic: boolean;
   isDefault: boolean;
 }
+
+export type AlertOperator = 'above' | 'below' | 'crosses_above' | 'crosses_below' | 'equals';
+export type AlertChannel = 'in_app' | 'email' | 'webhook';
+
+export interface PriceAlertCondition {
+  type: 'price';
+  operator: AlertOperator;
+  value: number;
+}
+
+export interface AlertRow {
+  id: string;
+  symbolId: string;
+  name: string;
+  kind: string;
+  condition: PriceAlertCondition | Record<string, unknown>;
+  channels: AlertChannel[];
+  active: boolean;
+  expiresAt: string | null;
+  lastFiredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}
+
+export interface AlertHistoryRow {
+  id: string;
+  alertId: string;
+  tenantId: string;
+  firedAt: string;
+  price: string | null;
+  payload: unknown;
+  delivered: Record<string, boolean>;
+}
+
+export interface PortfolioRow {
+  id: string;
+  name: string;
+  baseCurrency: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortfolioHolding {
+  id: string;
+  symbolId: string;
+  quantity: string;
+  avgCost: string | null;
+  openedAt: string;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}
+
+export interface PortfolioTransaction {
+  id: string;
+  tenantId: string;
+  portfolioId: string;
+  symbolId: string;
+  side: 'buy' | 'sell' | 'dividend';
+  quantity: string;
+  price: string;
+  fee: string;
+  occurredAt: string;
+  note: string | null;
+}
+
+export interface PortfolioMetrics {
+  invested: number;
+  marketValue: number;
+  realizedPnl: number;
+  dividends: number;
+  fees: number;
+  openPositions: number;
+}
+
+export interface PaperAccount {
+  id: string;
+  name: string;
+  balance: string;
+  currency: string;
+  leverage: string;
+  createdAt: string;
+}
+
+export interface PaperOrder {
+  id: string;
+  symbolId: string;
+  side: 'buy' | 'sell';
+  type: 'market' | 'limit';
+  quantity: string;
+  price: string | null;
+  status: 'pending' | 'filled';
+  filledAt: string | null;
+  fillPrice: string | null;
+  fee: string;
+  createdAt: string;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}

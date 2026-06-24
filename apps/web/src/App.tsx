@@ -9,6 +9,9 @@ import { AdminPage } from './pages/AdminPage';
 import { WatchlistsPage } from './pages/WatchlistsPage';
 import { LayoutPage } from './pages/LayoutPage';
 import { PineEditorPage } from './pages/PineEditorPage';
+import { AlertsPage } from './pages/AlertsPage';
+import { PortfoliosPage } from './pages/PortfoliosPage';
+import { PaperTradingPage } from './pages/PaperTradingPage';
 import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
@@ -24,6 +27,9 @@ function TopBar() {
             <Link to="/chart" className={loc.pathname.startsWith('/chart') ? 'active' : ''}>Chart</Link>
             <Link to="/layout" className={loc.pathname.startsWith('/layout') ? 'active' : ''}>Layouts</Link>
             <Link to="/pine" className={loc.pathname.startsWith('/pine') ? 'active' : ''}>Pine</Link>
+            <Link to="/alerts" className={loc.pathname.startsWith('/alerts') ? 'active' : ''}>Alerts</Link>
+            <Link to="/portfolios" className={loc.pathname.startsWith('/portfolios') ? 'active' : ''}>Portfolios</Link>
+            <Link to="/paper" className={loc.pathname.startsWith('/paper') ? 'active' : ''}>Paper</Link>
             <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>Watchlists</Link>
             {user.globalRole === 'super_admin' && (
               <Link to="/admin" className={loc.pathname === '/admin' ? 'active' : ''}>Admin</Link>
@@ -64,6 +70,9 @@ export function App() {
         <Route path="/chart/:symbol" element={<RequireAuth><ChartPage /></RequireAuth>} />
         <Route path="/layout" element={<RequireAuth><LayoutPage /></RequireAuth>} />
         <Route path="/pine" element={<RequireAuth><PineEditorPage /></RequireAuth>} />
+        <Route path="/alerts" element={<RequireAuth><AlertsPage /></RequireAuth>} />
+        <Route path="/portfolios" element={<RequireAuth><PortfoliosPage /></RequireAuth>} />
+        <Route path="/paper" element={<RequireAuth><PaperTradingPage /></RequireAuth>} />
         <Route path="/watchlists" element={<RequireAuth><WatchlistsPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />

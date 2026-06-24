@@ -10,6 +10,15 @@ import type {
   Tenant,
   Watchlist,
   WatchlistItem,
+  AlertRow,
+  AlertHistoryRow,
+  PortfolioRow,
+  PortfolioHolding,
+  PortfolioMetrics,
+  PortfolioTransaction,
+  PaperAccount,
+  PaperOrder,
+  PriceAlertCondition,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -98,6 +107,49 @@ export const api = {
     request<ValidateResult>('/api/pine/validate', { method: 'POST', body: JSON.stringify({ source }) }),
   pineRun: (body: { source: string; symbol: string; interval?: string; inputs?: PineInputs; limit?: number }) =>
     request<PineRunResponse>('/api/pine/run', { method: 'POST', body: JSON.stringify(body) }),
+  alerts: () => request<{ alerts: AlertRow[] }>('/api/alerts'),
+  createAlert: (body: { symbolId: string; name: string; condition: PriceAlertCondition; channels: string[]; active?: boolean }) =>
+    request<{ id: string }>('/api/alerts', { method: 'POST', body: JSON.stringify(body) }),
+  updateAlert: (id: string, body: { active?: boolean }) =>
+    request<{ ok: true }>(`/api/alerts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteAlert: (id: string) =>
+    request<{ ok: true }>(`/api/alerts/${id}`, { method: 'DELETE' }),
+  evaluateAlert: (id: string, body: { price?: number; previousPrice?: number } = {}) =>
+    request<{ result: { fired: boolean; value: number; reason: string } }>(`/api/alerts/${id}/evaluate`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  alertHistory: (id: string) => request<{ history: AlertHistoryRow[] }>(`/api/alerts/${id}/history`),
+  portfolios: () => request<{ portfolios: PortfolioRow[] }>('/api/portfolios'),
+  createPortfolio: (body: { name: string; baseCurrency?: string }) =>
+    request<{ id: string }>('/api/portfolios', { method: 'POST', body: JSON.stringify(body) }),
+  portfolio: (id: string) =>
+    request<{ portfolio: PortfolioRow; holdings: PortfolioHolding[]; transactions: PortfolioTransaction[]; metrics: PortfolioMetrics }>(
+      `/api/portfolios/${id}`,
+    ),
+  deletePortfolio: (id: string) =>
+    request<{ ok: true }>(`/api/portfolios/${id}`, { method: 'DELETE' }),
+  addPortfolioTransaction: (
+    id: string,
+    body: { symbolId: string; side: 'buy' | 'sell' | 'dividend'; quantity: number; price: number; fee?: number; note?: string },
+  ) =>
+    request<{ id: string; metrics: PortfolioMetrics }>(`/api/portfolios/${id}/transactions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  paperAccounts: () => request<{ accounts: PaperAccount[] }>('/api/paper/accounts'),
+  createPaperAccount: (body: { name: string; balance?: number; currency?: string; leverage?: number }) =>
+    request<{ id: string }>('/api/paper/accounts', { method: 'POST', body: JSON.stringify(body) }),
+  paperAccount: (id: string) =>
+    request<{ account: PaperAccount; orders: PaperOrder[] }>(`/api/paper/accounts/${id}`),
+  placePaperOrder: (
+    id: string,
+    body: { symbolId: string; side: 'buy' | 'sell'; type: 'market' | 'limit'; quantity: number; limitPrice?: number; lastPrice?: number },
+  ) =>
+    request<{ id: string; fill: { status: 'filled' | 'pending'; fillPrice?: number; fee: number; cashDelta: number } }>(
+      `/api/paper/accounts/${id}/orders`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 };
 
 export type {
@@ -107,6 +159,9 @@ export type {
   Watchlist,
   WatchlistItem,
   Plan,
+  AlertRow,
+  PortfolioRow,
+  PaperAccount,
 };
 
 export { ApiError };

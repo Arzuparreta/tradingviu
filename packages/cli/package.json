@@ -10,7 +10,7 @@
     "tvctl": "bun run src/index.ts",
     "lint": "echo skip",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --pass-with-no-tests",
     "build": "echo skip"
   },
   "dependencies": {

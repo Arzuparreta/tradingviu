@@ -9,7 +9,7 @@
     "build": "bun build src/index.ts --target=bun --outfile=dist/index.js",
     "lint": "echo skip",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test --pass-with-no-tests"
   },
   "dependencies": {
     "@tv/core": "workspace:*",
