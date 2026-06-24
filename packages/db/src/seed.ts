@@ -1,7 +1,7 @@
 import { createDb } from './client.js';
 import { applyRls } from './rls-policies.js';
-import { eq } from 'drizzle-orm';
-import { plans, exchanges, symbols } from './schema/index.js';
+import { and, eq } from 'drizzle-orm';
+import { earningsCalendar, economicEvents, newsArticles, plans, exchanges, symbols } from './schema/index.js';
 import { DEFAULT_FREE_QUOTAS, UNLIMITED_QUOTAS } from './schema/plans.js';
 import { ulid } from 'ulid';
 import postgres from 'postgres';
@@ -172,6 +172,7 @@ console.log('seeding starter symbols...');
 const binanceId = (await db.select().from(exchanges).where(eq(exchanges.code, 'BINANCE')))[0]?.id;
 const coinbaseId = (await db.select().from(exchanges).where(eq(exchanges.code, 'COINBASE')))[0]?.id;
 const krakenId = (await db.select().from(exchanges).where(eq(exchanges.code, 'KRAKEN')))[0]?.id;
+const nasdaqId = (await db.select().from(exchanges).where(eq(exchanges.code, 'NASDAQ')))[0]?.id;
 
 if (binanceId && coinbaseId && krakenId) {
   await db
@@ -190,6 +191,79 @@ if (binanceId && coinbaseId && krakenId) {
       { id: ulid(), exchangeId: krakenId, ticker: 'BTCUSD', name: 'Bitcoin / US Dollar (Kraken)', assetClass: 'crypto', baseCurrency: 'BTC', quoteCurrency: 'USD', currency: 'USD' },
     ])
     .onConflictDoNothing();
+}
+
+if (nasdaqId) {
+  await db
+    .insert(symbols)
+    .values([
+      { id: ulid(), exchangeId: nasdaqId, ticker: 'AAPL', name: 'Apple Inc.', assetClass: 'stock', currency: 'USD', country: 'US', sector: 'Technology', industry: 'Consumer Electronics' },
+      { id: ulid(), exchangeId: nasdaqId, ticker: 'MSFT', name: 'Microsoft Corporation', assetClass: 'stock', currency: 'USD', country: 'US', sector: 'Technology', industry: 'Software' },
+    ])
+    .onConflictDoNothing();
+}
+
+console.log('seeding discovery demo data...');
+const aapl = nasdaqId
+  ? (await db.select().from(symbols).where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'AAPL'))).limit(1))[0]
+  : undefined;
+const msft = nasdaqId
+  ? (await db.select().from(symbols).where(and(eq(symbols.exchangeId, nasdaqId), eq(symbols.ticker, 'MSFT'))).limit(1))[0]
+  : undefined;
+
+await db
+  .insert(newsArticles)
+  .values([
+    {
+      id: ulid(),
+      source: 'Tradingviu Demo',
+      url: 'https://example.com/tradingviu/news/crypto-liquidity',
+      title: 'Crypto liquidity firms up as majors hold trend support',
+      body: 'Bitcoin and Ethereum remain the main focus for intraday momentum desks as spot volumes improve.',
+      symbols: ['BTCUSDT', 'ETHUSDT'],
+      sentiment: 'positive',
+      publishedAt: new Date('2026-06-20T13:30:00.000Z'),
+    },
+    {
+      id: ulid(),
+      source: 'Tradingviu Demo',
+      url: 'https://example.com/tradingviu/news/macro-dollar-watch',
+      title: 'Dollar traders watch the next inflation print for rate-cut timing',
+      body: 'The macro calendar is likely to steer risk appetite across equities, rates and crypto pairs.',
+      symbols: ['AAPL', 'MSFT', 'BTCUSDT'],
+      sentiment: 'neutral',
+      publishedAt: new Date('2026-06-23T09:00:00.000Z'),
+    },
+  ])
+  .onConflictDoNothing();
+
+if (aapl && msft) {
+  await db
+    .insert(earningsCalendar)
+    .values([
+      { id: ulid(), symbolId: aapl.id, date: new Date('2026-07-02T20:00:00.000Z'), epsEstimate: '1.42', revenueEstimate: '89.3B' },
+      { id: ulid(), symbolId: msft.id, date: new Date('2026-07-09T20:00:00.000Z'), epsEstimate: '3.21', revenueEstimate: '69.8B' },
+    ])
+    .onConflictDoNothing();
+}
+
+const demoEconomicAt = new Date('2026-06-26T12:30:00.000Z');
+const [existingEconomicDemo] = await db
+  .select({ id: economicEvents.id })
+  .from(economicEvents)
+  .where(and(eq(economicEvents.country, 'US'), eq(economicEvents.eventAt, demoEconomicAt), eq(economicEvents.name, 'Core PCE Price Index')))
+  .limit(1);
+
+if (!existingEconomicDemo) {
+  await db.insert(economicEvents).values({
+    id: ulid(),
+    country: 'US',
+    eventAt: demoEconomicAt,
+    name: 'Core PCE Price Index',
+    importance: 'high',
+    forecast: '0.2%',
+    previous: '0.2%',
+  });
 }
 
 console.log('seed done');

@@ -9,3 +9,4 @@ export * from './trading-schemas.js';
 export * from './options-schemas.js';
 export * from './broker-schemas.js';
 export * from './dom-schemas.js';
+export * from './discovery-schemas.js';

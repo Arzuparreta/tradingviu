@@ -289,6 +289,44 @@ export interface BrokerOrder {
   submittedAt?: string;
 }
 
+export interface NewsArticle {
+  id: string;
+  source: string;
+  url: string;
+  title: string;
+  body: string | null;
+  symbols: string[];
+  sentiment: string | null;
+  publishedAt: string;
+  fetchedAt: string;
+}
+
+export interface EarningsEvent {
+  id: string;
+  date: string;
+  epsEstimate: string | null;
+  epsActual: string | null;
+  revenueEstimate: string | null;
+  revenueActual: string | null;
+  symbol: {
+    id: string;
+    ticker: string;
+    name: string;
+    exchange: string;
+  };
+}
+
+export interface EconomicEvent {
+  id: string;
+  country: string;
+  eventAt: string;
+  name: string;
+  importance: 'low' | 'medium' | 'high' | string;
+  actual: string | null;
+  forecast: string | null;
+  previous: string | null;
+}
+
 export type OptionType = 'call' | 'put';
 export type OptionSide = 'long' | 'short';
 export type StrategyTemplate =

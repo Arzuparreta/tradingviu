@@ -24,6 +24,9 @@ import type {
   BrokerHealth,
   BrokerOrder,
   BrokerPosition,
+  NewsArticle,
+  EarningsEvent,
+  EconomicEvent,
   PriceAlertCondition,
   OptionPriceResult,
   StrategyAnalysis,
@@ -75,6 +78,15 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     );
   }
   return (await res.json()) as T;
+};
+
+const queryString = (params: Record<string, string | number | undefined>): string => {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') search.set(key, String(value));
+  }
+  const raw = search.toString();
+  return raw ? `?${raw}` : '';
 };
 
 export const api = {
@@ -337,6 +349,29 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  news: (
+    params: {
+      symbol?: string;
+      source?: string;
+      sentiment?: string;
+      q?: string;
+      from?: string;
+      to?: string;
+      limit?: number;
+    } = {},
+  ) => request<{ articles: NewsArticle[] }>(`/api/news${queryString(params)}`),
+  earningsCalendar: (
+    params: { symbol?: string; from?: string; to?: string; limit?: number } = {},
+  ) => request<{ events: EarningsEvent[] }>(`/api/calendars/earnings${queryString(params)}`),
+  economicCalendar: (
+    params: {
+      country?: string;
+      importance?: 'low' | 'medium' | 'high';
+      from?: string;
+      to?: string;
+      limit?: number;
+    } = {},
+  ) => request<{ events: EconomicEvent[] }>(`/api/calendars/economic${queryString(params)}`),
 };
 
 export type {
@@ -351,6 +386,9 @@ export type {
   PortfolioRow,
   PaperAccount,
   BrokerConnection,
+  NewsArticle,
+  EarningsEvent,
+  EconomicEvent,
 };
 
 export { ApiError };
