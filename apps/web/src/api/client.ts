@@ -3,6 +3,7 @@ import type {
   Bar,
   IndicatorDef,
   IndicatorOutput,
+  LayoutRow,
   Plan,
   Symbol,
   User,
@@ -10,6 +11,7 @@ import type {
   Watchlist,
   WatchlistItem,
 } from './types';
+import type { LayoutConfig } from '@tv/layout-sync';
 
 const TOKEN_KEY = 'tv_token';
 
@@ -80,6 +82,14 @@ export const api = {
     request<{ id: string }>(`/api/watchlists/${id}/items`, { method: 'POST', body: JSON.stringify({ symbol }) }),
   removeFromWatchlist: (id: string, itemId: string) =>
     request<{ ok: true }>(`/api/watchlists/${id}/items/${itemId}`, { method: 'DELETE' }),
+  layouts: () => request<{ layouts: LayoutRow[] }>('/api/layouts'),
+  layout: (id: string) => request<{ layout: LayoutRow }>(`/api/layouts/${id}`),
+  createLayout: (body: { name: string; config: LayoutConfig; isDefault?: boolean }) =>
+    request<{ id: string }>('/api/layouts', { method: 'POST', body: JSON.stringify(body) }),
+  updateLayout: (id: string, body: { name?: string; config?: LayoutConfig; isDefault?: boolean }) =>
+    request<{ ok: true }>(`/api/layouts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteLayout: (id: string) =>
+    request<{ ok: true }>(`/api/layouts/${id}`, { method: 'DELETE' }),
 };
 
 export type {

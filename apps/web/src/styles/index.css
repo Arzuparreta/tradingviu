@@ -120,3 +120,30 @@ label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 
   text-align: left; font-size: 13px;
 }
 .symbol-search-item:hover, .symbol-search-item.active { background: var(--bg-3); border-color: transparent; }
+
+.layout-page { display: grid; grid-template-rows: 44px 1fr; height: 100%; }
+.layout-toolbar {
+  display: flex; align-items: center; gap: var(--gap); padding: 0 var(--gap);
+  background: var(--bg-2); border-bottom: 1px solid var(--border);
+}
+.layout-toolbar select { width: auto; min-width: 160px; }
+.layout-toolbar button { padding: 5px 12px; font-size: 13px; }
+.layout-divider { width: 1px; height: 22px; background: var(--border); }
+.layout-toggle { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-size: 12px; color: var(--text); cursor: pointer; }
+.layout-toggle input { width: auto; }
+
+.layout-grid { display: grid; gap: 2px; background: var(--border); padding: 2px; min-height: 0; }
+.chart-panel {
+  display: grid; grid-template-rows: 30px 1fr; min-width: 0; min-height: 0;
+  background: var(--bg); border: 1px solid transparent; position: relative;
+}
+.chart-panel.active { border-color: var(--accent); }
+.chart-panel-head {
+  display: flex; align-items: center; gap: 6px; padding: 0 6px;
+  background: var(--bg-2); border-bottom: 1px solid var(--border);
+}
+.chart-panel-head .symbol-search { width: 100%; }
+.chart-panel-head select { padding: 3px 6px; font-size: 12px; }
+.chart-panel-sym { padding: 3px 8px; font-size: 12px; flex: 1; text-align: left; }
+.chart-panel-canvas { min-width: 0; min-height: 0; }
+.chart-panel-loading { position: absolute; top: 38px; left: 10px; }

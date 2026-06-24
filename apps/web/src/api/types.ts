@@ -1,3 +1,14 @@
+import type { LayoutConfig } from '@tv/layout-sync';
+
+export interface LayoutRow {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  config: LayoutConfig;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   email: string;

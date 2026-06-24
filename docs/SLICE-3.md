@@ -2,8 +2,8 @@
 
 Slice 3 is being delivered in three sequenced pieces, each on its own branch:
 
-1. **3a — Meilisearch symbol search** ✅ (this commit)
-2. **3b — Multi-chart layout + persistence** ⏳
+1. **3a — Meilisearch symbol search** ✅
+2. **3b — Multi-chart layout + persistence** ✅ (this commit)
 3. **3c — Pine Script engine (parser + interpreter + Monaco editor)** ⏳
 
 ---
@@ -64,3 +64,63 @@ from a Meili index through an API endpoint to a global ⌘K search box in the we
   `ETHUSDT`/`ETHUSD` ahead of substring matches like "Avalanche / TetherUS".
 - Restarting Meili restored the `meili` backend.
 - `buildSymbolFilter` unit tests (4) pass; `pnpm typecheck` green across the workspace.
+
+---
+
+## 3b — Multi-chart layout + persistence
+
+### What it delivers
+
+A 1/2/4/8/16 multi-chart grid with per-panel symbol + timeframe, cross-panel sync
+(symbol / interval / crosshair), and named layouts saved per user.
+
+### `packages/layout-sync` (new)
+
+The schema + helpers that both the API and web share (single source of truth):
+
+- `INTERVALS` / `IntervalSchema` — supported timeframes.
+- `GRID_PRESETS` — `1` (1×1), `2` (2×1), `4` (2×2), `8` (4×2), `16` (4×4) with `{ count, cols, rows, label }`.
+- `PanelSchema` — `{ id, symbolId|null, interval, indicators[] }`.
+- `SyncSchema` — `{ symbol, interval, crosshair }` toggles.
+- `LayoutConfigSchema` — `{ grid, panels, sync, activePanel }` with `superRefine` checks:
+  panel count must match the grid, `activePanel` in range, panel ids unique.
+- Helpers: `makePanel`, `defaultLayoutConfig`, `reflowToGrid` (preserve panels when re-tiling),
+  `parseLayoutConfig`. 7 unit tests.
+
+### Backend (`apps/server`)
+
+- **`routes/layouts.ts`** — `/api/layouts` CRUD, all tenant + user scoped:
+  - `GET /layouts`, `GET /layouts/:id`, `POST /layouts`, `PUT /layouts/:id`, `DELETE /layouts/:id`.
+  - Config validated through `LayoutConfigSchema` at the edge (bad config → 400).
+  - `isDefault` is exclusive: setting one default clears the others in the same RLS transaction.
+- Uses the existing `layouts` table (already migrated in slice 1; RLS policy `layouts_tenant_iso`).
+
+### Frontend (`apps/web`)
+
+- **`components/ChartPanel.tsx`** — self-contained chart: candles + volume, autosizing,
+  history via TanStack Query, inline symbol picker, interval selector, optional live WS bars.
+  Registers its chart + series with the parent for crosshair sync.
+- **`components/SymbolSearch.tsx`** — refactored to be reusable: an optional `onSelect` callback
+  (panels set a symbol) vs. the default navigate-to-chart behavior; ⌘K only binds the global box.
+- **`pages/LayoutPage.tsx`** (`/layout`) — grid buttons (1/2/4/8/16 via `reflowToGrid`), sync
+  toggles, layout `<select>` to load saved layouts, Save / Save as… / Set default / Delete.
+  Symbol/interval sync propagate from the changed panel to all panels; crosshair sync mirrors the
+  pointer across charts via `subscribeCrosshairMove` → `setCrosshairPosition`.
+- Top-bar "Layouts" nav link + route.
+
+### Design decisions
+
+1. **Schema in `@tv/layout-sync`, imported by both server and web.** No drift between what the API
+   validates and what the UI builds.
+2. **Live bars only on the active panel.** Avoids opening up to 16 WebSocket connections at once.
+3. **`isDefault` exclusivity in one transaction.** The tenant middleware already wraps each handler
+   in an RLS transaction, so clearing old defaults and inserting the new one is atomic.
+4. **`reflowToGrid` preserves panels.** Switching 4→1→4 keeps the symbols you already placed.
+
+### Verification
+
+- `layout-sync` unit tests (7) pass; `pnpm typecheck` green (23 tasks); `vite build` succeeds.
+- Live API E2E against Postgres: create (2-panel BTC/ETH), list, get, rename (PUT), delete, default
+  exclusivity (second default unset the first), and config validation (bad panel count → HTTP 400).
+- Visual QA of the rendered grid was not run (the headless browse tool needs a one-time build).
+

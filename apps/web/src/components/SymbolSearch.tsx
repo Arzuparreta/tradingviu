@@ -13,7 +13,14 @@ const useDebounced = <T,>(value: T, ms: number): T => {
   return debounced;
 };
 
-export function SymbolSearch() {
+interface SymbolSearchProps {
+  /** When provided, selecting a result calls this instead of navigating to the chart. */
+  onSelect?: (s: Symbol) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+}
+
+export function SymbolSearch({ onSelect, placeholder, autoFocus }: SymbolSearchProps = {}) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -22,6 +29,10 @@ export function SymbolSearch() {
   const [active, setActive] = useState(0);
   const debouncedQ = useDebounced(q.trim(), 150);
 
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
+
   const results = useQuery({
     queryKey: ['search', debouncedQ],
     queryFn: () => api.search(debouncedQ, { limit: 12 }),
@@ -29,8 +40,9 @@ export function SymbolSearch() {
     staleTime: 30_000,
   });
 
-  // Cmd/Ctrl+K focuses the search box from anywhere.
+  // Cmd/Ctrl+K focuses the global search box (not the per-panel pickers).
   useEffect(() => {
+    if (onSelect) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -40,7 +52,7 @@ export function SymbolSearch() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [onSelect]);
 
   // Click outside closes the dropdown.
   useEffect(() => {
@@ -60,7 +72,8 @@ export function SymbolSearch() {
   const select = (s: Symbol) => {
     setOpen(false);
     setQ('');
-    navigate(`/chart/${s.id}`);
+    if (onSelect) onSelect(s);
+    else navigate(`/chart/${s.id}`);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -84,7 +97,7 @@ export function SymbolSearch() {
       <input
         ref={inputRef}
         value={q}
-        placeholder="Search symbols…  ⌘K"
+        placeholder={placeholder ?? 'Search symbols…  ⌘K'}
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
