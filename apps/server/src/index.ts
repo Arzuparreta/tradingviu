@@ -12,10 +12,12 @@ import { healthRoutes } from './routes/health.js';
 import { adminRoutes } from './routes/admin.js';
 import { indicatorRoutes } from './routes/indicators.js';
 import { watchlistRoutes } from './routes/watchlists.js';
+import { searchRoutes } from './routes/search.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
+import { indexAllSymbols, searchEnabled } from './services/search.js';
 
 const env = loadEnv();
 
@@ -44,10 +46,20 @@ app.route('/api', symbolRoutes);
 app.route('/api', chartRoutes);
 app.route('/api', indicatorRoutes);
 app.route('/api', watchlistRoutes);
+app.route('/api', searchRoutes);
 app.route('/api', billingRoutes);
 
 const port = env.API_PORT;
 console.log(`tradingviu api listening on :${port}`);
+
+// Index symbols into Meili on boot (fire-and-forget; search degrades to DB if unavailable).
+if (searchEnabled()) {
+  indexAllSymbols(db)
+    .then((n) => console.log(`[search] indexed ${n} symbols into meili`))
+    .catch((err) => console.warn('[search] initial symbol index failed:', (err as Error).message));
+} else {
+  console.log('[search] MEILI_HOST not set — symbol search will use DB fallback');
+}
 
 const _server: ReturnType<typeof Bun.serve> = Bun.serve({
   port,

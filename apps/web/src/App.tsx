@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ChartPage } from './pages/ChartPage';
 import { AdminPage } from './pages/AdminPage';
 import { WatchlistsPage } from './pages/WatchlistsPage';
+import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
   const { user, tenant } = useAuth();
@@ -27,6 +28,7 @@ function TopBar() {
         )}
       </div>
       <div className="row" style={{ gap: 12 }}>
+        {user && <SymbolSearch />}
         {tenant && <span className="muted small mono">{tenant.slug}</span>}
         {user && <span className="muted small">{user.email}</span>}
       </div>

@@ -9,6 +9,8 @@ export const EnvSchema = z.object({
   REDIS_URL: z.string().url(),
   CORS_ORIGIN: z.string().url(),
   API_PORT: z.coerce.number().int().positive().default(3001),
+  MEILI_HOST: z.string().url().optional(),
+  MEILI_MASTER_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
   POSTMARK_TOKEN: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),

@@ -86,4 +86,13 @@ export const adminRoutes = new Hono()
     const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10) || 50, 500);
     const rows = await db.select().from(symbols).limit(limit);
     return c.json({ symbols: rows });
+  })
+  .post('/search/reindex', async (c) => {
+    const db = c.get('db');
+    const { indexAllSymbols, searchEnabled } = await import('../services/search.js');
+    if (!searchEnabled()) {
+      return c.json({ ok: false, reason: 'MEILI_HOST not configured', indexed: 0 });
+    }
+    const indexed = await indexAllSymbols(db);
+    return c.json({ ok: true, indexed });
   });

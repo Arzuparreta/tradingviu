@@ -48,6 +48,11 @@ export const api = {
   me: () => request<{ user: User; tenant: Tenant } | { user: null }>('/auth/me'),
   symbols: (q: string) => request<{ results: Symbol[] }>(`/api/symbols/search?q=${encodeURIComponent(q)}&limit=20`),
   allSymbols: (limit = 100) => request<{ results: Symbol[] }>(`/api/symbols?limit=${limit}`),
+  search: (q: string, opts: { assetClass?: string; limit?: number } = {}) => {
+    const p = new URLSearchParams({ q, limit: String(opts.limit ?? 20) });
+    if (opts.assetClass) p.set('assetClass', opts.assetClass);
+    return request<{ results: Symbol[]; backend: 'meili' | 'db' }>(`/api/search?${p.toString()}`);
+  },
   history: (symbol: string, interval = '1h', limit = 500) =>
     request<{ symbol: { id: string; exchange: string; ticker: string; name: string }; interval: string; bars: Bar[] }>(
       `/api/chart/history?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
