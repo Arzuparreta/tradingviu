@@ -600,3 +600,38 @@ export interface ScriptDetail extends ScriptRow {
   source: string | null;
   locked: boolean;
 }
+
+export type SpaceVisibility = 'public' | 'private';
+export type SpacesSort = 'recent' | 'popular';
+
+export interface SpaceOwner {
+  id: string;
+  displayName: string | null;
+  email: string;
+}
+
+export interface SpaceRow {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: SpaceVisibility;
+  priceCents: number;
+  currency: string;
+  subscribersCount: number;
+  subscribed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  owner: SpaceOwner;
+}
+
+export interface SpaceDetail extends SpaceRow {
+  isOwner: boolean;
+}
+
+export interface SpacePost {
+  id: string;
+  title: string | null;
+  body: string;
+  createdAt: string;
+  author: SpaceOwner;
+}

@@ -17,6 +17,7 @@ import { BrokersPage } from './pages/BrokersPage';
 import { DiscoveryPage } from './pages/DiscoveryPage';
 import { IdeasPage } from './pages/IdeasPage';
 import { ScriptsPage } from './pages/ScriptsPage';
+import { SpacesPage } from './pages/SpacesPage';
 import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
@@ -68,6 +69,9 @@ function TopBar() {
             </Link>
             <Link to="/scripts" className={loc.pathname.startsWith('/scripts') ? 'active' : ''}>
               Scripts
+            </Link>
+            <Link to="/spaces" className={loc.pathname.startsWith('/spaces') ? 'active' : ''}>
+              Spaces
             </Link>
             <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>
               Watchlists
@@ -222,6 +226,14 @@ export function App() {
           element={
             <RequireAuth>
               <ScriptsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/spaces"
+          element={
+            <RequireAuth>
+              <SpacesPage />
             </RequireAuth>
           }
         />

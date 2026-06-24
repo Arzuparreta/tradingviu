@@ -308,6 +308,84 @@ export const publishedScripts = pgTable(
   }),
 );
 
+// Subscription channels: a creator-owned space (free or paid) whose posts are
+// gated behind an active subscription or ownership.
+export const spaces = pgTable(
+  'spaces',
+  {
+    id: id(),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    // public → listed in the tenant feed; private → unlisted (invite/id only)
+    visibility: text('visibility').notNull().default('public'),
+    priceCents: integer('price_cents').notNull().default(0),
+    currency: text('currency').notNull().default('USD'),
+    subscribersCount: integer('subscribers_count').notNull().default(0),
+    createdAt: ts('created_at'),
+    updatedAt: ts('updated_at'),
+  },
+  (t) => ({
+    tenantIdx: index('spaces_tenant_idx').on(t.tenantId, t.createdAt),
+    ownerIdx: index('spaces_owner_idx').on(t.ownerId),
+  }),
+);
+
+export const spaceSubscriptions = pgTable(
+  'space_subscriptions',
+  {
+    id: id(),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // active → entitled; canceled → kept for history, not entitled
+    status: text('status').notNull().default('active'),
+    priceCents: integer('price_cents').notNull().default(0),
+    startedAt: ts('started_at'),
+    canceledAt: timestamp('canceled_at', { withTimezone: true, mode: 'date' }),
+    createdAt: ts('created_at'),
+  },
+  (t) => ({
+    pairUq: uniqueIndex('space_subscriptions_pair_uq').on(t.spaceId, t.userId),
+    spaceIdx: index('space_subscriptions_space_idx').on(t.spaceId),
+    userIdx: index('space_subscriptions_user_idx').on(t.userId),
+  }),
+);
+
+export const spacePosts = pgTable(
+  'space_posts',
+  {
+    id: id(),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id')
+      .notNull()
+      .references(() => spaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: text('title'),
+    body: text('body').notNull(),
+    createdAt: ts('created_at'),
+    updatedAt: ts('updated_at'),
+  },
+  (t) => ({
+    spaceIdx: index('space_posts_space_idx').on(t.spaceId, t.createdAt),
+  }),
+);
+
 export const portfolios = pgTable(
   'portfolios',
   {

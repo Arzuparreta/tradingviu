@@ -79,3 +79,45 @@ export const UpdateScriptSchema = z.object({
   priceCents: z.coerce.number().int().min(0).max(10_000_00).optional(),
 });
 export type UpdateScript = z.infer<typeof UpdateScriptSchema>;
+
+// Subscription channels ("Spaces").
+// public  → listed in the tenant feed
+// private → unlisted; reachable (and subscribable) only by direct id (invite link)
+export const SpaceVisibilitySchema = z.enum(['public', 'private']);
+export type SpaceVisibility = z.infer<typeof SpaceVisibilitySchema>;
+
+export const SpacesSortSchema = z.enum(['recent', 'popular']);
+export type SpacesSort = z.infer<typeof SpacesSortSchema>;
+
+export const SpacesQuerySchema = z.object({
+  q: z.string().trim().min(1).max(120).optional(),
+  owner: z.string().trim().min(1).max(80).optional(),
+  free: z.coerce.boolean().optional(),
+  subscribed: z.coerce.boolean().optional(),
+  sort: SpacesSortSchema.default('recent'),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+});
+export type SpacesQuery = z.infer<typeof SpacesQuerySchema>;
+
+export const CreateSpaceSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(4000).optional(),
+  visibility: SpaceVisibilitySchema.default('public'),
+  priceCents: z.coerce.number().int().min(0).max(10_000_00).default(0),
+  currency: z.string().trim().length(3).toUpperCase().default('USD'),
+});
+export type CreateSpace = z.infer<typeof CreateSpaceSchema>;
+
+export const UpdateSpaceSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  description: z.string().trim().min(1).max(4000).optional(),
+  visibility: SpaceVisibilitySchema.optional(),
+  priceCents: z.coerce.number().int().min(0).max(10_000_00).optional(),
+});
+export type UpdateSpace = z.infer<typeof UpdateSpaceSchema>;
+
+export const CreateSpacePostSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().min(1).max(20_000),
+});
+export type CreateSpacePost = z.infer<typeof CreateSpacePostSchema>;

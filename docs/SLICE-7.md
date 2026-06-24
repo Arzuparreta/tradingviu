@@ -148,7 +148,57 @@ Notes:
 - `author=me` is a reserved selector (ULIDs never collide with `me`), matching the
   ideas feed.
 
+## 7e — Paid Spaces (subscription channels)
+
+Status: done.
+
+Delivered:
+
+- Three new tenant-scoped tables (migration `0006`): `spaces` (creator-owned
+  channel: name, description, visibility, `price_cents`, `currency`, denormalized
+  `subscribers_count`), `space_subscriptions` (the entitlement ledger, unique per
+  `(space_id, user_id)` with `active`/`canceled` status), and `space_posts` (gated
+  content). All three are in the RLS tenant-isolation set.
+- Tenant-scoped `/api/spaces` routes: feed (`GET /spaces`), detail
+  (`GET /spaces/:id`), create/update/delete (owner-enforced), subscribe /
+  unsubscribe (`POST`/`DELETE /spaces/:id/subscribe`), gated posts list
+  (`GET /spaces/:id/posts`), and owner post create/delete
+  (`POST`/`DELETE /spaces/:id/posts[/:postId]`).
+- Visibility: `public` spaces are listed in the tenant feed; `private` spaces are
+  unlisted and reachable (and subscribable) only by direct id — the invite-link
+  model. Detail returns 404 for a private space unless the caller owns it or has
+  an active subscription.
+- Entitlement model: a space's posts are readable only by the owner or an active
+  subscriber (else 403). The `space_subscriptions` ledger is the single source of
+  truth; `subscribers_count` is a denormalized counter maintained transactionally
+  and only on active-state transitions (subscribe / reactivate / cancel), so
+  re-subscribing reuses the row and never double-counts.
+- Subscribe is idempotent and reactivates a canceled subscription. For paid
+  spaces it records the price and grants the entitlement directly — with billing
+  disabled there is no payment gateway in front of it yet (see remaining work).
+  Owners get a 422 if they try to subscribe to their own space.
+- Feed filters: `q` (name/description), `owner` (`me`/user id), `free`
+  (price = 0), `subscribed` (only active subscriptions), and `sort`
+  (`recent` | `popular` by subscriber count).
+- Zod schemas in `packages/core/src/social-schemas.ts` (`CreateSpace`,
+  `UpdateSpace`, `SpacesQuery`, `CreateSpacePost`, visibility/sort enums) with
+  unit tests.
+- Web `SpacesPage` at `/spaces` (linked from the top nav): create form
+  (name, description, visibility, price), a Discover/Mine/Subscribed +
+  Newest/Popular browse, per-card Subscribe/Unsubscribe (price shown for paid),
+  and an expandable space view that loads gated posts (locked notice when not
+  entitled) with an owner-only composer and post delete.
+
+Notes:
+
+- `space_subscriptions` is distinct from the billing `subscriptions` table — the
+  former is per-space entitlements, the latter is the tenant's Stripe plan.
+- Run migrate + seed (or re-apply RLS) after pulling: `0006` adds the three tables
+  and their RLS policies are applied by `applyRls` (the `pnpm db:seed` path).
+
 ## Remaining Slice 7 Work
 
-- Paid Spaces (subscription channels) and a real purchase/entitlement flow for
-  paid scripts.
+- Stripe-backed checkout in front of paid-space subscriptions (and a refund /
+  expiry lifecycle) instead of granting the entitlement directly.
+- A real purchase/entitlement flow for paid scripts (7d), likely sharing the same
+  entitlement machinery as Spaces.

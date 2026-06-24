@@ -43,6 +43,13 @@
       "when": 1782328245306,
       "tag": "0005_dazzling_red_shift",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782336985029,
+      "tag": "0006_unusual_menace",
+      "breakpoints": true
     }
   ]
 }

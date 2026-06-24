@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   CreateIdeaSchema,
+  CreateSpaceSchema,
   IdeasQuerySchema,
   PublishScriptSchema,
   ScriptsQuerySchema,
@@ -48,5 +49,14 @@ describe('social schemas', () => {
       free: true,
       sort: 'popular',
     });
+  });
+
+  test('CreateSpace defaults visibility/price/currency and uppercases currency', () => {
+    const s = CreateSpaceSchema.parse({ name: '  Momentum  ', currency: 'eur' });
+    expect(s.name).toBe('Momentum');
+    expect(s.visibility).toBe('public');
+    expect(s.priceCents).toBe(0);
+    expect(s.currency).toBe('EUR');
+    expect(() => CreateSpaceSchema.parse({ name: 'x', currency: 'dollars' })).toThrow();
   });
 });

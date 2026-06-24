@@ -25,6 +25,7 @@ import { screenerRoutes } from './routes/screener.js';
 import { ideaRoutes } from './routes/ideas.js';
 import { followRoutes } from './routes/follows.js';
 import { scriptRoutes } from './routes/scripts.js';
+import { spaceRoutes } from './routes/spaces.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
 import { errorHandler } from './middleware/error.js';
@@ -78,6 +79,7 @@ app.route('/api', screenerRoutes);
 app.route('/api', ideaRoutes);
 app.route('/api', followRoutes);
 app.route('/api', scriptRoutes);
+app.route('/api', spaceRoutes);
 app.route('/api', billingRoutes);
 
 const port = env.API_PORT;

@@ -124,6 +124,7 @@ DECLARE
     'layouts','drawings','alerts','alert_history',
     'screener_presets','user_indicators','backtests',
     'ideas','comments','likes','follows','published_scripts',
+    'spaces','space_subscriptions','space_posts',
     'portfolios','holdings','transactions',
     'watchlists','watchlist_items',
     'paper_accounts','paper_orders','broker_connections',

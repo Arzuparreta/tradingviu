@@ -47,6 +47,11 @@ import type {
   ScriptDetail,
   ScriptVisibility,
   ScriptsSort,
+  SpaceRow,
+  SpaceDetail,
+  SpacePost,
+  SpaceVisibility,
+  SpacesSort,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -528,6 +533,46 @@ export const api = {
     request<{ favorited: boolean }>(`/api/scripts/${id}/favorite`, { method: 'POST' }),
   unfavoriteScript: (id: string) =>
     request<{ favorited: boolean }>(`/api/scripts/${id}/favorite`, { method: 'DELETE' }),
+  spaces: (
+    params: {
+      q?: string;
+      owner?: string;
+      free?: boolean;
+      subscribed?: boolean;
+      sort?: SpacesSort;
+      limit?: number;
+    } = {},
+  ) => request<{ spaces: SpaceRow[] }>(`/api/spaces${queryString(params)}`),
+  space: (id: string) => request<{ space: SpaceDetail }>(`/api/spaces/${id}`),
+  createSpace: (body: {
+    name: string;
+    description?: string;
+    visibility?: SpaceVisibility;
+    priceCents?: number;
+    currency?: string;
+  }) => request<{ id: string }>('/api/spaces', { method: 'POST', body: JSON.stringify(body) }),
+  updateSpace: (
+    id: string,
+    body: {
+      name?: string;
+      description?: string;
+      visibility?: SpaceVisibility;
+      priceCents?: number;
+    },
+  ) => request<{ ok: true }>(`/api/spaces/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteSpace: (id: string) => request<{ ok: true }>(`/api/spaces/${id}`, { method: 'DELETE' }),
+  subscribeSpace: (id: string) =>
+    request<{ subscribed: boolean }>(`/api/spaces/${id}/subscribe`, { method: 'POST' }),
+  unsubscribeSpace: (id: string) =>
+    request<{ subscribed: boolean }>(`/api/spaces/${id}/subscribe`, { method: 'DELETE' }),
+  spacePosts: (id: string) => request<{ posts: SpacePost[] }>(`/api/spaces/${id}/posts`),
+  addSpacePost: (id: string, body: { title?: string; body: string }) =>
+    request<{ id: string }>(`/api/spaces/${id}/posts`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteSpacePost: (id: string, postId: string) =>
+    request<{ ok: true }>(`/api/spaces/${id}/posts/${postId}`, { method: 'DELETE' }),
 };
 
 export type {
