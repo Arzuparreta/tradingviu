@@ -1,0 +1,28 @@
+{
+  "name": "@tv/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tenant": "./src/tenant.ts",
+    "./errors": "./src/errors.ts",
+    "./ids": "./src/ids.ts",
+    "./time": "./src/time.ts"
+  },
+  "scripts": {
+    "lint": "echo skip",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "build": "echo skip",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/bun": "^1.1.14"
+  }
+}

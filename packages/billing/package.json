@@ -1,0 +1,27 @@
+{
+  "name": "@tv/billing",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "echo skip",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "build": "echo skip"
+  },
+  "dependencies": {
+    "@tv/core": "workspace:*",
+    "@tv/db": "workspace:*",
+    "@tv/quotas": "workspace:*",
+    "drizzle-orm": "^0.36.4",
+    "stripe": "^17.5.0",
+    "ulid": "^2.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

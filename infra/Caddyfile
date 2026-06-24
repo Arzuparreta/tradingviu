@@ -1,0 +1,36 @@
+{
+  global {
+    admin off
+}
+
+(tradingviu.localhost) {
+  encode zstd gzip
+  reverse_proxy api:3001
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+:80 {
+  root * /srv
+  encode zstd gzip
+  reverse_proxy web:5173
+}
+
+# Production-like TLS (use --domain to enable)
+{$DOMAIN} {
+  encode zstd gzip
+  @api path /api/* /auth/* /billing/* /webhooks/* /ws/*
+  reverse_proxy api:3001
+  reverse_proxy web:5173
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  }
+}
