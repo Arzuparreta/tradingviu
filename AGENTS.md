@@ -2,6 +2,8 @@
 
 Conventions for AI agents and humans working on `tradingviu`. Read this before editing anything.
 
+**Before you start, read [`docs/ROADMAP.md`](docs/ROADMAP.md)** — it tells you where the project is, what's done, what's next, and the locked architectural decisions. Without it you'll waste time rediscovering the gotchas.
+
 ## Project shape
 
 - **Monorepo.** pnpm workspaces. `apps/*` are deployable; `packages/*` are libraries; `services/*` are background workers; `tools/*` are CLIs.
@@ -15,6 +17,13 @@ Conventions for AI agents and humans working on `tradingviu`. Read this before e
 3. **Every request resolves `tenant_id` from the JWT** and stores it in `AsyncLocalStorage`. Workers receive it per-job.
 4. **Drizzle inserts auto-inject `tenant_id`.** Reads filter by it. No exceptions.
 5. **E2E tests verify isolation.** Two seeded tenants must never see each other's data.
+
+### Multi-tenant pitfalls (learned the hard way)
+
+- **Two Postgres roles are mandatory:** `tradingviu` (superuser, BYPASSRLS) for migrations/admin/signup, `tv_app` (no superuser, RLS-enforced) for runtime. The seed creates `tv_app` automatically. The app uses `DATABASE_URL` (tv_app) for all requests, and `DATABASE_URL_ADMIN` (tradingviu) only for auth bootstrap and admin operations.
+- **RLS context is per-connection.** `set_config('app.tenant_id', ...)` must run on the same connection as the queries. Always wrap multi-statement work in `db.transaction()` (Drizzle). Without this, you get intermittent cross-tenant leaks. See `apps/server/src/middleware/tenant.ts` for the pattern.
+- **First signup = super admin.** Every subsequent signup = regular user. The check is in `apps/server/src/routes/auth.ts`. Don't change it without a migration plan for existing users.
+- **Chicken-and-egg signup:** new users have no tenant yet, so they can't satisfy tenant_id RLS. Signup uses the admin connection with `withSuperAdminRls(txDb, ...)` inside a transaction, then commits. The user record is then readable.
 
 ## Code style
 
