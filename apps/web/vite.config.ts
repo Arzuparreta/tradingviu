@@ -19,6 +19,7 @@ export default defineConfig({
       '/webhooks': { target: 'http://localhost:3001', changeOrigin: true },
       '/admin': { target: 'http://localhost:3001', changeOrigin: true },
       '/health': { target: 'http://localhost:3001', changeOrigin: true },
+      '/ws': { target: 'ws://localhost:3001', ws: true },
     },
   },
   build: {
