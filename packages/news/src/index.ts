@@ -136,9 +136,120 @@ export class MockNewsProvider implements NewsProvider {
   }
 }
 
-export type NewsProviderId = 'mock';
+type Fetcher = (input: URL | RequestInfo, init?: RequestInit) => Promise<Response>;
 
-export const createNewsProvider = (providerId: string): NewsProvider => {
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+const textOrUndefined = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+};
+
+const parseNewsApiArticle = (
+  value: unknown,
+  symbols: readonly string[],
+): NewsProviderArticle | undefined => {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const url = textOrUndefined(record.url);
+  const title = textOrUndefined(record.title);
+  const publishedAtRaw = textOrUndefined(record.publishedAt);
+  if (!url || !title || !publishedAtRaw) return undefined;
+  const publishedAt = new Date(publishedAtRaw);
+  if (Number.isNaN(publishedAt.getTime())) return undefined;
+  const source = asRecord(record.source);
+  const sourceName = source ? textOrUndefined(source.name) : undefined;
+  const body = textOrUndefined(record.description) ?? textOrUndefined(record.content);
+  return {
+    url,
+    title,
+    symbols: [...symbols],
+    publishedAt,
+    ...(sourceName ? { source: sourceName } : {}),
+    ...(body ? { body } : {}),
+  };
+};
+
+export class NewsApiProvider implements NewsProvider {
+  public readonly id = 'newsapi';
+  public readonly displayName = 'NewsAPI';
+
+  public constructor(
+    private readonly apiKey: string,
+    private readonly baseUrl = 'https://newsapi.org',
+    private readonly fetcher: Fetcher = fetch,
+  ) {
+    if (!apiKey.trim()) throw new NewsProviderError(this.id, 'NEWSAPI_KEY is required');
+  }
+
+  public async fetchNews(queryInput: NewsIngestQuery): Promise<readonly NewsProviderArticle[]> {
+    const query = NewsIngestQuerySchema.parse(queryInput);
+    const symbols = uniqueSymbols(query.symbols);
+    const byUrl = new Map<string, NewsProviderArticle>();
+
+    if (symbols.length === 0) {
+      for (const article of await this.fetchEverything('stocks OR markets OR earnings', [], query)) {
+        byUrl.set(article.url, article);
+      }
+    } else {
+      for (const symbol of symbols) {
+        for (const article of await this.fetchEverything(symbol, [symbol], query)) {
+          const existing = byUrl.get(article.url);
+          byUrl.set(
+            article.url,
+            existing
+              ? { ...existing, symbols: uniqueSymbols([...existing.symbols, ...article.symbols]) }
+              : article,
+          );
+        }
+      }
+    }
+
+    return [...byUrl.values()]
+      .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+      .slice(0, query.limit);
+  }
+
+  public async healthCheck(): Promise<NewsProviderHealth> {
+    return { ok: true, checkedAt: new Date() };
+  }
+
+  private async fetchEverything(
+    q: string,
+    symbols: readonly string[],
+    query: NewsIngestQuery,
+  ): Promise<readonly NewsProviderArticle[]> {
+    const url = new URL('/v2/everything', this.baseUrl);
+    url.searchParams.set('q', q);
+    url.searchParams.set('language', 'en');
+    url.searchParams.set('sortBy', 'publishedAt');
+    url.searchParams.set('pageSize', String(Math.min(query.limit, 100)));
+    if (query.from) url.searchParams.set('from', query.from.toISOString());
+    if (query.to) url.searchParams.set('to', query.to.toISOString());
+
+    const response = await this.fetcher(url, { headers: { 'X-Api-Key': this.apiKey } });
+    if (!response.ok) {
+      throw new NewsProviderError(this.id, `HTTP ${response.status} for /v2/everything`);
+    }
+    const payload = (await response.json()) as { articles?: unknown };
+    const articles = Array.isArray(payload.articles) ? payload.articles : [];
+    return articles
+      .map((article) => parseNewsApiArticle(article, symbols))
+      .filter((article): article is NewsProviderArticle => article !== undefined);
+  }
+}
+
+export type NewsProviderId = 'mock' | 'newsapi';
+
+export const createNewsProvider = (
+  providerId: string,
+  options: { readonly newsApiKey?: string } = {},
+): NewsProvider => {
   if (providerId === 'mock') return new MockNewsProvider();
+  if (providerId === 'newsapi') return new NewsApiProvider(options.newsApiKey ?? '');
   throw new NewsProviderError(providerId, 'Unsupported news provider');
 };

@@ -160,8 +160,26 @@ Notes:
 - `mock` remains the default provider for deterministic local development and tests; it emits AAPL/MSFT earnings + dividends and US economic events so a seeded install upserts cleanly.
 - `fmp` uses the Financial Modeling Prep `earning_calendar`, `stock_dividend_calendar`, and `economic_calendar` endpoints and requires `FMP_KEY`.
 
+## 6j — Real News Provider Ingestion
+
+Status: done.
+
+Delivered:
+
+- `NewsApiProvider` in `packages/news`: a real NewsAPI.org adapter over the `/v2/everything` endpoint with an injectable fetcher, authenticating via the `X-Api-Key` header.
+- Per-symbol brand news: when `NEWS_INGEST_SYMBOLS` is set, the adapter queries each symbol separately and tags articles with that symbol; overlapping articles (same URL) merge their symbol lists. With no symbols it runs one general markets query.
+- `createNewsProvider` now takes provider options and supports `newsapi`; `NEWS_PROVIDER` accepts `mock | newsapi`; `services/news-ingest` passes `NEWSAPI_KEY` through.
+- Articles upsert into `news_articles` by URL through the existing news-ingest worker (admin/RLS-safe transaction), so `pnpm news:ingest` works with either provider.
+- `NEWSAPI_KEY` is now validated in `EnvSchema` and documented next to the news block in `.env.example`.
+
+Notes:
+
+- `mock` remains the default provider for deterministic local development and tests.
+- `newsapi` requires `NEWSAPI_KEY`; symbol tagging is query-based (ticker as the search term) since NewsAPI does not return native symbol tags.
+
 ## Remaining Slice 6 Work
 
+- Additional news providers (Finnhub, Benzinga) and richer sentiment.
 - Additional fundamentals providers and broader metric coverage.
 - Additional macro providers and non-US country mappings.
 - Additional calendar providers (Finnhub, Benzinga) and per-symbol brand calendars.

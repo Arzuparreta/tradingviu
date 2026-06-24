@@ -14,6 +14,7 @@ const NewsIngestEnvSchema = EnvSchema.pick({
   DATABASE_URL_ADMIN: true,
   NEWS_PROVIDER: true,
   NEWS_INGEST_INTERVAL_SECONDS: true,
+  NEWSAPI_KEY: true,
 });
 
 export interface NewsIngestResult {
@@ -92,7 +93,10 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 const run = async (): Promise<void> => {
   const env = NewsIngestEnvSchema.parse(process.env);
-  const provider = createNewsProvider(env.NEWS_PROVIDER);
+  const provider = createNewsProvider(
+    env.NEWS_PROVIDER,
+    env.NEWSAPI_KEY ? { newsApiKey: env.NEWSAPI_KEY } : {},
+  );
   const adminUrl = env.DATABASE_URL_ADMIN ?? env.DATABASE_URL;
   const db = createDb({ url: adminUrl, max: 1 });
   const query = buildQueryFromEnv();
