@@ -12,6 +12,10 @@ import type {
   WatchlistItem,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
+import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
+
+type PineInputs = Record<string, number | boolean | string>;
+type PineRunResponse = { ok: true; result: PineRunResult } | { ok: false; error: { kind: string; message: string; line?: number; column?: number } };
 
 const TOKEN_KEY = 'tv_token';
 
@@ -90,6 +94,10 @@ export const api = {
     request<{ ok: true }>(`/api/layouts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteLayout: (id: string) =>
     request<{ ok: true }>(`/api/layouts/${id}`, { method: 'DELETE' }),
+  pineValidate: (source: string) =>
+    request<ValidateResult>('/api/pine/validate', { method: 'POST', body: JSON.stringify({ source }) }),
+  pineRun: (body: { source: string; symbol: string; interval?: string; inputs?: PineInputs; limit?: number }) =>
+    request<PineRunResponse>('/api/pine/run', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export type {

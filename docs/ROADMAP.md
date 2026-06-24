@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation) and Slice 2 (indicators + live bars + watchlists) are done and committed.** This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), and Slice 3 (Pine Script + multi-chart + search) are done and committed.** This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -12,8 +12,8 @@
 |---|---|---|
 | 0 | Cimientos (monorepo, DB, auth, plans, charts) | ✅ done (`cf23b90`) |
 | 1 | Indicators (31), live WS bars, watchlists | ✅ done (`39a6465`) |
-| 2 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ⏳ next |
-| 3 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | pending |
+| 2 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (slice-3 branches) |
+| 3 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ⏳ next |
 | 4 | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | pending |
 | 5 | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener | pending |
 | 6 | Social (ideas, comments, follows, scripts marketplace, paid spaces) | pending |
@@ -80,8 +80,8 @@ tradingviu/
 │   ├── data-adapters/           # CCXT providers (Binance, Coinbase, Kraken, Bybit)
 │   ├── chart-engine/            # wrapper over lightweight-charts (themes, series helpers)
 │   ├── ta-lib/                  # 31 technical indicators (TS port)
-│   ├── pine-parser/             # [TODO] Pine Script v5 PEG grammar → AST
-│   ├── pine-runtime/            # [TODO] AST interpreter, sandbox
+│   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
+│   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
 │   ├── drawing-tools/           # [TODO] 110+ drawing primitives
 │   ├── indicators/              # [TODO] indicator catalog with display info
 │   ├── screener-engine/         # [TODO] SQL-based screener
@@ -93,7 +93,7 @@ tradingviu/
 │   ├── news/                    # [TODO] aggregator
 │   ├── calendar/                # [TODO] earnings/economic/dividends
 │   ├── portfolio/               # [TODO] P&L, holdings, transactions
-│   ├── layout-sync/             # [TODO] workspaces, drawings, templates persistence
+│   ├── layout-sync/             # multi-chart layout schema + grid presets + helpers
 │   ├── ui-kit/                  # [TODO] shared React components
 │   ├── cli/                     # tvctl operator CLI (tenants, users, plans)
 │   └── billing/                 # Stripe

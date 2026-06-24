@@ -1,0 +1,23 @@
+{
+  "name": "@tv/pine-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "echo skip",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "build": "echo skip"
+  },
+  "dependencies": {
+    "@tv/pine-parser": "workspace:*",
+    "@tv/data-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "typescript": "^5.7.2"
+  }
+}

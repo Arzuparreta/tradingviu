@@ -14,6 +14,7 @@ import { indicatorRoutes } from './routes/indicators.js';
 import { watchlistRoutes } from './routes/watchlists.js';
 import { searchRoutes } from './routes/search.js';
 import { layoutRoutes } from './routes/layouts.js';
+import { pineRoutes } from './routes/pine.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
 import { errorHandler } from './middleware/error.js';
@@ -49,6 +50,7 @@ app.route('/api', indicatorRoutes);
 app.route('/api', watchlistRoutes);
 app.route('/api', searchRoutes);
 app.route('/api', layoutRoutes);
+app.route('/api', pineRoutes);
 app.route('/api', billingRoutes);
 
 const port = env.API_PORT;
