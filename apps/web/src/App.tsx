@@ -15,6 +15,7 @@ import { PaperTradingPage } from './pages/PaperTradingPage';
 import { OptionsPage } from './pages/OptionsPage';
 import { BrokersPage } from './pages/BrokersPage';
 import { DiscoveryPage } from './pages/DiscoveryPage';
+import { IdeasPage } from './pages/IdeasPage';
 import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
@@ -60,6 +61,9 @@ function TopBar() {
             </Link>
             <Link to="/discovery" className={loc.pathname.startsWith('/discovery') ? 'active' : ''}>
               Discovery
+            </Link>
+            <Link to="/ideas" className={loc.pathname.startsWith('/ideas') ? 'active' : ''}>
+              Ideas
             </Link>
             <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>
               Watchlists
@@ -198,6 +202,14 @@ export function App() {
           element={
             <RequireAuth>
               <DiscoveryPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ideas"
+          element={
+            <RequireAuth>
+              <IdeasPage />
             </RequireAuth>
           }
         />

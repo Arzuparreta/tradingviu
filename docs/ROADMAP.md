@@ -18,7 +18,7 @@
 | 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                        |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                                    |
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6j done)                   |
-| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                                    |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a done)                      |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
 | 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                    |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                    |
@@ -201,7 +201,7 @@ tradingviu/
 
 ### Slice 7 — Social
 
-- Ideas (chart snapshot + text)
+- **7a (done) — Ideas CRUD + feed:** tenant-scoped `/api/ideas` (feed/detail/create/update/delete) with public/private visibility, symbol/author/direction filters, author + symbol joins, owner-enforced mutations, Zod schemas in `packages/core/src/social-schemas.ts`, and a web `IdeasPage` at `/ideas`. See `docs/SLICE-7.md`.
 - Comments, likes, follows
 - Scripts marketplace (public/invite-only/protected/paid)
 - Paid Spaces (subscription channels)

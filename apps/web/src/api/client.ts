@@ -38,6 +38,9 @@ import type {
   OptionPriceResult,
   StrategyAnalysis,
   StrategyTemplate,
+  IdeaRow,
+  IdeaDirection,
+  IdeaVisibility,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -428,6 +431,35 @@ export const api = {
     }),
   deleteScreenerPreset: (id: string) =>
     request<{ ok: true }>(`/api/screener/presets/${id}`, { method: 'DELETE' }),
+  ideas: (
+    params: {
+      symbol?: string;
+      author?: string;
+      direction?: IdeaDirection;
+      visibility?: IdeaVisibility;
+      limit?: number;
+    } = {},
+  ) => request<{ ideas: IdeaRow[] }>(`/api/ideas${queryString(params)}`),
+  idea: (id: string) => request<{ idea: IdeaRow }>(`/api/ideas/${id}`),
+  createIdea: (body: {
+    title: string;
+    body?: string;
+    symbol?: string;
+    direction?: IdeaDirection;
+    visibility?: IdeaVisibility;
+    snapshotUrl?: string;
+  }) => request<{ id: string }>('/api/ideas', { method: 'POST', body: JSON.stringify(body) }),
+  updateIdea: (
+    id: string,
+    body: {
+      title?: string;
+      body?: string;
+      direction?: IdeaDirection;
+      visibility?: IdeaVisibility;
+      snapshotUrl?: string;
+    },
+  ) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteIdea: (id: string) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'DELETE' }),
 };
 
 export type {
@@ -451,6 +483,7 @@ export type {
   ScreenerPreset,
   ScreenerResult,
   YieldCurvePoint,
+  IdeaRow,
 };
 
 export { ApiError };

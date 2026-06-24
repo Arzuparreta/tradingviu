@@ -528,3 +528,34 @@ export interface StrategyAnalysis {
   unlimitedLoss: boolean;
   breakevens: number[];
 }
+
+export type IdeaDirection = 'long' | 'short' | 'neutral';
+export type IdeaVisibility = 'public' | 'private';
+
+export interface IdeaAuthor {
+  id: string;
+  displayName: string | null;
+  email: string;
+}
+
+export interface IdeaSymbol {
+  id: string;
+  ticker: string;
+  name: string;
+  exchange: string;
+}
+
+export interface IdeaRow {
+  id: string;
+  title: string;
+  body: string | null;
+  direction: IdeaDirection | null;
+  visibility: IdeaVisibility;
+  snapshotUrl: string | null;
+  likesCount: number;
+  commentsCount: number;
+  createdAt: string;
+  updatedAt: string;
+  author: IdeaAuthor;
+  symbol: IdeaSymbol | null;
+}
