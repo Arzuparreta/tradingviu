@@ -4,22 +4,24 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), and Slice 4 (alerts + portfolios + paper trading) are done and committed.** This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), and Slice 4 (alerts + portfolios + paper trading) are done and committed. Slice 5 is in progress — 5a (options engine) is done.** This doc maps the full scope so you can keep building.
 
 ## Status
 
+> Slice numbers are 1-indexed and match the `docs/SLICE-N.md` files and the "What each slice delivers" section below.
+
 | Slice | Scope | Status |
 |---|---|---|
-| 0 | Cimientos (monorepo, DB, auth, plans, charts) | ✅ done (`cf23b90`) |
-| 1 | Indicators (31), live WS bars, watchlists | ✅ done (`39a6465`) |
-| 2 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (`ac02b78`) |
-| 3 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ✅ done |
-| 4 | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | pending |
-| 5 | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener | pending |
-| 6 | Social (ideas, comments, follows, scripts marketplace, paid spaces) | pending |
-| 7 | Desktop (Tauri) + Mobile (React Native) + push notifications | pending |
-| 8 | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns | pending |
-| 9 | Public API + plugin SDK + ecosystem | pending |
+| 1 | Foundation (monorepo, DB, auth, plans, charts) | ✅ done (`cf23b90`) |
+| 2 | Indicators (31), live WS bars, watchlists | ✅ done (`39a6465`) |
+| 3 | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search | ✅ done (`ac02b78`) |
+| 4 | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine | ✅ done (`4fd3fd3`) |
+| 5 | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | 🚧 in progress — 5a options engine done |
+| 6 | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener | pending |
+| 7 | Social (ideas, comments, follows, scripts marketplace, paid spaces) | pending |
+| 8 | Desktop (Tauri) + Mobile (React Native) + push notifications | pending |
+| 9 | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns | pending |
+| 10 | Public API + plugin SDK + ecosystem | pending |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -85,10 +87,11 @@ tradingviu/
 │   ├── drawing-tools/           # [TODO] 110+ drawing primitives
 │   ├── indicators/              # [TODO] indicator catalog with display info
 │   ├── screener-engine/         # [TODO] SQL-based screener
-│   ├── alert-engine/            # [TODO] rule evaluator (price/indicator/multi-condition)
+│   ├── alert-engine/            # (placeholder — alert evaluator lives in apps/server/src/services/alert-engine.ts)
 │   ├── backtest-engine/         # [TODO] strategy simulator
-│   ├── paper-trading/           # [TODO] fill models, paper accounts
-│   ├── broker-adapters/         # [TODO] Alpaca, IBKR, Binance
+│   ├── paper-trading/           # (placeholder — fill model lives in apps/server/src/services/paper-trading.ts)
+│   ├── options-engine/          # Black-Scholes pricing, greeks, IV, chain, strategy builder + payoff
+│   ├── broker-adapters/         # [TODO] Alpaca, IBKR, Binance live trading (slice 5b)
 │   ├── social/                  # [TODO] ideas, comments, follows
 │   ├── news/                    # [TODO] aggregator
 │   ├── calendar/                # [TODO] earnings/economic/dividends
@@ -115,6 +118,9 @@ tradingviu/
 │   ├── ARCHITECTURE.md          # layers, multi-tenancy, WS protocol
 │   ├── SLICE-1.md               # what slice 1 delivered
 │   ├── SLICE-2.md               # what slice 2 delivered
+│   ├── SLICE-3.md               # what slice 3 delivered
+│   ├── SLICE-4.md               # what slice 4 delivered
+│   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -164,12 +170,11 @@ tradingviu/
 - Web app pages: Alerts, Portfolios, Paper
 - No DB migration was required: the foundation schema already contained the tenant-scoped tables.
 
-### Slice 5 — Brokers + DOM + Options
-- Alpaca, IBKR (Client Portal API), Binance live trading adapters
-- DOM (depth of market) and chart trading
-- Options chain + strategy builder (verticals, condors, butterflies)
-- Volatility surface
-- Greeks + P&L profile
+### Slice 5 (in progress) — Brokers + DOM + Options
+- **5a (done) — Options engine:** Black-Scholes pricing, full greeks, implied volatility, option chain, 13-strategy builder (verticals, straddle/strangle, condors, butterflies), expiration payoff (max profit/loss, breakevens, net greeks). Pure `packages/options-engine` + `/api/options/*` + `OptionsPage`. See `docs/SLICE-5.md`.
+- 5b (pending) — Alpaca, IBKR (Client Portal API), Binance live trading adapters
+- 5c (pending) — DOM (depth of market) and chart trading
+- Later — volatility surface, P&L profile across time/vol (not just at expiration)
 
 ### Slice 6 — News + Calendars + Screener
 - News aggregator (NewsAPI, Finnhub, Benzinga)
@@ -246,6 +251,10 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 | `apps/server/src/routes/alerts.ts` | Alerts CRUD, evaluation, and history |
 | `apps/server/src/routes/portfolios.ts` | Portfolios, transactions, holdings rebuild, P&L metrics |
 | `apps/server/src/routes/paper.ts` | Paper accounts and market/limit paper orders |
+| `apps/server/src/routes/options.ts` | Stateless options pricing/chain/strategy endpoints |
+| `packages/options-engine/src/black-scholes.ts` | BS pricing, greeks, implied vol |
+| `packages/options-engine/src/strategy.ts` | Strategy templates + payoff/greeks analysis |
+| `apps/web/src/pages/OptionsPage.tsx` | Options strategy builder + SVG payoff diagram |
 | `apps/server/src/services/ws.ts` | WebSocket handlers, broadcast, CCXT subscribe |
 | `apps/server/src/services/alert-engine.ts` | Pure alert condition evaluator |
 | `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic |
@@ -300,7 +309,7 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 When you pick up this repo, you should be able to:
 1. Read this file and know exactly where the project is and where to go next.
 2. Run `pnpm install && pnpm dev` and see the dashboard, chart with live bars, and watchlists.
-3. Pick slice 3 and start with Pine Script parser OR multi-chart layout (whichever has more value to you).
+3. Continue slice 5 — either 5b (broker adapters: Alpaca/IBKR/Binance live trading) or 5c (DOM + chart trading). Options analytics (5a) are done; reuse the `packages/options-engine` + stateless-route pattern.
 4. Not have to re-discover the RLS/transactions gotcha — it's documented here.
 
 If something is unclear, fix the docs. If something is broken, fix the code. If something is missing, build it.

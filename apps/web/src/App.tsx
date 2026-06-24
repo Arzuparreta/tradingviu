@@ -12,6 +12,7 @@ import { PineEditorPage } from './pages/PineEditorPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { PortfoliosPage } from './pages/PortfoliosPage';
 import { PaperTradingPage } from './pages/PaperTradingPage';
+import { OptionsPage } from './pages/OptionsPage';
 import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
@@ -30,6 +31,7 @@ function TopBar() {
             <Link to="/alerts" className={loc.pathname.startsWith('/alerts') ? 'active' : ''}>Alerts</Link>
             <Link to="/portfolios" className={loc.pathname.startsWith('/portfolios') ? 'active' : ''}>Portfolios</Link>
             <Link to="/paper" className={loc.pathname.startsWith('/paper') ? 'active' : ''}>Paper</Link>
+            <Link to="/options" className={loc.pathname.startsWith('/options') ? 'active' : ''}>Options</Link>
             <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>Watchlists</Link>
             {user.globalRole === 'super_admin' && (
               <Link to="/admin" className={loc.pathname === '/admin' ? 'active' : ''}>Admin</Link>
@@ -73,6 +75,7 @@ export function App() {
         <Route path="/alerts" element={<RequireAuth><AlertsPage /></RequireAuth>} />
         <Route path="/portfolios" element={<RequireAuth><PortfoliosPage /></RequireAuth>} />
         <Route path="/paper" element={<RequireAuth><PaperTradingPage /></RequireAuth>} />
+        <Route path="/options" element={<RequireAuth><OptionsPage /></RequireAuth>} />
         <Route path="/watchlists" element={<RequireAuth><WatchlistsPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />

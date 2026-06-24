@@ -19,6 +19,9 @@ import type {
   PaperAccount,
   PaperOrder,
   PriceAlertCondition,
+  OptionPriceResult,
+  StrategyAnalysis,
+  StrategyTemplate,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -150,6 +153,27 @@ export const api = {
       `/api/paper/accounts/${id}/orders`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+  priceOption: (body: {
+    type: 'call' | 'put';
+    spot: number;
+    strike: number;
+    timeToExpiry: number;
+    volatility: number;
+    rate?: number;
+    dividendYield?: number;
+  }) => request<OptionPriceResult>('/api/options/price', { method: 'POST', body: JSON.stringify(body) }),
+  analyzeStrategy: (body: {
+    template?: StrategyTemplate;
+    spot: number;
+    volatility: number;
+    timeToExpiry: number;
+    rate?: number;
+    width?: number;
+    contracts?: number;
+    priceMin?: number;
+    priceMax?: number;
+    steps?: number;
+  }) => request<StrategyAnalysis>('/api/options/strategy', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export type {

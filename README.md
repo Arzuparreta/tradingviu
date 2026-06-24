@@ -4,7 +4,7 @@ Self-hosted, open-source trading platform. TradingView, but yours.
 
 Multi-tenant, runs on your VPS. Charts, indicators, Pine Script subset, alerts, screening, paper trading, broker integrations, social, portfolios, news, calendars — all the things, in one platform.
 
-**Status:** active development. Slice 1 / Phase 0.
+**Status:** active development. Slices 1–4 done (foundation, indicators, Pine Script + multi-chart + search, alerts + portfolios + paper trading); slice 5 in progress (options engine done). See `docs/ROADMAP.md`.
 
 ## Quick start (self-hosted)
 
