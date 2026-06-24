@@ -135,6 +135,42 @@ export const FundamentalsQuerySchema = z.object({
 });
 export type FundamentalsQuery = z.infer<typeof FundamentalsQuerySchema>;
 
+export const FundamentalsIngestQuerySchema = z.object({
+  symbols: z.array(z.string().trim().min(1).max(32)).default([]),
+  fiscalPeriod: z.string().trim().min(1).max(20).default('ttm'),
+  limit: z.coerce.number().int().positive().max(200).default(50),
+});
+export type FundamentalsIngestQuery = z.infer<typeof FundamentalsIngestQuerySchema>;
+
+const optionalFundamentalMetric = z.number().finite().nullable().optional();
+
+export const FundamentalProviderSnapshotSchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  fiscalPeriod: z.string().trim().min(1).max(20).default('ttm'),
+  periodEnd: z.coerce.date(),
+  source: z.string().trim().min(1).max(80).optional(),
+  currency: z.string().trim().min(1).max(12).default('USD'),
+  isLatest: z.boolean().default(true),
+  marketCap: optionalFundamentalMetric,
+  peRatio: optionalFundamentalMetric,
+  eps: optionalFundamentalMetric,
+  revenue: optionalFundamentalMetric,
+  dividendYield: optionalFundamentalMetric,
+  roe: optionalFundamentalMetric,
+  revenueGrowth: optionalFundamentalMetric,
+  earningsGrowth: optionalFundamentalMetric,
+  beta: optionalFundamentalMetric,
+  week52High: optionalFundamentalMetric,
+  week52Low: optionalFundamentalMetric,
+});
+export type FundamentalProviderSnapshot = z.infer<typeof FundamentalProviderSnapshotSchema>;
+
+export const NormalizedFundamentalSnapshotSchema = FundamentalProviderSnapshotSchema.extend({
+  source: z.string().trim().min(1).max(80),
+  fetchedAt: z.date(),
+});
+export type NormalizedFundamentalSnapshot = z.infer<typeof NormalizedFundamentalSnapshotSchema>;
+
 export const YieldCurveQuerySchema = z.object({
   country: z.string().trim().min(1).max(80).optional(),
   source: z.string().trim().min(1).max(80).optional(),

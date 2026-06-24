@@ -105,7 +105,25 @@ Notes:
 
 - Provider ingestion is intentionally not part of this cut. Future adapters should write these global tables through the admin connection with super-admin RLS context, following the news ingest pattern.
 
+## 6g — Fundamentals Provider Ingestion
+
+Status: done.
+
+Delivered:
+
+- `packages/fundamentals` with a provider interface, Zod-backed snapshot normalization, deterministic `MockFundamentalsProvider`, optional Polygon ratios adapter, and unit tests.
+- `services/fundamentals-ingest` background service that fetches normalized snapshots and upserts into `fundamental_snapshots`.
+- Ingestion resolves provider tickers against the global `symbols` table, skips unknown symbols, and marks older latest snapshots false before writing new latest rows.
+- Ingestion runs through `DATABASE_URL_ADMIN` with super-admin RLS context inside a transaction, matching the news ingest boundary.
+- Root `pnpm fundamentals:ingest` command for one-shot local ingest; `pnpm --filter @tv/fundamentals-ingest start` runs the same worker on an interval.
+- Env controls for provider, symbols, limit, interval, and optional `POLYGON_KEY` in `.env.example`.
+
+Notes:
+
+- `mock` remains the default provider for deterministic local development and tests.
+- `polygon` uses the Polygon/Massive financial ratios endpoint and requires `POLYGON_KEY` plus explicit `FUNDAMENTALS_INGEST_SYMBOLS`.
+
 ## Remaining Slice 6 Work
 
-- Real fundamentals provider ingestion.
+- Additional fundamentals providers and broader metric coverage.
 - Real yield curve and macro provider ingestion.
