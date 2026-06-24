@@ -536,6 +536,15 @@ export interface IdeaAuthor {
   id: string;
   displayName: string | null;
   email: string;
+  following?: boolean;
+}
+
+export interface FollowUser {
+  id: string;
+  displayName: string | null;
+  email: string;
+  ideasCount: number;
+  followedAt?: string;
 }
 
 export interface IdeaSymbol {

@@ -64,7 +64,43 @@ Notes:
 - Counts are denormalized for cheap feed reads; the like/comment endpoints are the only
   writers and keep them in sync within the transaction.
 
+## 7c — Follows + Followed-Authors Feed
+
+Status: done.
+
+Delivered:
+
+- Tenant-scoped `/api/follows` routes over the existing `follows` table:
+  `GET /follows/following` (authors the caller follows), `GET /follows/followers`
+  (members who follow the caller), `GET /follows/suggestions` (tenant members the
+  caller does not follow yet, self excluded, ordered by public-idea count),
+  `POST /follows/:userId` (idempotent follow), and `DELETE /follows/:userId`
+  (idempotent unfollow).
+- Follow targets are validated as members of the caller's tenant: following a
+  non-member (or a user in another tenant) returns 404, and following yourself
+  returns a 422 validation error. The `follows_pair_uq` unique index plus an
+  existence check keep follows idempotent.
+- The idea feed/detail now returns `author.following` (per-caller boolean) via a
+  left join on `follows`, so the UI can render a Follow/Unfollow control on each
+  card.
+- Followed-authors feed: `GET /api/ideas?author=following` filters the feed to
+  ideas authored by users the caller follows (subquery on `follows`), reusing the
+  existing public/own-private visibility rules.
+- Web `IdeasPage`: a third **Following** feed tab, a Follow/Unfollow button on
+  every non-own idea card, and a left-column **People** panel listing who you
+  follow plus suggested authors (each with their public-idea count and a follow
+  toggle).
+
+Notes:
+
+- No DB migration was required — the `follows` table and its RLS tenant-isolation
+  policy already shipped with the foundation schema (migration `0000`) and were
+  already in the RLS table set.
+- `author=following` is a reserved feed selector; user ids are ULIDs, so they can
+  never collide with the literal `following` (same pattern as the existing `me`).
+- Followed-authors only surfaces ideas inside the caller's tenant, so the feed
+  respects tenant isolation even when an author is followed.
+
 ## Remaining Slice 7 Work
 
-- Follows and a followed-authors feed (7c).
 - Scripts marketplace (public/invite-only/protected/paid) and paid Spaces.

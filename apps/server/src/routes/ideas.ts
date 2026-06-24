@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import {
   CreateCommentSchema,
@@ -13,7 +13,7 @@ import {
   tryGetTenant,
   type TenantContext,
 } from '@tv/core';
-import { comments, exchanges, ideas, likes, symbols, users } from '@tv/db/schema';
+import { comments, exchanges, follows, ideas, likes, symbols, users } from '@tv/db/schema';
 import type { Database } from '@tv/db';
 
 const ideaSelect = {
@@ -32,6 +32,7 @@ const ideaSelect = {
     id: users.id,
     displayName: users.displayName,
     email: users.email,
+    following: sql<boolean>`${follows.id} IS NOT NULL`,
   },
   symbol: {
     id: symbols.id,
@@ -56,6 +57,9 @@ const likedJoin = (userId: string): SQL =>
     eq(likes.targetType, 'idea'),
     eq(likes.userId, userId),
   ) as SQL;
+
+const followingJoin = (userId: string): SQL =>
+  and(eq(follows.followedId, ideas.userId), eq(follows.followerId, userId)) as SQL;
 
 interface VisibleIdea {
   readonly id: string;
@@ -90,7 +94,19 @@ export const ideaRoutes = new Hono()
 
     if (q.visibility) filters.push(eq(ideas.visibility, q.visibility));
     if (q.direction) filters.push(eq(ideas.direction, q.direction));
-    if (q.author) filters.push(eq(ideas.userId, q.author === 'me' ? tenant.userId : q.author));
+    if (q.author === 'following') {
+      filters.push(
+        inArray(
+          ideas.userId,
+          db
+            .select({ id: follows.followedId })
+            .from(follows)
+            .where(eq(follows.followerId, tenant.userId)),
+        ),
+      );
+    } else if (q.author) {
+      filters.push(eq(ideas.userId, q.author === 'me' ? tenant.userId : q.author));
+    }
     if (q.symbol) {
       const like = `%${q.symbol}%`;
       filters.push(
@@ -105,6 +121,7 @@ export const ideaRoutes = new Hono()
       .leftJoin(symbols, eq(symbols.id, ideas.symbolId))
       .leftJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
       .leftJoin(likes, likedJoin(tenant.userId))
+      .leftJoin(follows, followingJoin(tenant.userId))
       .where(and(...filters))
       .orderBy(desc(ideas.createdAt))
       .limit(q.limit);
@@ -122,6 +139,7 @@ export const ideaRoutes = new Hono()
       .leftJoin(symbols, eq(symbols.id, ideas.symbolId))
       .leftJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
       .leftJoin(likes, likedJoin(tenant.userId))
+      .leftJoin(follows, followingJoin(tenant.userId))
       .where(and(eq(ideas.id, id), eq(ideas.tenantId, tenant.tenantId)))
       .limit(1);
     if (!row) throw new NotFoundError('Idea not found');

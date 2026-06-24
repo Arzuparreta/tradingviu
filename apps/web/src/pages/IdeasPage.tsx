@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
-import type { IdeaDirection, IdeaRow } from '../api/types';
+import type { FollowUser, IdeaDirection, IdeaRow } from '../api/types';
 
 const directions: IdeaDirection[] = ['long', 'short', 'neutral'];
 const directionClass: Record<IdeaDirection, string> = {
@@ -11,7 +11,27 @@ const directionClass: Record<IdeaDirection, string> = {
   neutral: 'muted',
 };
 
-type FeedFilter = 'all' | 'mine';
+type FeedFilter = 'all' | 'mine' | 'following';
+
+function FollowButton({ userId, following }: { userId: string; following: boolean }) {
+  const queryClient = useQueryClient();
+  const toggle = useMutation({
+    mutationFn: () => (following ? api.unfollowUser(userId) : api.followUser(userId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      queryClient.invalidateQueries({ queryKey: ['follows'] });
+    },
+  });
+  return (
+    <button
+      className={following ? '' : 'primary'}
+      onClick={() => toggle.mutate()}
+      disabled={toggle.isPending}
+    >
+      {following ? 'Following' : 'Follow'}
+    </button>
+  );
+}
 
 function IdeaCard({ idea, userId }: { idea: IdeaRow; userId: string | undefined }) {
   const queryClient = useQueryClient();
@@ -87,8 +107,10 @@ function IdeaCard({ idea, userId }: { idea: IdeaRow; userId: string | undefined 
             </button>
             <button onClick={() => setOpen((v) => !v)}>💬 {idea.commentsCount}</button>
           </div>
-          {userId === idea.author.id && (
+          {userId === idea.author.id ? (
             <DeleteIdeaButton id={idea.id} onDone={refreshFeed} />
+          ) : (
+            <FollowButton userId={idea.author.id} following={idea.author.following ?? false} />
           )}
         </div>
       </div>
@@ -150,6 +172,59 @@ function DeleteIdeaButton({ id, onDone }: { id: string; onDone: () => void }) {
   );
 }
 
+function PersonRow({ person, following }: { person: FollowUser; following: boolean }) {
+  return (
+    <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="small" style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {person.displayName ?? person.email}
+        </div>
+        <div className="muted small">
+          {person.ideasCount} {person.ideasCount === 1 ? 'idea' : 'ideas'}
+        </div>
+      </div>
+      <span className="grow" />
+      <FollowButton userId={person.id} following={following} />
+    </div>
+  );
+}
+
+function PeoplePanel() {
+  const followingQ = useQuery({ queryKey: ['follows', 'following'], queryFn: api.following });
+  const suggestionsQ = useQuery({
+    queryKey: ['follows', 'suggestions'],
+    queryFn: api.followSuggestions,
+  });
+
+  return (
+    <section className="card">
+      <div className="col" style={{ gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Following</div>
+          {followingQ.data?.users.length === 0 && (
+            <p className="muted small">You're not following anyone yet.</p>
+          )}
+          <div className="col" style={{ gap: 8 }}>
+            {followingQ.data?.users.map((u) => (
+              <PersonRow key={u.id} person={u} following />
+            ))}
+          </div>
+        </div>
+        {suggestionsQ.data && suggestionsQ.data.users.length > 0 && (
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Suggested authors</div>
+            <div className="col" style={{ gap: 8 }}>
+              {suggestionsQ.data.users.map((u) => (
+                <PersonRow key={u.id} person={u} following={false} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function IdeasPage() {
   const queryClient = useQueryClient();
   const user = useAuth((s) => s.user);
@@ -163,7 +238,8 @@ export function IdeasPage() {
 
   const ideasQ = useQuery({
     queryKey: ['ideas', filter],
-    queryFn: () => api.ideas(filter === 'mine' ? { author: 'me' } : {}),
+    queryFn: () =>
+      api.ideas(filter === 'all' ? {} : { author: filter === 'mine' ? 'me' : 'following' }),
   });
 
   const create = useMutation({
@@ -187,7 +263,8 @@ export function IdeasPage() {
     <div className="page">
       <h1>Ideas</h1>
       <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
-        <section className="card" style={{ width: 340 }}>
+        <div className="col" style={{ width: 340, gap: 16 }}>
+        <section className="card">
           <div className="col">
             <div>
               <label>Title</label>
@@ -250,6 +327,9 @@ export function IdeasPage() {
           </div>
         </section>
 
+        <PeoplePanel />
+        </div>
+
         <section style={{ flex: 1 }}>
           <div className="row" style={{ marginBottom: 12, gap: 8 }}>
             <button className={filter === 'all' ? 'primary' : ''} onClick={() => setFilter('all')}>
@@ -257,6 +337,12 @@ export function IdeasPage() {
             </button>
             <button className={filter === 'mine' ? 'primary' : ''} onClick={() => setFilter('mine')}>
               My ideas
+            </button>
+            <button
+              className={filter === 'following' ? 'primary' : ''}
+              onClick={() => setFilter('following')}
+            >
+              Following
             </button>
           </div>
           {ideasQ.isLoading && <p className="muted">Loading…</p>}

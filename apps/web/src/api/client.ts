@@ -42,6 +42,7 @@ import type {
   IdeaDirection,
   IdeaVisibility,
   CommentRow,
+  FollowUser,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -474,6 +475,13 @@ export const api = {
     request<{ liked: boolean }>(`/api/ideas/${id}/like`, { method: 'POST' }),
   unlikeIdea: (id: string) =>
     request<{ liked: boolean }>(`/api/ideas/${id}/like`, { method: 'DELETE' }),
+  following: () => request<{ users: FollowUser[] }>('/api/follows/following'),
+  followers: () => request<{ users: FollowUser[] }>('/api/follows/followers'),
+  followSuggestions: () => request<{ users: FollowUser[] }>('/api/follows/suggestions'),
+  followUser: (userId: string) =>
+    request<{ following: boolean }>(`/api/follows/${userId}`, { method: 'POST' }),
+  unfollowUser: (userId: string) =>
+    request<{ following: boolean }>(`/api/follows/${userId}`, { method: 'DELETE' }),
 };
 
 export type {
