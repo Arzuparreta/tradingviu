@@ -52,9 +52,25 @@ Delivered:
 - `/discovery` dividend calendar panel using the existing symbol/date filters.
 - Seeded demo dividend rows for AAPL/MSFT.
 
+## 6d — News Provider Adapters + Scheduled Ingestion
+
+Status: done.
+
+Delivered:
+
+- `packages/news` with a provider interface, Zod-backed article normalization, deterministic `MockNewsProvider`, provider registry, and unit tests.
+- `services/news-ingest` background service that fetches normalized articles and upserts into global `news_articles` by URL.
+- Ingestion runs through `DATABASE_URL_ADMIN` with super-admin RLS context inside a transaction, preserving the runtime `tv_app`/RLS boundary.
+- Root `pnpm news:ingest` command for a one-shot local ingest; `pnpm --filter @tv/news-ingest start` runs the same worker on an interval.
+- Env controls for provider, symbol/date filters, limit, and interval in `.env.example`.
+
+Notes:
+
+- The only provider implemented in this cut is `mock`; real NewsAPI/Finnhub/Benzinga adapters should plug into the same interface with mocked tests first.
+- No DB migration was required because 6a already added the `news_articles` read surface and table.
+
 ## Remaining Slice 6 Work
 
-- News provider adapters and scheduled ingestion.
 - Yield curves and macroeconomic series.
 - Fundamentals storage and API.
 - Expand screener to dedicated fundamentals storage once that table exists.

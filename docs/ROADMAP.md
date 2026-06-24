@@ -10,18 +10,18 @@
 
 > Slice numbers are 1-indexed and match the `docs/SLICE-N.md` files and the "What each slice delivers" section below.
 
-| Slice | Scope                                                                                                      | Status                   |
-| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)      |
-| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)      |
-| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)      |
-| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)      |
-| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                  |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b/6c done) |
-| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                  |
-| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
-| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                  |
-| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
+| Slice | Scope                                                                                                      | Status                         |
+| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)            |
+| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)            |
+| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)            |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)            |
+| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                        |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b/6c/6d done) |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                        |
+| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                        |
+| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                        |
+| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                        |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -186,7 +186,8 @@ tradingviu/
 - **6a (done) — News + calendars read surface:** Zod-validated `/api/news`, `/api/calendars/earnings`, and `/api/calendars/economic` endpoints over the existing global tables, seeded demo rows, and a `/discovery` web page with symbol/country/range filters. See `docs/SLICE-6.md`.
 - **6b (done) — Screener + saved presets:** `packages/screener-engine`, Zod-validated `/api/screener`, tenant-scoped `/api/screener/presets` CRUD, and a screener panel in `/discovery` backed by seeded demo symbol metrics. See `docs/SLICE-6.md`.
 - **6c (done) — Dividend calendar:** Global `dividend_calendar` table, RLS policies, Zod-validated `/api/calendars/dividends`, seeded AAPL/MSFT demo rows, and `/discovery` dividend panel. See `docs/SLICE-6.md`.
-- News aggregator (NewsAPI, Finnhub, Benzinga)
+- **6d (done) — News provider adapters + scheduled ingestion:** `packages/news` provider contract and deterministic mock provider, `services/news-ingest` worker, admin/RLS-safe upsert into `news_articles`, and `pnpm news:ingest`. See `docs/SLICE-6.md`.
+- Real news providers (NewsAPI, Finnhub, Benzinga)
 - Brand news by symbol
 - Calendars: earnings, economic, dividends
 - Yield curves multi-country

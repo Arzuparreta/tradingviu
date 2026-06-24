@@ -93,6 +93,40 @@ export const NewsQuerySchema = z.object({
 });
 export type NewsQuery = z.infer<typeof NewsQuerySchema>;
 
+export const NewsSentimentSchema = z.enum(['negative', 'neutral', 'positive']);
+export type NewsSentiment = z.infer<typeof NewsSentimentSchema>;
+
+export const NewsProviderArticleSchema = z.object({
+  source: z.string().trim().min(1).max(80).optional(),
+  url: z.string().trim().url().max(2048),
+  title: z.string().trim().min(1).max(500),
+  body: z.string().trim().min(1).max(20_000).optional(),
+  symbols: z.array(z.string().trim().min(1).max(32)).default([]),
+  sentiment: NewsSentimentSchema.optional(),
+  publishedAt: z.coerce.date(),
+});
+export type NewsProviderArticle = z.infer<typeof NewsProviderArticleSchema>;
+
+export const NormalizedNewsArticleSchema = z.object({
+  source: z.string().trim().min(1).max(80),
+  url: z.string().trim().url().max(2048),
+  title: z.string().trim().min(1).max(500),
+  body: z.string().trim().min(1).max(20_000).optional(),
+  symbols: z.array(z.string().trim().min(1).max(32)),
+  sentiment: NewsSentimentSchema.optional(),
+  publishedAt: z.date(),
+  fetchedAt: z.date(),
+});
+export type NormalizedNewsArticle = z.infer<typeof NormalizedNewsArticleSchema>;
+
+export const NewsIngestQuerySchema = z.object({
+  symbols: z.array(z.string().trim().min(1).max(32)).default([]),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+});
+export type NewsIngestQuery = z.infer<typeof NewsIngestQuerySchema>;
+
 export const EarningsCalendarQuerySchema = z.object({
   symbol: z.string().trim().min(1).max(80).optional(),
   from: z.coerce.date().optional(),

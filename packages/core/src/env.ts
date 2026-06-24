@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const optionalDatetimeEnv = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().datetime().optional(),
+);
+
 export const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DOMAIN: z.string().default('localhost'),
@@ -11,6 +16,12 @@ export const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3001),
   MEILI_HOST: z.string().url().optional(),
   MEILI_MASTER_KEY: z.string().optional(),
+  NEWS_PROVIDER: z.enum(['mock']).default('mock'),
+  NEWS_INGEST_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
+  NEWS_INGEST_SYMBOLS: z.string().optional(),
+  NEWS_INGEST_FROM: optionalDatetimeEnv,
+  NEWS_INGEST_TO: optionalDatetimeEnv,
+  NEWS_INGEST_LIMIT: z.coerce.number().int().positive().max(500).default(100),
   EMAIL_FROM: z.string().email().optional(),
   POSTMARK_TOKEN: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -28,7 +39,9 @@ export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
   if (cached) return cached;
   const parsed = EnvSchema.safeParse(source);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
+    const issues = parsed.error.issues
+      .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
     throw new Error(`Invalid environment variables:\n${issues}`);
   }
   cached = parsed.data;

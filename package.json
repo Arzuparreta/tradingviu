@@ -21,6 +21,7 @@
     "db:generate": "pnpm --filter @tv/db generate",
     "db:migrate": "pnpm --filter @tv/db migrate",
     "db:seed": "pnpm --filter @tv/db seed",
+    "news:ingest": "bun run services/news-ingest/src/index.ts --once",
     "tvctl": "pnpm --filter @tv/cli tvctl"
   },
   "devDependencies": {
