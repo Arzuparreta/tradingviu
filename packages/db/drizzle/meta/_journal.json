@@ -36,6 +36,13 @@
       "when": 1782322278490,
       "tag": "0004_jazzy_salo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782328245306,
+      "tag": "0005_dazzling_red_shift",
+      "breakpoints": true
     }
   ]
 }

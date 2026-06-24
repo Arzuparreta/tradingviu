@@ -123,7 +123,7 @@ DECLARE
     'data_subscriptions',
     'layouts','drawings','alerts','alert_history',
     'screener_presets','user_indicators','backtests',
-    'ideas','comments','follows','published_scripts',
+    'ideas','comments','likes','follows','published_scripts',
     'portfolios','holdings','transactions',
     'watchlists','watchlist_items',
     'paper_accounts','paper_orders','broker_connections',

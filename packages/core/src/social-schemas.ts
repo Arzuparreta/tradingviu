@@ -33,3 +33,9 @@ export const UpdateIdeaSchema = z.object({
   snapshotUrl: z.string().trim().url().max(2048).optional(),
 });
 export type UpdateIdea = z.infer<typeof UpdateIdeaSchema>;
+
+export const CreateCommentSchema = z.object({
+  body: z.string().trim().min(1).max(4000),
+  parentId: z.string().trim().min(1).max(40).optional(),
+});
+export type CreateComment = z.infer<typeof CreateCommentSchema>;

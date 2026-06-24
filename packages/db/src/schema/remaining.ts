@@ -242,6 +242,26 @@ export const comments = pgTable(
   }),
 );
 
+export const likes = pgTable(
+  'likes',
+  {
+    id: id(),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').notNull(),
+    createdAt: ts('created_at'),
+  },
+  (t) => ({
+    targetIdx: index('likes_target_idx').on(t.targetType, t.targetId),
+    userTargetUq: uniqueIndex('likes_user_target_uq').on(t.userId, t.targetType, t.targetId),
+  }),
+);
+
 export const follows = pgTable(
   'follows',
   {

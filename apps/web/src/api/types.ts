@@ -554,8 +554,17 @@ export interface IdeaRow {
   snapshotUrl: string | null;
   likesCount: number;
   commentsCount: number;
+  liked: boolean;
   createdAt: string;
   updatedAt: string;
   author: IdeaAuthor;
   symbol: IdeaSymbol | null;
+}
+
+export interface CommentRow {
+  id: string;
+  body: string;
+  parentId: string | null;
+  createdAt: string;
+  author: IdeaAuthor;
 }

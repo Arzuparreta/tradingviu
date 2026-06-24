@@ -41,6 +41,7 @@ import type {
   IdeaRow,
   IdeaDirection,
   IdeaVisibility,
+  CommentRow,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
@@ -460,6 +461,19 @@ export const api = {
     },
   ) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteIdea: (id: string) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'DELETE' }),
+  ideaComments: (id: string) =>
+    request<{ comments: CommentRow[] }>(`/api/ideas/${id}/comments`),
+  addIdeaComment: (id: string, body: { body: string; parentId?: string }) =>
+    request<{ id: string }>(`/api/ideas/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteIdeaComment: (id: string, commentId: string) =>
+    request<{ ok: true }>(`/api/ideas/${id}/comments/${commentId}`, { method: 'DELETE' }),
+  likeIdea: (id: string) =>
+    request<{ liked: boolean }>(`/api/ideas/${id}/like`, { method: 'POST' }),
+  unlikeIdea: (id: string) =>
+    request<{ liked: boolean }>(`/api/ideas/${id}/like`, { method: 'DELETE' }),
 };
 
 export type {

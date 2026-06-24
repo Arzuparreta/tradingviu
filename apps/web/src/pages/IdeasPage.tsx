@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
-import type { IdeaDirection } from '../api/types';
+import type { IdeaDirection, IdeaRow } from '../api/types';
 
 const directions: IdeaDirection[] = ['long', 'short', 'neutral'];
 const directionClass: Record<IdeaDirection, string> = {
@@ -12,6 +12,143 @@ const directionClass: Record<IdeaDirection, string> = {
 };
 
 type FeedFilter = 'all' | 'mine';
+
+function IdeaCard({ idea, userId }: { idea: IdeaRow; userId: string | undefined }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [comment, setComment] = useState('');
+
+  const refreshFeed = () => queryClient.invalidateQueries({ queryKey: ['ideas'] });
+
+  const commentsQ = useQuery({
+    queryKey: ['ideaComments', idea.id],
+    queryFn: () => api.ideaComments(idea.id),
+    enabled: open,
+  });
+
+  const toggleLike = useMutation({
+    mutationFn: () => (idea.liked ? api.unlikeIdea(idea.id) : api.likeIdea(idea.id)),
+    onSuccess: refreshFeed,
+  });
+
+  const addComment = useMutation({
+    mutationFn: () => api.addIdeaComment(idea.id, { body: comment.trim() }),
+    onSuccess: () => {
+      setComment('');
+      queryClient.invalidateQueries({ queryKey: ['ideaComments', idea.id] });
+      refreshFeed();
+    },
+  });
+
+  const removeComment = useMutation({
+    mutationFn: (commentId: string) => api.deleteIdeaComment(idea.id, commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ideaComments', idea.id] });
+      refreshFeed();
+    },
+  });
+
+  return (
+    <div className="card">
+      <div className="row">
+        <div>
+          <div style={{ fontWeight: 600 }}>
+            {idea.title}
+            {idea.visibility === 'private' && (
+              <span className="muted small" style={{ marginLeft: 8 }}>
+                · private
+              </span>
+            )}
+          </div>
+          <div className="muted small mono">
+            {idea.symbol ? `${idea.symbol.exchange}:${idea.symbol.ticker} · ` : ''}
+            {idea.direction && (
+              <span className={directionClass[idea.direction]}>{idea.direction}</span>
+            )}
+            {idea.direction ? ' · ' : ''}
+            {idea.author.displayName ?? idea.author.email} ·{' '}
+            {new Date(idea.createdAt).toLocaleDateString()}
+          </div>
+          {idea.body && (
+            <p className="small" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
+              {idea.body}
+            </p>
+          )}
+        </div>
+        <span className="grow" />
+        <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
+          <div className="row" style={{ gap: 8 }}>
+            <button
+              className={idea.liked ? 'primary' : ''}
+              onClick={() => toggleLike.mutate()}
+              disabled={toggleLike.isPending}
+            >
+              ♥ {idea.likesCount}
+            </button>
+            <button onClick={() => setOpen((v) => !v)}>💬 {idea.commentsCount}</button>
+          </div>
+          {userId === idea.author.id && (
+            <DeleteIdeaButton id={idea.id} onDone={refreshFeed} />
+          )}
+        </div>
+      </div>
+
+      {open && (
+        <div className="col" style={{ marginTop: 12, gap: 8 }}>
+          {commentsQ.isLoading && <p className="muted small">Loading comments…</p>}
+          {commentsQ.data?.comments.map((cm) => (
+            <div key={cm.id} className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
+              <div>
+                <span className="small" style={{ fontWeight: 600 }}>
+                  {cm.author.displayName ?? cm.author.email}
+                </span>{' '}
+                <span className="muted small">{new Date(cm.createdAt).toLocaleString()}</span>
+                <p className="small" style={{ whiteSpace: 'pre-wrap', margin: '2px 0 0' }}>
+                  {cm.body}
+                </p>
+              </div>
+              <span className="grow" />
+              {userId === cm.author.id && (
+                <button onClick={() => removeComment.mutate(cm.id)} disabled={removeComment.isPending}>
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          {commentsQ.data?.comments.length === 0 && (
+            <p className="muted small">No comments yet.</p>
+          )}
+          <div className="row" style={{ gap: 8 }}>
+            <input
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Add a comment"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && comment.trim()) addComment.mutate();
+              }}
+            />
+            <button
+              className="primary"
+              disabled={comment.trim().length === 0 || addComment.isPending}
+              onClick={() => addComment.mutate()}
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeleteIdeaButton({ id, onDone }: { id: string; onDone: () => void }) {
+  const remove = useMutation({ mutationFn: () => api.deleteIdea(id), onSuccess: onDone });
+  return (
+    <button onClick={() => remove.mutate()} disabled={remove.isPending}>
+      Delete
+    </button>
+  );
+}
 
 export function IdeasPage() {
   const queryClient = useQueryClient();
@@ -44,11 +181,6 @@ export function IdeasPage() {
       setSymbol('');
       queryClient.invalidateQueries({ queryKey: ['ideas'] });
     },
-  });
-
-  const remove = useMutation({
-    mutationFn: (id: string) => api.deleteIdea(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ideas'] }),
   });
 
   return (
@@ -114,9 +246,7 @@ export function IdeasPage() {
             >
               Publish idea
             </button>
-            {create.isError && (
-              <p className="down small">{(create.error as Error).message}</p>
-            )}
+            {create.isError && <p className="down small">{(create.error as Error).message}</p>}
           </div>
         </section>
 
@@ -132,45 +262,7 @@ export function IdeasPage() {
           {ideasQ.isLoading && <p className="muted">Loading…</p>}
           <div className="col">
             {ideasQ.data?.ideas.map((idea) => (
-              <div key={idea.id} className="card">
-                <div className="row">
-                  <div>
-                    <div style={{ fontWeight: 600 }}>
-                      {idea.title}
-                      {idea.visibility === 'private' && (
-                        <span className="muted small" style={{ marginLeft: 8 }}>
-                          · private
-                        </span>
-                      )}
-                    </div>
-                    <div className="muted small mono">
-                      {idea.symbol ? `${idea.symbol.exchange}:${idea.symbol.ticker} · ` : ''}
-                      {idea.direction && (
-                        <span className={directionClass[idea.direction]}>{idea.direction}</span>
-                      )}
-                      {idea.direction ? ' · ' : ''}
-                      {idea.author.displayName ?? idea.author.email} ·{' '}
-                      {new Date(idea.createdAt).toLocaleDateString()}
-                    </div>
-                    {idea.body && (
-                      <p className="small" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>
-                        {idea.body}
-                      </p>
-                    )}
-                  </div>
-                  <span className="grow" />
-                  <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <span className="muted small">
-                      ♥ {idea.likesCount} · 💬 {idea.commentsCount}
-                    </span>
-                    {user?.id === idea.author.id && (
-                      <button onClick={() => remove.mutate(idea.id)} disabled={remove.isPending}>
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <IdeaCard key={idea.id} idea={idea} userId={user?.id} />
             ))}
             {ideasQ.data?.ideas.length === 0 && <p className="muted">No ideas yet.</p>}
           </div>
