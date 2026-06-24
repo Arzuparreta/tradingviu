@@ -29,6 +29,13 @@
       "when": 1782317727176,
       "tag": "0003_tiny_hawkeye",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782322278490,
+      "tag": "0004_jazzy_salo",
+      "breakpoints": true
     }
   ]
 }

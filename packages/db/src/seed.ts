@@ -574,20 +574,9 @@ if (aapl && msft) {
 }
 
 const demoEconomicAt = new Date('2026-06-26T12:30:00.000Z');
-const [existingEconomicDemo] = await db
-  .select({ id: economicEvents.id })
-  .from(economicEvents)
-  .where(
-    and(
-      eq(economicEvents.country, 'US'),
-      eq(economicEvents.eventAt, demoEconomicAt),
-      eq(economicEvents.name, 'Core PCE Price Index'),
-    ),
-  )
-  .limit(1);
-
-if (!existingEconomicDemo) {
-  await db.insert(economicEvents).values({
+await db
+  .insert(economicEvents)
+  .values({
     id: ulid(),
     country: 'US',
     eventAt: demoEconomicAt,
@@ -595,8 +584,8 @@ if (!existingEconomicDemo) {
     importance: 'high',
     forecast: '0.2%',
     previous: '0.2%',
-  });
-}
+  })
+  .onConflictDoNothing();
 
 const demoCurveDate = new Date('2026-06-23T00:00:00.000Z');
 await db

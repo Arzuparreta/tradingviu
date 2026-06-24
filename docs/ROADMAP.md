@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news, earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, and macro series ingestion delivered. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news, earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -17,7 +17,7 @@
 | 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)                        |
 | 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                        |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                                    |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b/6c/6d/6e/6f/6g/6h done) |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6i done)                   |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                                    |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
 | 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                    |
@@ -93,8 +93,8 @@ tradingviu/
 │   ├── options-engine/          # Black-Scholes pricing, greeks, IV, chain, strategy builder + payoff
 │   ├── broker-adapters/         # [TODO] Alpaca, IBKR, Binance live trading (slice 5b)
 │   ├── social/                  # [TODO] ideas, comments, follows
-│   ├── news/                    # [TODO] aggregator
-│   ├── calendar/                # [TODO] earnings/economic/dividends
+│   ├── news/                    # provider contract + mock adapter + ingest worker
+│   ├── calendar/                # earnings/economic/dividend provider contract + mock/FMP adapters
 │   ├── portfolio/               # [TODO] P&L, holdings, transactions
 │   ├── layout-sync/             # multi-chart layout schema + grid presets + helpers
 │   ├── ui-kit/                  # [TODO] shared React components
@@ -105,7 +105,7 @@ tradingviu/
 │   ├── desktop/                 # [TODO] Tauri 2
 │   ├── mobile/                  # [TODO] React Native
 │   └── server/                  # Hono on Bun (port 3001)
-├── services/                    # [TODO] background workers (data-ingest, alert-runner, etc.)
+├── services/                    # background workers: news-ingest, fundamentals-ingest, macro-ingest, calendar-ingest
 ├── infra/
 │   ├── docker-compose.yml       # postgres, redis, minio, meili, mailpit, caddy, api, web
 │   ├── Caddyfile
@@ -191,6 +191,7 @@ tradingviu/
 - **6f (done) — Yield curves + macro series:** Global `yield_curves` and `macro_series_observations` tables, RLS policies, `/api/macro/yield-curves`, `/api/macro/series`, Discovery rates/macro panel, and seeded demo US rates/macroeconomic observations. See `docs/SLICE-6.md`.
 - **6g (done) — Fundamentals provider ingestion:** `packages/fundamentals` provider contract with mock + Polygon adapters, `services/fundamentals-ingest` worker, admin/RLS-safe upsert into `fundamental_snapshots`, and `pnpm fundamentals:ingest`. See `docs/SLICE-6.md`.
 - **6h (done) — Yield curve + macro provider ingestion:** `packages/macro` provider contract with mock + FRED adapters, `services/macro-ingest` worker, admin/RLS-safe upserts into `yield_curves` and `macro_series_observations`, and `pnpm macro:ingest`. See `docs/SLICE-6.md`.
+- **6i (done) — Calendar provider ingestion:** `packages/calendar` provider contract with mock + FMP adapters, `services/calendar-ingest` worker, admin/RLS-safe upserts into `earnings_calendar`/`dividend_calendar`/`economic_events` (new `economic_events` unique index), and `pnpm calendars:ingest`. See `docs/SLICE-6.md`.
 - Real news providers (NewsAPI, Finnhub, Benzinga)
 - Brand news by symbol
 - Calendars: earnings, economic, dividends

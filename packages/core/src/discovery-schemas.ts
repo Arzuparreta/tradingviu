@@ -259,3 +259,79 @@ export const EconomicCalendarQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(100),
 });
 export type EconomicCalendarQuery = z.infer<typeof EconomicCalendarQuerySchema>;
+
+const optionalEventText = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : undefined;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  }
+  return value;
+}, z.string().min(1).max(80).optional());
+
+const requiredEventText = z.preprocess((value) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : value;
+  if (typeof value === 'string') return value.trim();
+  return value;
+}, z.string().min(1).max(40));
+
+export const CalendarIngestQuerySchema = z.object({
+  symbols: z.array(z.string().trim().min(1).max(32)).default([]),
+  country: z.string().trim().min(1).max(80).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  limit: z.coerce.number().int().positive().max(1000).default(250),
+});
+export type CalendarIngestQuery = z.infer<typeof CalendarIngestQuerySchema>;
+
+export const EarningsProviderEventSchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  date: z.coerce.date(),
+  epsEstimate: optionalEventText,
+  epsActual: optionalEventText,
+  revenueEstimate: optionalEventText,
+  revenueActual: optionalEventText,
+});
+export type EarningsProviderEvent = z.infer<typeof EarningsProviderEventSchema>;
+
+export const NormalizedEarningsEventSchema = EarningsProviderEventSchema.extend({
+  fetchedAt: z.date(),
+});
+export type NormalizedEarningsEvent = z.infer<typeof NormalizedEarningsEventSchema>;
+
+export const DividendProviderEventSchema = z.object({
+  symbol: z.string().trim().min(1).max(32),
+  exDate: z.coerce.date(),
+  paymentDate: z.coerce.date().optional(),
+  recordDate: z.coerce.date().optional(),
+  declarationDate: z.coerce.date().optional(),
+  amount: requiredEventText,
+  currency: z.string().trim().min(1).max(12).default('USD'),
+  frequency: z.string().trim().min(1).max(40).optional(),
+});
+export type DividendProviderEvent = z.infer<typeof DividendProviderEventSchema>;
+
+export const NormalizedDividendEventSchema = DividendProviderEventSchema.extend({
+  fetchedAt: z.date(),
+});
+export type NormalizedDividendEvent = z.infer<typeof NormalizedDividendEventSchema>;
+
+export const EconomicImportanceSchema = z.enum(['low', 'medium', 'high']);
+export type EconomicImportance = z.infer<typeof EconomicImportanceSchema>;
+
+export const EconomicProviderEventSchema = z.object({
+  country: z.string().trim().min(1).max(80),
+  eventAt: z.coerce.date(),
+  name: z.string().trim().min(1).max(200),
+  importance: EconomicImportanceSchema.default('low'),
+  actual: optionalEventText,
+  forecast: optionalEventText,
+  previous: optionalEventText,
+});
+export type EconomicProviderEvent = z.infer<typeof EconomicProviderEventSchema>;
+
+export const NormalizedEconomicEventSchema = EconomicProviderEventSchema.extend({
+  fetchedAt: z.date(),
+});
+export type NormalizedEconomicEvent = z.infer<typeof NormalizedEconomicEventSchema>;

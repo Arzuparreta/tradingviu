@@ -24,6 +24,7 @@
     "news:ingest": "bun run services/news-ingest/src/index.ts --once",
     "fundamentals:ingest": "bun run services/fundamentals-ingest/src/index.ts --once",
     "macro:ingest": "bun run services/macro-ingest/src/index.ts --once",
+    "calendars:ingest": "bun run services/calendar-ingest/src/index.ts --once",
     "tvctl": "pnpm --filter @tv/cli tvctl"
   },
   "devDependencies": {

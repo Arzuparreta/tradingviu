@@ -141,7 +141,27 @@ Notes:
 - `mock` remains the default provider for deterministic local development and tests.
 - `fred` uses the official FRED `fred/series/observations` endpoint and currently supports US data only.
 
+## 6i — Calendar Provider Ingestion
+
+Status: done.
+
+Delivered:
+
+- `packages/calendar` with a provider interface, Zod-backed normalization for earnings/dividend/economic events, deterministic `MockCalendarProvider`, optional Financial Modeling Prep (FMP) adapter, provider registry, and unit tests.
+- `services/calendar-ingest` background service that fetches normalized calendar events and upserts into `earnings_calendar`, `dividend_calendar`, and `economic_events`.
+- Earnings and dividend ingestion resolves provider tickers against the global `symbols` table and skips unknown symbols; economic events ingest by country and need no symbol linkage.
+- New `economic_events_country_event_name_uq` unique index (migration `0004_jazzy_salo`) makes the economic upsert idempotent; earnings/dividends reuse their existing symbol/date unique indexes.
+- Ingestion runs through `DATABASE_URL_ADMIN` with super-admin RLS context inside a transaction, matching news/fundamentals/macro ingest.
+- Root `pnpm calendars:ingest` command for one-shot local ingest; `pnpm --filter @tv/calendar-ingest start` runs the same worker on an interval.
+- Env controls for provider, symbols, country, date range, limit, interval, and optional `FMP_KEY` in `.env.example`.
+
+Notes:
+
+- `mock` remains the default provider for deterministic local development and tests; it emits AAPL/MSFT earnings + dividends and US economic events so a seeded install upserts cleanly.
+- `fmp` uses the Financial Modeling Prep `earning_calendar`, `stock_dividend_calendar`, and `economic_calendar` endpoints and requires `FMP_KEY`.
+
 ## Remaining Slice 6 Work
 
 - Additional fundamentals providers and broader metric coverage.
 - Additional macro providers and non-US country mappings.
+- Additional calendar providers (Finnhub, Benzinga) and per-symbol brand calendars.

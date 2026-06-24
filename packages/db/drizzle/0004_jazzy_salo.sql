@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "economic_events_country_event_name_uq" ON "economic_events" USING btree ("country","event_at","name");

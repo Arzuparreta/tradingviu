@@ -540,6 +540,11 @@ export const economicEvents = pgTable(
   },
   (t) => ({
     countryDateIdx: index('economic_events_country_date_idx').on(t.country, t.eventAt),
+    countryEventNameUq: uniqueIndex('economic_events_country_event_name_uq').on(
+      t.country,
+      t.eventAt,
+      t.name,
+    ),
   }),
 );
 
