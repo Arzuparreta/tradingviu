@@ -191,6 +191,50 @@ export const MacroSeriesQuerySchema = z.object({
 });
 export type MacroSeriesQuery = z.infer<typeof MacroSeriesQuerySchema>;
 
+export const MacroIngestQuerySchema = z.object({
+  country: z.string().trim().min(1).max(80).default('US'),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  limit: z.coerce.number().int().positive().max(500).default(100),
+});
+export type MacroIngestQuery = z.infer<typeof MacroIngestQuerySchema>;
+
+export const YieldCurveProviderPointSchema = z.object({
+  country: z.string().trim().min(1).max(80),
+  curveDate: z.coerce.date(),
+  tenorMonths: z.number().int().positive(),
+  rate: z.number().finite(),
+  currency: z.string().trim().min(1).max(12).default('USD'),
+  source: z.string().trim().min(1).max(80).optional(),
+});
+export type YieldCurveProviderPoint = z.infer<typeof YieldCurveProviderPointSchema>;
+
+export const MacroSeriesProviderObservationSchema = z.object({
+  country: z.string().trim().min(1).max(80),
+  metricCode: z.string().trim().min(1).max(80),
+  metricName: z.string().trim().min(1).max(160),
+  observedAt: z.coerce.date(),
+  value: z.number().finite(),
+  unit: z.string().trim().min(1).max(40),
+  frequency: z.string().trim().min(1).max(40),
+  source: z.string().trim().min(1).max(80).optional(),
+});
+export type MacroSeriesProviderObservation = z.infer<typeof MacroSeriesProviderObservationSchema>;
+
+export const NormalizedYieldCurvePointSchema = YieldCurveProviderPointSchema.extend({
+  source: z.string().trim().min(1).max(80),
+  fetchedAt: z.date(),
+});
+export type NormalizedYieldCurvePoint = z.infer<typeof NormalizedYieldCurvePointSchema>;
+
+export const NormalizedMacroSeriesObservationSchema = MacroSeriesProviderObservationSchema.extend({
+  source: z.string().trim().min(1).max(80),
+  fetchedAt: z.date(),
+});
+export type NormalizedMacroSeriesObservation = z.infer<
+  typeof NormalizedMacroSeriesObservationSchema
+>;
+
 export const EarningsCalendarQuerySchema = z.object({
   symbol: z.string().trim().min(1).max(80).optional(),
   from: z.coerce.date().optional(),

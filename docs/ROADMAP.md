@@ -4,24 +4,24 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news, earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, and macro series delivered. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news, earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, and macro series ingestion delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
 > Slice numbers are 1-indexed and match the `docs/SLICE-N.md` files and the "What each slice delivers" section below.
 
-| Slice | Scope                                                                                                      | Status                                  |
-| ----- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)                     |
-| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)                     |
-| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)                     |
-| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                     |
-| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                                 |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b/6c/6d/6e/6f/6g done) |
-| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                                 |
-| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                 |
-| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                 |
-| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                 |
+| Slice | Scope                                                                                                      | Status                                     |
+| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)                        |
+| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)                        |
+| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)                        |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                        |
+| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                                    |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a/6b/6c/6d/6e/6f/6g/6h done) |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | pending                                    |
+| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
+| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                    |
+| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                    |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -190,11 +190,12 @@ tradingviu/
 - **6e (done) — Fundamentals storage + API:** Global `fundamental_snapshots` table, RLS policies, `/api/fundamentals`, Discovery fundamentals panel, seeded demo fundamentals, and screener metrics switched from `symbols.metadata` to dedicated storage. See `docs/SLICE-6.md`.
 - **6f (done) — Yield curves + macro series:** Global `yield_curves` and `macro_series_observations` tables, RLS policies, `/api/macro/yield-curves`, `/api/macro/series`, Discovery rates/macro panel, and seeded demo US rates/macroeconomic observations. See `docs/SLICE-6.md`.
 - **6g (done) — Fundamentals provider ingestion:** `packages/fundamentals` provider contract with mock + Polygon adapters, `services/fundamentals-ingest` worker, admin/RLS-safe upsert into `fundamental_snapshots`, and `pnpm fundamentals:ingest`. See `docs/SLICE-6.md`.
+- **6h (done) — Yield curve + macro provider ingestion:** `packages/macro` provider contract with mock + FRED adapters, `services/macro-ingest` worker, admin/RLS-safe upserts into `yield_curves` and `macro_series_observations`, and `pnpm macro:ingest`. See `docs/SLICE-6.md`.
 - Real news providers (NewsAPI, Finnhub, Benzinga)
 - Brand news by symbol
 - Calendars: earnings, economic, dividends
 - Additional fundamentals providers and broader metric coverage
-- Yield curve and macro provider ingestion
+- Additional macro providers and non-US country mappings
 - Screener with 400+ filters, auto-refresh
 
 ### Slice 7 — Social

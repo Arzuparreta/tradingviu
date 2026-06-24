@@ -123,7 +123,25 @@ Notes:
 - `mock` remains the default provider for deterministic local development and tests.
 - `polygon` uses the Polygon/Massive financial ratios endpoint and requires `POLYGON_KEY` plus explicit `FUNDAMENTALS_INGEST_SYMBOLS`.
 
+## 6h — Yield Curve + Macro Provider Ingestion
+
+Status: done.
+
+Delivered:
+
+- `packages/macro` with a provider interface, Zod-backed normalization for yield curve points and macro observations, deterministic `MockMacroProvider`, FRED adapter, and unit tests.
+- `services/macro-ingest` background service that fetches normalized rates/macro data and upserts into `yield_curves` and `macro_series_observations`.
+- FRED support for the US Treasury curve (`DGS3MO`, `DGS2`, `DGS5`, `DGS10`, `DGS30`) and core macro series (`CPIAUCSL`, `UNRATE`, `GDP`, `FEDFUNDS`).
+- Ingestion runs through `DATABASE_URL_ADMIN` with super-admin RLS context inside a transaction, matching news/fundamentals ingest.
+- Root `pnpm macro:ingest` command for one-shot local ingest; `pnpm --filter @tv/macro-ingest start` runs the same worker on an interval.
+- Env controls for provider, country, date range, limit, interval, and optional `FRED_KEY` in `.env.example`.
+
+Notes:
+
+- `mock` remains the default provider for deterministic local development and tests.
+- `fred` uses the official FRED `fred/series/observations` endpoint and currently supports US data only.
+
 ## Remaining Slice 6 Work
 
 - Additional fundamentals providers and broader metric coverage.
-- Real yield curve and macro provider ingestion.
+- Additional macro providers and non-US country mappings.
