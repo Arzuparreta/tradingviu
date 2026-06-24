@@ -17,7 +17,7 @@
 :80 {
   root * /srv
   encode zstd gzip
-  reverse_proxy web:5173
+  reverse_proxy web:5147
 }
 
 # Production-like TLS (use --domain to enable)
@@ -25,7 +25,7 @@
   encode zstd gzip
   @api path /api/* /auth/* /billing/* /webhooks/* /ws/*
   reverse_proxy api:3001
-  reverse_proxy web:5173
+  reverse_proxy web:5147
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"
     X-Content-Type-Options "nosniff"

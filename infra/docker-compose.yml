@@ -102,7 +102,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-tradingviu}:${POSTGRES_PASSWORD:-tradingviu}@postgres:5432/${POSTGRES_DB:-tradingviu}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5147}
       CRED_ENC_KEY: ${CRED_ENC_KEY:?CRED_ENC_KEY required}
       DOMAIN: ${DOMAIN:-tradingviu.localhost}
     ports:
@@ -121,7 +121,7 @@ services:
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
     ports:
-      - "5173:5173"
+      - "5147:5147"
     depends_on:
       - api
 
