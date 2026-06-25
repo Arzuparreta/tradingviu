@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, volume profile, and TPO/Market profile. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, and bar replay. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -21,7 +21,7 @@
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6k done) |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
-| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | in progress (9a–9d done) |
+| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | in progress (9a–9e done) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
@@ -126,7 +126,7 @@ tradingviu/
 │   ├── SLICE-3.md               # what slice 3 delivered
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
-│   ├── SLICE-9.md               # what slice 9 delivers (9a–9d: patterns, chart patterns, volume profile, TPO)
+│   ├── SLICE-9.md               # what slice 9 delivers (9a–9e: patterns, chart patterns, volume profile, TPO, bar replay)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -260,8 +260,14 @@ tradingviu/
   prints); `POST /api/tpo-profile`; and a **TPO** toggle on `ChartPage` that
   overlays POC/VAH/VAL + IB high/low price lines plus a Market Profile letter
   ladder + stats panel. See `docs/SLICE-9.md`.
+- **9e (done) — Bar Replay:** a single-chart replay mode on `ChartPage` that
+  reveals historical bars one at a time (play/pause/step/speed + click-to-set
+  start), pausing the live stream and pagination while active and clipping
+  causal indicators / pattern markers / chart-pattern lines to the cursor's
+  time. Pure index/timing math in `apps/web/src/lib/replay.ts` with unit tests.
+  No new endpoint — reuses paginated history. See `docs/SLICE-9.md`.
 - Per-candle footprint cells (bid/ask split, needs trade-level data)
-- Bar Replay multi-chart
+- Bar Replay multi-chart (single-chart shipped in 9e)
 - Ichimoku cloud rendering
 
 ### Slice 10 — Ecosystem

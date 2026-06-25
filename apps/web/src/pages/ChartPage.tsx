@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -18,6 +18,7 @@ import type {
   IPriceLine,
   ISeriesApi,
   ISeriesMarkersPluginApi,
+  MouseEventParams,
   SeriesMarker,
   SeriesType,
   Time,
@@ -26,6 +27,14 @@ import type {
 import type { DomLevel } from '../api/types';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
+import {
+  REPLAY_SPEEDS,
+  replayStepMs,
+  clampIndex,
+  defaultReplayIndex,
+  isReplayAtEnd,
+  indexAtOrBefore,
+} from '../lib/replay';
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'] as const;
 type Interval = (typeof INTERVALS)[number];
@@ -74,6 +83,10 @@ export function ChartPage() {
   const [showChartPatterns, setShowChartPatterns] = useState(false);
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [showTpo, setShowTpo] = useState(false);
+  const [replayActive, setReplayActive] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replaySpeed, setReplaySpeed] = useState<number>(1);
   const [destination, setDestination] = useState<'paper' | 'broker'>('paper');
   const [paperAccountId, setPaperAccountId] = useState('');
   const [brokerConnectionId, setBrokerConnectionId] = useState('');
@@ -100,7 +113,9 @@ export function ChartPage() {
   // Only enable the bar stream when the fetched symbol matches the URL param.
   // Prevents writing stale bars of the previous symbol to the new chart during
   // a symbol/interval switch.
-  const streamEnabled = !!symbolId && symbolInfo?.id === symbolId;
+  // The live stream and replay are mutually exclusive: replay owns the candle
+  // series while active, so we pause streaming to avoid future bars leaking in.
+  const streamEnabled = !!symbolId && symbolInfo?.id === symbolId && !replayActive;
   const streamExchange = streamEnabled ? (symbolInfo?.exchange ?? '') : '';
   const streamTicker = streamEnabled ? (symbolInfo?.ticker ?? '') : '';
 
@@ -161,6 +176,20 @@ export function ChartPage() {
   });
 
   const lastPrice = domQ.data?.book.mid ?? historyQ.bars.at(-1)?.close;
+
+  // Bars actually drawn on the chart. In replay we reveal only bars up to the
+  // cursor; otherwise we render the full loaded history (same array identity, so
+  // downstream effects don't re-run on every replay tick when replay is off).
+  const visibleBars = useMemo(
+    () => (replayActive ? historyQ.bars.slice(0, replayIndex + 1) : historyQ.bars),
+    [historyQ.bars, replayActive, replayIndex],
+  );
+  // Time cutoff for time-keyed overlays (indicators, pattern markers). Causal
+  // indicators are unchanged by future bars, so filtering precomputed series by
+  // `time <= cutoff` is exactly their value "as of" the replay cursor.
+  const replayCutoff = replayActive ? (historyQ.bars[replayIndex]?.time ?? null) : null;
+  const replayActiveRef = useRef(replayActive);
+  replayActiveRef.current = replayActive;
 
   useEffect(() => {
     if (!paperAccountId && paperAccountsQ.data?.accounts[0]) {
@@ -263,10 +292,10 @@ export function ChartPage() {
   // series here so the user's pan/zoom, markers, and price lines are
   // preserved. fitContent runs only on the first load per symbol/interval.
   useEffect(() => {
-    if (!candleRef.current || !volumeRef.current || historyQ.bars.length === 0) return;
+    if (!candleRef.current || !volumeRef.current || visibleBars.length === 0) return;
     setData(
       candleRef.current,
-      historyQ.bars.map((b) => ({
+      visibleBars.map((b) => ({
         time: b.time as UTCTimestamp,
         open: b.open,
         high: b.high,
@@ -276,7 +305,7 @@ export function ChartPage() {
     );
     setData(
       volumeRef.current,
-      historyQ.bars.map((b) => ({
+      visibleBars.map((b) => ({
         time: b.time as UTCTimestamp,
         value: b.volume,
       })),
@@ -284,8 +313,11 @@ export function ChartPage() {
     if (isFirstSetDataRef.current) {
       chartRef.current?.timeScale().fitContent();
       isFirstSetDataRef.current = false;
+    } else if (replayActive) {
+      // Follow the replay edge so the newest revealed bar stays at the right.
+      chartRef.current?.timeScale().scrollToRealTime();
     }
-  }, [historyQ.bars]);
+  }, [visibleBars, replayActive]);
 
   useEffect(() => {
     if (!candleRef.current) return;
@@ -296,7 +328,11 @@ export function ChartPage() {
       markersRef.current.setMarkers([]);
       return;
     }
-    const markers: SeriesMarker<Time>[] = patternsQ.data.matches.map((m) => {
+    const visibleMatches =
+      replayCutoff == null
+        ? patternsQ.data.matches
+        : patternsQ.data.matches.filter((m) => m.time <= replayCutoff);
+    const markers: SeriesMarker<Time>[] = visibleMatches.map((m) => {
       const abbrev = m.name
         .split(' ')
         .map((w) => w.charAt(0))
@@ -329,7 +365,7 @@ export function ChartPage() {
       };
     });
     markersRef.current.setMarkers(markers);
-  }, [patternsQ.data, showPatterns, historyQ.bars]);
+  }, [patternsQ.data, showPatterns, historyQ.bars, replayCutoff]);
 
   // Draw each detected chart pattern as a polyline through its structural
   // points (pivots → breakout), colored by direction. One line series per
@@ -348,7 +384,15 @@ export function ChartPage() {
     if (!showChartPatterns || !chartPatternsQ.data) return;
     const colorFor = (d: string): string =>
       d === 'bullish' ? '#26a69a' : d === 'bearish' ? '#ef5350' : '#b2b5be';
-    for (const m of chartPatternsQ.data.matches.slice(0, 12)) {
+    // In replay, only show patterns whose structure is fully formed by the cursor.
+    const visibleMatches =
+      replayCutoff == null
+        ? chartPatternsQ.data.matches
+        : chartPatternsQ.data.matches.filter((m) => {
+            const last = m.points[m.points.length - 1];
+            return last != null && last.time <= replayCutoff;
+          });
+    for (const m of visibleMatches.slice(0, 12)) {
       const line = addSeries(chart, 'line', {
         color: colorFor(m.direction),
         lineWidth: 2,
@@ -360,7 +404,7 @@ export function ChartPage() {
       line.setData(m.points.map((p) => ({ time: p.time as UTCTimestamp, value: p.price })));
       chartPatternSeriesRef.current.push(line);
     }
-  }, [chartPatternsQ.data, showChartPatterns, historyQ.bars]);
+  }, [chartPatternsQ.data, showChartPatterns, historyQ.bars, replayCutoff]);
 
   // Volume profile: overlay the Point of Control and value-area bounds as
   // horizontal price lines on the candle series. Rebuilt whenever the data,
@@ -496,12 +540,17 @@ export function ChartPage() {
 
   useEffect(() => {
     if (!chartRef.current || historyQ.bars.length === 0) return;
+    // In replay, clip causal indicator series to the cursor's time.
+    const passCut = (t: number) => replayCutoff == null || t <= replayCutoff;
     for (let i = 0; i < indicatorQueries.length; i++) {
       const q = indicatorQueries[i];
       const ind = activeIndicators[i];
       if (!q?.data || !ind) continue;
       const out = q.data.output;
       if (out.overlay) {
+        const points = (out.points as ReadonlyArray<{ time: number }>).filter((p) =>
+          passCut(p.time),
+        );
         for (const line of out.lines) {
           const key = `${ind.id}:${line.key}`;
           let s = indicatorSeriesRef.current.get(key);
@@ -509,7 +558,7 @@ export function ChartPage() {
             s = addSeries(chartRef.current, 'line');
             indicatorSeriesRef.current.set(key, s);
           }
-          setData(s, out.points as never);
+          setData(s, points as never);
         }
         if (out.bands) {
           const bandKey = ind.id;
@@ -524,29 +573,35 @@ export function ChartPage() {
           }
           setData(
             band.upper,
-            out.bands.map((b: { time: number; upper: number }) => ({
-              time: b.time as UTCTimestamp,
-              value: b.upper,
-            })),
+            out.bands
+              .filter((b: { time: number }) => passCut(b.time))
+              .map((b: { time: number; upper: number }) => ({
+                time: b.time as UTCTimestamp,
+                value: b.upper,
+              })),
           );
           setData(
             band.middle,
-            out.bands.map((b: { time: number; middle: number }) => ({
-              time: b.time as UTCTimestamp,
-              value: b.middle,
-            })),
+            out.bands
+              .filter((b: { time: number }) => passCut(b.time))
+              .map((b: { time: number; middle: number }) => ({
+                time: b.time as UTCTimestamp,
+                value: b.middle,
+              })),
           );
           setData(
             band.lower,
-            out.bands.map((b: { time: number; lower: number }) => ({
-              time: b.time as UTCTimestamp,
-              value: b.lower,
-            })),
+            out.bands
+              .filter((b: { time: number }) => passCut(b.time))
+              .map((b: { time: number; lower: number }) => ({
+                time: b.time as UTCTimestamp,
+                value: b.lower,
+              })),
           );
         }
       }
     }
-  }, [indicatorQueries, historyQ.bars]);
+  }, [indicatorQueries, historyQ.bars, replayCutoff]);
 
   const stream = useBarStream({
     symbolId: streamEnabled ? symbolId : null,
@@ -590,6 +645,8 @@ export function ChartPage() {
     if (!chart) return;
     const unsub = subscribeVisibleTimeRange(chart, (range) => {
       if (!range || !range.from) return;
+      // Replay owns the visible window; don't paginate while it's active.
+      if (replayActiveRef.current) return;
       const from = typeof range.from === 'number' ? range.from : Number(range.from);
       const hq = historyQRef.current;
       const earliest = hq.bars[0]?.time;
@@ -600,6 +657,75 @@ export function ChartPage() {
     });
     return () => unsub();
   }, [interval, triggerZone]);
+
+  // --- Bar Replay ---------------------------------------------------------
+  // Switching symbol/interval reloads history; leave replay so indices stay valid.
+  useEffect(() => {
+    setReplayActive(false);
+    setReplayPlaying(false);
+  }, [symbolId, interval]);
+
+  // Auto-advance the cursor while playing; cadence is the speed multiplier.
+  // (Note: `setInterval` is shadowed by the timeframe state setter — use window.)
+  useEffect(() => {
+    if (!replayActive || !replayPlaying) return;
+    const id = window.setInterval(() => {
+      setReplayIndex((i) => clampIndex(i + 1, historyQRef.current.bars.length));
+    }, replayStepMs(replaySpeed));
+    return () => window.clearInterval(id);
+  }, [replayActive, replayPlaying, replaySpeed]);
+
+  // Stop playback once the cursor reaches the final loaded bar.
+  useEffect(() => {
+    if (replayPlaying && isReplayAtEnd(replayIndex, historyQ.bars.length)) {
+      setReplayPlaying(false);
+    }
+  }, [replayPlaying, replayIndex, historyQ.bars.length]);
+
+  // Click a bar to set the replay start point (TradingView-style).
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !replayActive) return;
+    const handler = (param: MouseEventParams) => {
+      if (param.time == null) return;
+      const time = typeof param.time === 'number' ? param.time : Number(param.time);
+      if (!Number.isFinite(time)) return;
+      const idx = indexAtOrBefore(
+        historyQRef.current.bars.map((b) => b.time),
+        time,
+      );
+      if (idx >= 0) {
+        setReplayPlaying(false);
+        setReplayIndex(idx);
+      }
+    };
+    chart.subscribeClick(handler);
+    return () => chart.unsubscribeClick(handler);
+  }, [replayActive]);
+
+  const enterReplay = () => {
+    setReplayIndex(defaultReplayIndex(historyQ.bars.length));
+    setReplayPlaying(false);
+    setReplayActive(true);
+  };
+  const exitReplay = () => {
+    setReplayActive(false);
+    setReplayPlaying(false);
+  };
+  const replayStepForward = () => {
+    setReplayPlaying(false);
+    setReplayIndex((i) => clampIndex(i + 1, historyQ.bars.length));
+  };
+  const replayStepBack = () => {
+    setReplayPlaying(false);
+    setReplayIndex((i) => clampIndex(i - 1, historyQ.bars.length));
+  };
+  const replayTogglePlay = () => {
+    if (!replayPlaying && isReplayAtEnd(replayIndex, historyQ.bars.length)) {
+      setReplayIndex(defaultReplayIndex(historyQ.bars.length));
+    }
+    setReplayPlaying((p) => !p);
+  };
 
   const addIndicator = useCallback(
     (id: string) => {
@@ -1277,6 +1403,58 @@ export function ChartPage() {
           TPO
         </button>
         {showTpo && tpoQ.isFetching && <span className="muted small">computing…</span>}
+        <span className="muted small">|</span>
+        <button
+          className={replayActive ? 'primary' : ''}
+          onClick={() => (replayActive ? exitReplay() : enterReplay())}
+          style={{ fontSize: 12 }}
+          disabled={historyQ.bars.length === 0}
+        >
+          Replay
+        </button>
+        {replayActive && (
+          <>
+            <button
+              onClick={replayStepBack}
+              style={{ fontSize: 12 }}
+              title="Step back"
+              disabled={replayIndex <= 0}
+            >
+              ⏮
+            </button>
+            <button
+              onClick={replayTogglePlay}
+              style={{ fontSize: 12 }}
+              title={replayPlaying ? 'Pause' : 'Play'}
+            >
+              {replayPlaying ? '⏸' : '▶'}
+            </button>
+            <button
+              onClick={replayStepForward}
+              style={{ fontSize: 12 }}
+              title="Step forward"
+              disabled={isReplayAtEnd(replayIndex, historyQ.bars.length)}
+            >
+              ⏭
+            </button>
+            <select
+              value={replaySpeed}
+              onChange={(e) => setReplaySpeed(Number(e.target.value))}
+              style={{ width: 64 }}
+              title="Replay speed"
+            >
+              {REPLAY_SPEEDS.map((s) => (
+                <option key={s} value={s}>
+                  {s}×
+                </option>
+              ))}
+            </select>
+            <span className="muted small mono">
+              {replayIndex + 1}/{historyQ.bars.length}
+            </span>
+            <span className="muted small">click a bar to set start</span>
+          </>
+        )}
         <span className="grow" />
         {symbolInfo && (
           <span className="mono small">

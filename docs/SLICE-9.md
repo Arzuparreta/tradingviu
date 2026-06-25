@@ -197,8 +197,49 @@ Notes:
 - Computation requires no DB migration and no new env vars — it reads the same
   historical bars the chart already fetches.
 
+## 9e — Bar Replay
+
+Status: done.
+
+Delivered:
+
+- A **Bar Replay** mode on `ChartPage` that reveals historical bars one at a
+  time, so a user can step through past price action and practice as if trading
+  live. It reuses the existing paginated history (`useChartHistory`) — no new
+  endpoint.
+- `apps/web/src/lib/replay.ts`: a pure, React-free helper module with the index
+  and timing math (`replayStepMs` speed→cadence, `clampIndex`,
+  `defaultReplayIndex`, `isReplayAtEnd`, and a binary-search `indexAtOrBefore`
+  for click-to-set-start). Unit-tested in `apps/web/test/replay.test.ts`.
+- **Controls:** a Replay toggle plus step-back (`⏮`), play/pause (`▶`/`⏸`),
+  step-forward (`⏭`), a speed selector (0.5×–10×), and a position readout
+  (`cursor/total`). Clicking any bar on the chart sets the replay start point.
+- **Correctness:**
+  - The live WS stream and left-scroll pagination are both paused while replay
+    is active (replay owns the candle/volume series), and resume on exit.
+  - Candles/volume render the sliced window via `setData`, following the cursor
+    with `scrollToRealTime` so the newest revealed bar stays at the right edge.
+  - Time-keyed overlays are clipped to the cursor's time: causal **indicators**
+    (lines + bands), **candlestick markers**, and **chart-pattern** polylines
+    only show what had formed by the replay cursor. Because indicators are
+    causal, slicing the precomputed series by `time <= cursor` is exactly their
+    value "as of" that bar — no recompute needed.
+  - Switching symbol or interval leaves replay so the cursor index stays valid.
+- Deterministic `bun test` suite for the replay math (speeds, clamping, default
+  cursor, end detection, and the at-or-before search) — the `ChartPage`
+  mount-regression test continues to pass with the replay wiring in place.
+
+Notes:
+
+- `setInterval` is shadowed inside `ChartPage` by the timeframe state setter
+  (`const [interval, setInterval] = useState(...)`), so the playback loop calls
+  `window.setInterval` / `window.clearInterval` explicitly.
+- Window-aggregate overlays (Volume Profile, TPO) are not re-scoped to the
+  replay window in this slice — they remain explicit toggles computed over the
+  fetched history. Per-window replay recompute can come later.
+
 ## Remaining Slice 9 Work
 
 - Per-candle footprint cells (bid/ask split) once trade-level data is available.
-- Bar Replay across multi-chart layouts.
+- Bar Replay across multi-chart layouts (single-chart replay shipped in 9e).
 - Ichimoku cloud rendering (the indicator math already exists in `@tv/ta-lib`).
