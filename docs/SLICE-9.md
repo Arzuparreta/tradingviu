@@ -282,7 +282,46 @@ Notes:
   Ichimoku look.
 - Computation requires no DB migration and no new env vars.
 
-## Remaining Slice 9 Work
+## 9g — Bar Replay across multi-chart layouts
 
-- Per-candle footprint cells (bid/ask split) once trade-level data is available.
-- Bar Replay across multi-chart layouts (single-chart replay shipped in 9e).
+Status: done.
+
+Delivered:
+
+- Multi-chart Bar Replay on `LayoutPage`: a single replay control steps **every
+  panel together**. Because panels can hold different symbols and intervals, the
+  sync is by **cursor time**, not bar index — each panel reveals only its bars
+  with `time <= cursor`, so charts on different timeframes stay aligned to the
+  same moment.
+- **Global time domain:** each `ChartPanel` reports its loaded `{ min, max, step }`
+  time bounds up via a new `onBounds` callback; `LayoutPage` unions them into a
+  global span (finest step wins) and drives the shared cursor over it. Panels
+  with no symbol are ignored, and the Replay button is disabled until at least
+  one panel has bars.
+- **Controls:** Replay toggle, step-back/play-pause/step-forward, a speed
+  selector (0.5×–10×), and the live cursor timestamp. The cadence reuses the
+  same `replayStepMs` mapping as single-chart replay.
+- **Correctness:** while replay is active the per-panel live WebSocket stream is
+  disabled (the active panel's `live` is gated on `!replayActive`), each panel
+  follows the cursor with `scrollToRealTime`, and the view only re-fits on a
+  symbol/interval change (not on every step). The cursor is clamped into the
+  domain as panels load or the grid reflows.
+- New pure, React-free time helpers in `apps/web/src/lib/replay.ts` (`clampTime`,
+  `defaultReplayTime`, `isTimeAtEnd`) with deterministic `bun` tests, reused by
+  the layout's play loop and stepping.
+
+Notes:
+
+- Crosshair sync (existing) and replay are independent: you can scrub the replay
+  cursor and still mirror the crosshair across panels.
+- The per-chart overlays (indicators, patterns, profiles, Ichimoku) live on the
+  single-chart `ChartPage`; the layout panels are price/volume only, so
+  multi-chart replay reveals candles + volume in lockstep.
+
+## Slice 9 status
+
+Slices **9a–9g are done**. The only remaining item — **per-candle footprint
+cells** (true bid/ask aggressor split) — is **deferred**: it needs trade-level
+(tick) data, which the current OHLCV provider path does not expose. It will be
+picked up when a trade-tape source lands. With that one data-blocked exception,
+Slice 9 (advanced TA) is complete.

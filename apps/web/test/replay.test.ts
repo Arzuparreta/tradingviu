@@ -6,6 +6,9 @@ import {
   defaultReplayIndex,
   isReplayAtEnd,
   indexAtOrBefore,
+  clampTime,
+  defaultReplayTime,
+  isTimeAtEnd,
 } from '../src/lib/replay';
 
 describe('replayStepMs', () => {
@@ -71,5 +74,26 @@ describe('indexAtOrBefore', () => {
   test('returns -1 before the first bar or on an empty series', () => {
     expect(indexAtOrBefore(times, 50)).toBe(-1);
     expect(indexAtOrBefore([], 100)).toBe(-1);
+  });
+});
+
+describe('time-based replay (multi-chart)', () => {
+  test('clampTime keeps the cursor inside [min, max]', () => {
+    expect(clampTime(150, 100, 200)).toBe(150);
+    expect(clampTime(50, 100, 200)).toBe(100);
+    expect(clampTime(999, 100, 200)).toBe(200);
+    expect(clampTime(5, 100, 50)).toBe(100); // degenerate span
+  });
+
+  test('defaultReplayTime lands ~60% through the span', () => {
+    expect(defaultReplayTime(100, 200)).toBe(160);
+    expect(defaultReplayTime(0, 1000)).toBe(600);
+    expect(defaultReplayTime(100, 100)).toBe(100); // empty span
+  });
+
+  test('isTimeAtEnd is true at or past the end', () => {
+    expect(isTimeAtEnd(200, 200)).toBe(true);
+    expect(isTimeAtEnd(199, 200)).toBe(false);
+    expect(isTimeAtEnd(250, 200)).toBe(true);
   });
 });

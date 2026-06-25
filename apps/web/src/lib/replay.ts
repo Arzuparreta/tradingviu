@@ -32,6 +32,25 @@ export const defaultReplayIndex = (len: number): number =>
 export const isReplayAtEnd = (index: number, len: number): boolean =>
   len <= 0 || index >= len - 1;
 
+/** Clamp a replay cursor *time* into `[min, max]` (degenerate span → `min`). */
+export const clampTime = (t: number, min: number, max: number): number => {
+  if (min > max) return min;
+  if (t < min) return min;
+  if (t > max) return max;
+  return t;
+};
+
+/**
+ * Default multi-chart replay cursor: ~60% through the global time span, so a
+ * chunk of history is visible and the rest plays forward. Used when entering
+ * replay across a layout of charts that share a time axis but not an index.
+ */
+export const defaultReplayTime = (min: number, max: number): number =>
+  max <= min ? min : min + Math.round((max - min) * 0.6);
+
+/** True once the cursor time has reached (or passed) the end of the span. */
+export const isTimeAtEnd = (t: number, max: number): boolean => t >= max;
+
 /**
  * Index of the rightmost bar whose time is `<= time` — the bar to stop the
  * replay at when the user clicks at `time`. `times` must be ascending.

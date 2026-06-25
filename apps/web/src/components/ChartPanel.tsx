@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, getToken } from '../api/client';
 import { createTvChart, addSeries, setData, update, removeChart, darkTheme } from '@tv/chart-engine';
 import { INTERVALS, type Interval, type Panel } from '@tv/layout-sync';
 import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
 import { SymbolSearch } from './SymbolSearch';
+
+/** The loaded time span of a panel's bars, reported up for multi-chart replay. */
+export interface PanelBounds {
+  min: number;
+  max: number;
+  step: number;
+}
 
 export interface ChartPanelProps {
   panel: Panel;
@@ -15,9 +22,26 @@ export interface ChartPanelProps {
   /** Register the chart + candle series with the parent (for crosshair sync). */
   onReady?: (id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => void;
   onDestroy?: (id: string) => void;
+  /** When true, the panel reveals only bars up to `replayCursor` (time). */
+  replayActive?: boolean;
+  /** Shared replay cursor time (UTC seconds), or null when not replaying. */
+  replayCursor?: number | null;
+  /** Report this panel's loaded time bounds (or null) for the global domain. */
+  onBounds?: (id: string, bounds: PanelBounds | null) => void;
 }
 
-export function ChartPanel({ panel, active, live, onActivate, onChange, onReady, onDestroy }: ChartPanelProps) {
+export function ChartPanel({
+  panel,
+  active,
+  live,
+  onActivate,
+  onChange,
+  onReady,
+  onDestroy,
+  replayActive = false,
+  replayCursor = null,
+  onBounds,
+}: ChartPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
@@ -26,8 +50,10 @@ export function ChartPanel({ panel, active, live, onActivate, onChange, onReady,
 
   const onReadyRef = useRef(onReady);
   const onDestroyRef = useRef(onDestroy);
+  const onBoundsRef = useRef(onBounds);
   onReadyRef.current = onReady;
   onDestroyRef.current = onDestroy;
+  onBoundsRef.current = onBounds;
 
   const historyQ = useQuery({
     queryKey: ['panel-history', panel.symbolId, panel.interval],
@@ -60,12 +86,26 @@ export function ChartPanel({ panel, active, live, onActivate, onChange, onReady,
     };
   }, [panel.id]);
 
-  // Load history into the series.
+  // Bars actually drawn: the full history, or clipped to the shared replay
+  // cursor time so every panel reveals the same point in time together.
+  const renderBars = useMemo(() => {
+    const bars = historyQ.data?.bars ?? [];
+    if (replayActive && replayCursor != null) return bars.filter((b) => b.time <= replayCursor);
+    return bars;
+  }, [historyQ.data, replayActive, replayCursor]);
+
+  // Re-fit the view when the symbol/interval changes (not on every replay step).
+  const firstFitRef = useRef(true);
   useEffect(() => {
-    if (!candleRef.current || !volumeRef.current || !historyQ.data) return;
+    firstFitRef.current = true;
+  }, [panel.symbolId, panel.interval]);
+
+  // Render bars into the series.
+  useEffect(() => {
+    if (!candleRef.current || !volumeRef.current) return;
     setData(
       candleRef.current,
-      historyQ.data.bars.map((b) => ({
+      renderBars.map((b) => ({
         time: b.time as UTCTimestamp,
         open: b.open,
         high: b.high,
@@ -73,9 +113,31 @@ export function ChartPanel({ panel, active, live, onActivate, onChange, onReady,
         close: b.close,
       })),
     );
-    setData(volumeRef.current, historyQ.data.bars.map((b) => ({ time: b.time as UTCTimestamp, value: b.volume })));
-    chartRef.current?.timeScale().fitContent();
-  }, [historyQ.data]);
+    setData(volumeRef.current, renderBars.map((b) => ({ time: b.time as UTCTimestamp, value: b.volume })));
+    if (firstFitRef.current && renderBars.length > 0) {
+      chartRef.current?.timeScale().fitContent();
+      firstFitRef.current = false;
+    } else if (replayActive) {
+      chartRef.current?.timeScale().scrollToRealTime();
+    }
+  }, [renderBars, replayActive]);
+
+  // Report this panel's loaded time bounds for the parent's global replay domain.
+  useEffect(() => {
+    const bars = historyQ.data?.bars;
+    if (!bars || bars.length === 0) {
+      onBoundsRef.current?.(panel.id, null);
+      return;
+    }
+    const min = bars[0]!.time;
+    const max = bars[bars.length - 1]!.time;
+    let step = Infinity;
+    for (let i = 1; i < bars.length; i++) {
+      const d = bars[i]!.time - bars[i - 1]!.time;
+      if (d > 0 && d < step) step = d;
+    }
+    onBoundsRef.current?.(panel.id, { min, max, step: Number.isFinite(step) ? step : 60 });
+  }, [historyQ.data, panel.id]);
 
   // Live bars over WebSocket.
   useEffect(() => {
