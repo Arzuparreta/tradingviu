@@ -9,6 +9,7 @@ import type {
   ChartPatternCatalogEntry,
   ChartPatternMatch,
   VolumeProfile,
+  TpoProfile,
   LayoutRow,
   Plan,
   Symbol,
@@ -233,6 +234,22 @@ export const api = {
     }>('/api/volume-profile', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, bins }),
+    }),
+  tpoProfile: (
+    symbol: string,
+    interval = '1h',
+    limit = 240,
+    bins = 24,
+    barsPerPeriod = 10,
+  ) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      profile: TpoProfile;
+    }>('/api/tpo-profile', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, bins, barsPerPeriod }),
     }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>

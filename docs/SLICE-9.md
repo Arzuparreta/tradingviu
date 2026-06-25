@@ -144,9 +144,61 @@ Notes:
 - Computation requires no DB migration and no new env vars — it reads the same
   historical bars the chart already fetches.
 
+## 9d — TPO Profile (Market Profile)
+
+Status: done.
+
+Delivered:
+
+- `packages/tpo-profile`: a pure, deterministic Time-Price-Opportunity (Market
+  Profile) engine over OHLCV bars. Like the volume-profile engine, it is a
+  function of the bar array and the bin / value-area / period settings only —
+  no time, randomness, or I/O — so results are reproducible and unit-testable.
+- **Period model:** bars are grouped into equal-size periods of `barsPerPeriod`
+  consecutive bars (default 1); each period merges its bars' `[low, high]` range
+  and is assigned a Market Profile letter (`A`–`Z`, then `a`–`z`, then wrapping).
+  Every period prints its letter at **every price row its range spans**, so a
+  row's `count` is the number of distinct periods that traded through it — the
+  classic letter ladder, in contrast to volume profile's volume-weighted rows.
+- **Profile statistics:** total TPO count; the **Point of Control** (POC — the
+  most-printed row); the **Value Area** (VAH/VAL — the contiguous band of rows
+  around the POC holding `valueAreaPct`, default 70%, of all TPOs, grown one row
+  at a time toward the heavier neighbour, ties expanding up); the **Initial
+  Balance** (IBH/IBL — the price range of the first one or two periods); and
+  **single prints** (rows touched by exactly one period). Each row reports its
+  price bounds, TPO count, the letters that printed there, and `isPoc` /
+  `inValueArea` / `isSinglePrint` flags. Degenerate inputs (single flat price)
+  collapse to one row safely.
+- `computeTpoProfile(bars, { bins?, valueAreaPct?, barsPerPeriod? })` returning a
+  fully Zod-described `TpoProfile`, plus a `periodLabel` helper.
+- `POST /api/tpo-profile` (`{ symbol, interval, limit, bins?, valueAreaPct?,
+  barsPerPeriod? }`) in `apps/server/src/routes/tpo-profile.ts`. It fetches bars
+  through the same CCXT provider path as `/api/volume-profile`, runs
+  `computeTpoProfile`, and returns the profile.
+- A **TPO** toggle on `ChartPage` that overlays the POC (solid cyan), VAH/VAL
+  (dashed grey), and the Initial Balance high/low (dotted indigo) as horizontal
+  price lines on the candle series, plus a side panel with the Market Profile
+  letter ladder (value-area rows tinted, POC row flagged cyan, single prints in
+  amber) and POC / value-area / initial-balance / single-print stats. The client
+  defaults to 240 bars at 10 bars/period → 24 periods (`A`–`X`) for a readable
+  ladder.
+- Deterministic `bun test` suite (`packages/tpo-profile/src/tpo-profile.test.ts`)
+  covering the letter convention, per-period row counting, POC selection, value
+  area growth, single prints + initial balance, `barsPerPeriod` grouping, the
+  degenerate single-price case, schema validity, and run-to-run determinism.
+
+Notes:
+
+- TPO counts *periods*, not volume, so the same window can read differently from
+  the volume profile (a price visited by many short periods ranks high even with
+  little volume). The two are complementary views.
+- Letters wrap after 52 periods; the row `count` stays authoritative, which is
+  why the client defaults to a period count that keeps the ladder legible.
+- Computation requires no DB migration and no new env vars — it reads the same
+  historical bars the chart already fetches.
+
 ## Remaining Slice 9 Work
 
 - Per-candle footprint cells (bid/ask split) once trade-level data is available.
-- TPO (Time Price Opportunity) profiles.
 - Bar Replay across multi-chart layouts.
 - Ichimoku cloud rendering (the indicator math already exists in `@tv/ta-lib`).

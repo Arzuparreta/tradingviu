@@ -62,6 +62,7 @@ export function ChartPage() {
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const chartPatternSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
   const volumeProfileLinesRef = useRef<IPriceLine[]>([]);
+  const tpoLinesRef = useRef<IPriceLine[]>([]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, tenant } = useAuth();
@@ -72,6 +73,7 @@ export function ChartPage() {
   const [showPatterns, setShowPatterns] = useState(false);
   const [showChartPatterns, setShowChartPatterns] = useState(false);
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
+  const [showTpo, setShowTpo] = useState(false);
   const [destination, setDestination] = useState<'paper' | 'broker'>('paper');
   const [paperAccountId, setPaperAccountId] = useState('');
   const [brokerConnectionId, setBrokerConnectionId] = useState('');
@@ -120,6 +122,13 @@ export function ChartPage() {
     queryKey: ['volume-profile', symbolId, interval],
     queryFn: () => api.volumeProfile(symbolId!, interval, 500, 24),
     enabled: !!symbolId && showVolumeProfile,
+    staleTime: 30_000,
+  });
+
+  const tpoQ = useQuery({
+    queryKey: ['tpo-profile', symbolId, interval],
+    queryFn: () => api.tpoProfile(symbolId!, interval, 240, 24, 10),
+    enabled: !!symbolId && showTpo,
     staleTime: 30_000,
   });
 
@@ -242,6 +251,7 @@ export function ChartPage() {
       markersRef.current = null;
       chartPatternSeriesRef.current = [];
       volumeProfileLinesRef.current = [];
+      tpoLinesRef.current = [];
       indicatorSeriesRef.current.clear();
       indicatorBandSeriesRef.current.clear();
     };
@@ -396,6 +406,67 @@ export function ChartPage() {
       }),
     ];
   }, [volumeProfileQ.data, showVolumeProfile, historyQ.bars]);
+
+  // TPO profile: overlay the Point of Control, value-area bounds, and the
+  // Initial Balance high/low as horizontal price lines on the candle series.
+  // Rebuilt whenever the data, the toggle, or the candles change.
+  useEffect(() => {
+    const candle = candleRef.current;
+    if (!candle) return;
+    for (const line of tpoLinesRef.current) {
+      try {
+        candle.removePriceLine(line);
+      } catch {
+        // candle series was recreated; the old handles are already gone
+      }
+    }
+    tpoLinesRef.current = [];
+    if (!showTpo || !tpoQ.data) return;
+    const p = tpoQ.data.profile;
+    if (p.bins === 0) return;
+    tpoLinesRef.current = [
+      candle.createPriceLine({
+        price: p.poc,
+        color: '#26c6da',
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: 'POC',
+      }),
+      candle.createPriceLine({
+        price: p.vah,
+        color: '#787b86',
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: 'VAH',
+      }),
+      candle.createPriceLine({
+        price: p.val,
+        color: '#787b86',
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: 'VAL',
+      }),
+      candle.createPriceLine({
+        price: p.initialBalanceHigh,
+        color: '#5c6bc0',
+        lineWidth: 1,
+        lineStyle: 3,
+        axisLabelVisible: true,
+        title: 'IBH',
+      }),
+      candle.createPriceLine({
+        price: p.initialBalanceLow,
+        color: '#5c6bc0',
+        lineWidth: 1,
+        lineStyle: 3,
+        axisLabelVisible: true,
+        title: 'IBL',
+      }),
+    ];
+  }, [tpoQ.data, showTpo, historyQ.bars]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -1013,6 +1084,105 @@ export function ChartPage() {
               })()}
           </section>
         )}
+
+        {showTpo && (
+          <section className="col" style={{ gap: 8 }}>
+            <div className="row">
+              <div style={{ fontWeight: 600 }}>TPO Profile</div>
+              <span className="grow" />
+              {tpoQ.isFetching && <span className="muted small">computing…</span>}
+            </div>
+            {tpoQ.data && tpoQ.data.profile.bins === 0 && (
+              <div className="muted small">No data in the last 240 bars.</div>
+            )}
+            {tpoQ.data &&
+              tpoQ.data.profile.bins > 0 &&
+              (() => {
+                const p = tpoQ.data.profile;
+                const display = p.rows.slice().reverse();
+                return (
+                  <>
+                    <div className="col" style={{ gap: 2 }}>
+                      <div className="row small">
+                        <span className="muted">POC</span>
+                        <span className="grow" />
+                        <span className="mono" style={{ color: '#26c6da' }}>
+                          {formatPrice(p.poc)}
+                        </span>
+                      </div>
+                      <div className="row small">
+                        <span className="muted">Value area</span>
+                        <span className="grow" />
+                        <span className="mono">
+                          {formatPrice(p.val)} – {formatPrice(p.vah)}
+                        </span>
+                      </div>
+                      <div className="row small">
+                        <span className="muted">Initial balance</span>
+                        <span className="grow" />
+                        <span className="mono" style={{ color: '#5c6bc0' }}>
+                          {formatPrice(p.initialBalanceLow)} – {formatPrice(p.initialBalanceHigh)}
+                        </span>
+                      </div>
+                      <div className="row small">
+                        <span className="muted">Single prints</span>
+                        <span className="grow" />
+                        <span className="mono">{p.singlePrintCount}</span>
+                      </div>
+                    </div>
+                    <div
+                      className="col mono"
+                      style={{ gap: 0, fontSize: 11, lineHeight: '13px' }}
+                    >
+                      {display.map((r) => (
+                        <div
+                          key={r.index}
+                          className="row"
+                          style={{
+                            gap: 6,
+                            padding: '0 2px',
+                            background: r.inValueArea ? 'rgba(38,198,218,0.10)' : 'transparent',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 56,
+                              flexShrink: 0,
+                              textAlign: 'right',
+                              color: r.isPoc ? '#26c6da' : '#787b86',
+                            }}
+                          >
+                            {formatPrice(r.priceMid)}
+                          </span>
+                          <span
+                            style={{
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              color: r.isPoc
+                                ? '#26c6da'
+                                : r.isSinglePrint
+                                  ? '#ef9a3d'
+                                  : '#d1d4dc',
+                            }}
+                          >
+                            {r.letters || '·'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="row muted small">
+                      <span>{p.periodCount} periods</span>
+                      <span className="grow" />
+                      <span>
+                        {p.bins} bins · {(p.valueAreaPct * 100).toFixed(0)}% VA
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
+          </section>
+        )}
       </aside>
       <div className="chart-toolbar" style={{ flexWrap: 'wrap', gap: 8, gridColumn: 1 }}>
         <select
@@ -1099,6 +1269,14 @@ export function ChartPage() {
         {showVolumeProfile && volumeProfileQ.isFetching && (
           <span className="muted small">computing…</span>
         )}
+        <button
+          className={showTpo ? 'primary' : ''}
+          onClick={() => setShowTpo((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          TPO
+        </button>
+        {showTpo && tpoQ.isFetching && <span className="muted small">computing…</span>}
         <span className="grow" />
         {symbolInfo && (
           <span className="mono small">

@@ -175,6 +175,40 @@ export interface VolumeProfile {
   rows: VolumeProfileRow[];
 }
 
+export interface TpoProfileRow {
+  index: number;
+  priceLow: number;
+  priceHigh: number;
+  priceMid: number;
+  count: number;
+  letters: string;
+  isPoc: boolean;
+  inValueArea: boolean;
+  isSinglePrint: boolean;
+}
+
+export interface TpoProfile {
+  bins: number;
+  binSize: number;
+  priceLow: number;
+  priceHigh: number;
+  barCount: number;
+  periodCount: number;
+  startTime: number;
+  endTime: number;
+  totalTpo: number;
+  poc: number;
+  pocIndex: number;
+  vah: number;
+  val: number;
+  valueAreaTpo: number;
+  valueAreaPct: number;
+  initialBalanceHigh: number;
+  initialBalanceLow: number;
+  singlePrintCount: number;
+  rows: TpoProfileRow[];
+}
+
 export interface Watchlist {
   id: string;
   name: string;

@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, and volume profile. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, volume profile, and TPO/Market profile. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -21,7 +21,7 @@
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6k done) |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
-| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | in progress (9a–9c done) |
+| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | in progress (9a–9d done) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
@@ -86,6 +86,7 @@ tradingviu/
 │   ├── candlestick-patterns/    # 22 candlestick pattern detectors (slice 9a)
 │   ├── chart-patterns/          # 11 auto chart-pattern detectors over swing pivots (slice 9b)
 │   ├── volume-profile/          # volume-at-price engine: POC, value area, buy/sell delta (slice 9c)
+│   ├── tpo-profile/             # TPO / Market Profile engine: letter ladder, POC, value area, IB, single prints (slice 9d)
 │   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
 │   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
 │   ├── drawing-tools/           # [TODO] 110+ drawing primitives
@@ -125,7 +126,7 @@ tradingviu/
 │   ├── SLICE-3.md               # what slice 3 delivered
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
-│   ├── SLICE-9.md               # what slice 9 delivers (9a–9c: patterns, chart patterns, volume profile)
+│   ├── SLICE-9.md               # what slice 9 delivers (9a–9d: patterns, chart patterns, volume profile, TPO)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -252,8 +253,14 @@ tradingviu/
   the Point of Control + value area); `POST /api/volume-profile`; and a **Volume
   Profile** toggle on `ChartPage` that overlays POC/VAH/VAL price lines plus a
   buy/sell SVG histogram + stats panel. See `docs/SLICE-9.md`.
+- **9d (done) — TPO Profile (Market Profile):** `packages/tpo-profile` (pure,
+  deterministic Time-Price-Opportunity engine — groups bars into periods,
+  letters each period, counts the periods printing at each price row, and
+  computes the Point of Control, value area, Initial Balance, and single
+  prints); `POST /api/tpo-profile`; and a **TPO** toggle on `ChartPage` that
+  overlays POC/VAH/VAL + IB high/low price lines plus a Market Profile letter
+  ladder + stats panel. See `docs/SLICE-9.md`.
 - Per-candle footprint cells (bid/ask split, needs trade-level data)
-- TPO (Time Price Opportunity)
 - Bar Replay multi-chart
 - Ichimoku cloud rendering
 
