@@ -84,10 +84,74 @@ export interface CreateChartOptions extends Partial<TimeChartOptions> {
   container: HTMLElement;
   theme?: ChartTheme;
   autoSize?: boolean;
+  /**
+   * IANA timezone id (e.g. 'Europe/Madrid'). Defaults to the browser's local
+   * timezone. Lightweight-charts renders all timestamps in this zone; the
+   * underlying `time` value stays in UTC seconds.
+   */
+  timezone?: string;
 }
+
+const detectLocalTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+};
+
+const TICKMARK_FORMATTERS: Map<string, Intl.DateTimeFormat> = new Map();
+
+/**
+ * Returns an Intl.DateTimeFormat for the given timezone, memoized.
+ */
+const getTzFormatter = (tz: string): Intl.DateTimeFormat => {
+  let f = TICKMARK_FORMATTERS.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour12: false });
+    TICKMARK_FORMATTERS.set(tz, f);
+  }
+  return f;
+};
+
+/**
+ * lightweight-charts v5.x ships no public `timezone` option. We work around
+ * that by feeding the time scale a tickMarkFormatter that prints each
+ * tick in the chosen IANA zone. The bar `time` values stay UTC seconds;
+ * only the displayed labels are converted.
+ */
+const makeLocalTzFormatter = (tz: string) => {
+  const f = getTzFormatter(tz);
+  return (time: import('lightweight-charts').Time, tickMarkType: import('lightweight-charts').TickMarkType): string | null => {
+    const t = typeof time === 'number' ? time : Number(time);
+    if (!Number.isFinite(t)) return null;
+    const d = new Date(t * 1000);
+    const parts = f.formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+    switch (tickMarkType) {
+      case 0: // Year
+        return get('year');
+      case 1: // Month
+        return get('month') + ' ' + get('year').slice(2);
+      case 2: // DayOfMonth
+        return get('day') + ' ' + get('month');
+      case 3: // Time
+        return get('hour') + ':' + get('minute');
+      case 4: // TimeWithSeconds
+        return get('hour') + ':' + get('minute') + ':' + get('second');
+      default:
+        return null;
+    }
+  };
+};
 
 export const createTvChart = (opts: CreateChartOptions): IChartApi => {
   const theme = opts.theme ?? darkTheme;
+  // Lightweight-charts v5.x doesn't expose a `timezone` option in its public
+  // types. The underlying data is UTC seconds; we render in the browser's
+  // local zone via a custom tickMarkFormatter (set on the time scale below).
+  const tz = opts.timezone ?? detectLocalTimezone();
+  const tickMarkFormatter = makeLocalTzFormatter(tz);
   const chart = createChart(opts.container, {
     width: opts.width ?? opts.container.clientWidth,
     height: opts.height ?? opts.container.clientHeight,
@@ -109,6 +173,7 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
       borderColor: theme.borderColor,
       timeVisible: true,
       secondsVisible: false,
+      tickMarkFormatter,
       ...opts.timeScale,
     },
     crosshair: {
@@ -116,6 +181,10 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
       ...opts.crosshair,
     },
     autoSize: opts.autoSize ?? true,
+    localization: {
+      locale: navigator.language,
+      ...opts.localization,
+    },
   });
 
   if (opts.autoSize) {
@@ -130,6 +199,25 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
   }
 
   return chart;
+};
+
+export type VisibleTimeRangeHandler = (range: { from: Time | null; to: Time | null } | null) => void;
+
+export const subscribeVisibleTimeRange = (
+  chart: IChartApi,
+  cb: VisibleTimeRangeHandler,
+): (() => void) => {
+  const handler = (range: { from: Time; to: Time } | null) => {
+    if (range === null) {
+      cb(null);
+      return;
+    }
+    cb({ from: range.from, to: range.to });
+  };
+  chart.timeScale().subscribeVisibleTimeRangeChange(handler);
+  return () => {
+    chart.timeScale().unsubscribeVisibleTimeRangeChange(handler);
+  };
 };
 
 export const addSeries = <T extends SeriesKind>(
@@ -166,16 +254,22 @@ export const setData = (
 ): void => {
   if (series.seriesType() === 'Candlestick' || series.seriesType() === 'Bar') {
     series.setData(
-      data.map((d) => ({
-        time: d.time,
-        open: d.open ?? 0,
-        high: d.high ?? 0,
-        low: d.low ?? 0,
-        close: d.close ?? 0,
-      })),
+      data
+        .filter((d) => isFiniteOHLC(d.open, d.high, d.low, d.close))
+        .map((d) => ({
+          time: d.time,
+          open: d.open ?? 0,
+          high: d.high ?? 0,
+          low: d.low ?? 0,
+          close: d.close ?? 0,
+        })),
     );
   } else {
-    series.setData(data.map((d) => ({ time: d.time, value: d.value ?? d.close ?? 0 })));
+    series.setData(
+      data
+        .filter((d) => Number.isFinite(d.value ?? d.close ?? NaN))
+        .map((d) => ({ time: d.time, value: d.value ?? d.close ?? 0 })),
+    );
   }
 };
 
@@ -192,6 +286,7 @@ export const update = (
   },
 ): void => {
   if (series.seriesType() === 'Candlestick' || series.seriesType() === 'Bar') {
+    if (!isFiniteOHLC(bar.open, bar.high, bar.low, bar.close)) return;
     series.update({
       time: bar.time,
       open: bar.open ?? 0,
@@ -200,8 +295,34 @@ export const update = (
       close: bar.close ?? 0,
     });
   } else {
-    series.update({ time: bar.time, value: bar.value ?? bar.close ?? 0 });
+    const v = bar.value ?? bar.close ?? 0;
+    if (!Number.isFinite(v)) return;
+    series.update({ time: bar.time, value: v });
   }
+};
+
+/**
+ * Validate OHLC. Rejects bars that would render as 0/Infinity/NaN or
+ * violate `high >= max(open, close)` / `low <= min(open, close)`. The
+ * lightweight-charts canvas draws these as candles at y=0 or as
+ * disconnected spikes — a common source of the "broken candle" symptom.
+ */
+const isFiniteOHLC = (
+  open: number | undefined,
+  high: number | undefined,
+  low: number | undefined,
+  close: number | undefined,
+): boolean => {
+  if (![open, high, low, close].every((v) => typeof v === 'number' && Number.isFinite(v))) {
+    return false;
+  }
+  const o = open as number;
+  const h = high as number;
+  const l = low as number;
+  const c = close as number;
+  if (h < Math.max(o, c)) return false;
+  if (l > Math.min(o, c)) return false;
+  return true;
 };
 
 export const createMarkers = (

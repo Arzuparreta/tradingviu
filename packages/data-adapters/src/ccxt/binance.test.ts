@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Exchange as CcxtExchange } from 'ccxt';
 import type { BarQuery, Symbol } from '@tv/data-types';
+import type { BarEvent } from '../provider.js';
 import { CcxtProvider } from './binance.js';
 
 const HOUR_MS = 3_600_000;
@@ -91,5 +92,71 @@ describe('CcxtProvider.subscribe', () => {
 
     expect(calls.length).toBeGreaterThan(0);
     expect(calls[0]!.tf).toBe('5m');
+  });
+
+  test('emits update on first poll for the in-progress bar', async () => {
+    const t = Math.floor(Date.now() / 1000);
+    const ohlcv = [[t * 1000, 1, 2, 0.5, 1.5, 10]];
+    const exchange = {
+      fetchOHLCV: async () => ohlcv,
+    } as unknown as CcxtExchange;
+    const provider = new CcxtProvider('binance', exchange);
+    const events: BarEvent[] = [];
+    const unsub = provider.subscribe(symbol, (e) => events.push(e), '1m');
+    await new Promise((r) => setTimeout(r, 30));
+    unsub();
+
+    expect(events.length).toBeGreaterThanOrEqual(1);
+    expect(events[0]!.kind).toBe('update');
+    expect(events[0]!.bar.time).toBe(t);
+  });
+
+  test('emits close for the previous in-progress bar when the time changes', async () => {
+    const t1 = Math.floor(Date.now() / 1000) - 60;
+    const t2 = t1 + 60;
+    let poll = 0;
+    const exchange = {
+      fetchOHLCV: async () => {
+        poll += 1;
+        if (poll === 1) return [[t1 * 1000, 1, 2, 0.5, 1.5, 10]];
+        return [[t2 * 1000, 2, 3, 1.5, 2.5, 20]];
+      },
+    } as unknown as CcxtExchange;
+    const provider = new CcxtProvider('binance', exchange);
+    const events: BarEvent[] = [];
+    const unsub = provider.subscribe(symbol, (e) => events.push(e), '1m');
+    // Poll interval is 1s; wait 1.2s to be sure both polls fire.
+    await new Promise((r) => setTimeout(r, 1200));
+    unsub();
+
+    // Expect at least: update(t1), close(t1), update(t2)
+    const updateT1 = events.find((e) => e.bar.time === t1 && e.kind === 'update');
+    const closeT1 = events.find((e) => e.bar.time === t1 && e.kind === 'close');
+    const updateT2 = events.find((e) => e.bar.time === t2 && e.kind === 'update');
+    expect(updateT1).toBeDefined();
+    expect(closeT1).toBeDefined();
+    expect(updateT2).toBeDefined();
+  });
+
+  test('does not emit close when the in-progress time has not changed', async () => {
+    const t = Math.floor(Date.now() / 1000);
+    let poll = 0;
+    const exchange = {
+      fetchOHLCV: async () => {
+        poll += 1;
+        return [[t * 1000, 1 + poll * 0.1, 2, 0.5, 1.5, 10]];
+      },
+    } as unknown as CcxtExchange;
+    const provider = new CcxtProvider('binance', exchange);
+    const events: BarEvent[] = [];
+    const unsub = provider.subscribe(symbol, (e) => events.push(e), '1m');
+    // Poll interval is 1s; wait 1.2s to be sure at least 2 polls fire.
+    await new Promise((r) => setTimeout(r, 1200));
+    unsub();
+
+    const closes = events.filter((e) => e.kind === 'close');
+    expect(closes.length).toBe(0);
+    const updates = events.filter((e) => e.kind === 'update' && e.bar.time === t);
+    expect(updates.length).toBeGreaterThanOrEqual(2);
   });
 });

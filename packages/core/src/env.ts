@@ -53,6 +53,7 @@ export const EnvSchema = z.object({
   CRED_ENC_KEY: z
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'CRED_ENC_KEY must be 64 hex chars (32 bytes)'),
+  SYSTEM_USER_ID: z.string().default('system'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

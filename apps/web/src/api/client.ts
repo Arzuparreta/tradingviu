@@ -91,7 +91,17 @@ class ApiError extends Error {
 }
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const res = await fetch(path, { ...init, headers: { ...headers(), ...(init?.headers ?? {}) } });
+  // Default 8s timeout. The Vite dev proxy occasionally hangs on the very
+  // first request after a client-side route transition (resolves only on
+  // F5). Aborting forces React Query to surface the error and stop the
+  // query from staying in `pending` forever.
+  const timeoutMs = (init as { timeoutMs?: number } | undefined)?.timeoutMs ?? 8_000;
+  const signal = init?.signal ?? AbortSignal.timeout(timeoutMs);
+  const res = await fetch(path, {
+    ...init,
+    signal,
+    headers: { ...headers(), ...(init?.headers ?? {}) },
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as {
       error?: { code: string; message: string; meta?: Record<string, unknown> };

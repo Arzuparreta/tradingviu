@@ -43,6 +43,8 @@ ALTER TABLE macro_series_observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE macro_series_observations FORCE ROW LEVEL SECURITY;
 ALTER TABLE provider_health ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_health FORCE ROW LEVEL SECURITY;
+ALTER TABLE bars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bars FORCE ROW LEVEL SECURITY;
 
 -- RLS policies: read public, super_admin write on global tables
 DROP POLICY IF EXISTS exchanges_read ON exchanges;
@@ -113,6 +115,12 @@ CREATE POLICY macro_series_write ON macro_series_observations FOR ALL
 
 DROP POLICY IF EXISTS provider_health_read ON provider_health;
 CREATE POLICY provider_health_read ON provider_health FOR SELECT USING (is_super_admin());
+
+DROP POLICY IF EXISTS bars_read ON bars;
+CREATE POLICY bars_read ON bars FOR SELECT USING (true);
+DROP POLICY IF EXISTS bars_write ON bars;
+CREATE POLICY bars_write ON bars FOR ALL
+  USING (is_super_admin()) WITH CHECK (is_super_admin());
 
 -- Tenant-scoped tables (have tenant_id column)
 DO $$

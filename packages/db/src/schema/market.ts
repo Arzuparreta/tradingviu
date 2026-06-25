@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, boolean, bigint, doublePrecision, index, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
 import { ulid } from 'ulid';
 import { exchanges, symbols } from './symbols';
 import { users, tenants } from './tenants';
@@ -41,3 +41,30 @@ export const providerHealth = pgTable(
     providerIdx: index('provider_health_provider_idx').on(t.provider),
   }),
 );
+
+export const bars = pgTable(
+  'bars',
+  {
+    provider: text('provider').notNull(),
+    ticker: text('ticker').notNull(),
+    interval: text('interval').notNull(),
+    time: bigint('time', { mode: 'number' }).notNull(),
+    open: doublePrecision('open').notNull(),
+    high: doublePrecision('high').notNull(),
+    low: doublePrecision('low').notNull(),
+    close: doublePrecision('close').notNull(),
+    volume: doublePrecision('volume').notNull().default(0),
+    trades: bigint('trades', { mode: 'number' }),
+    isClosed: boolean('is_closed').notNull().default(true),
+    insertedAt: timestamp('inserted_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.provider, t.ticker, t.interval, t.time] }),
+    lookupIdx: index('bars_lookup_idx').on(t.provider, t.ticker, t.interval, t.time),
+  }),
+);
+
+export type BarRow = typeof bars.$inferSelect;
+export type NewBarRow = typeof bars.$inferInsert;

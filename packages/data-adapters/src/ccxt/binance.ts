@@ -1,6 +1,6 @@
 import ccxt, { type Exchange as CcxtExchange } from 'ccxt';
 import type { Bar, BarQuery, Symbol, ProviderHealth, ProviderCapabilities } from '@tv/data-types';
-import { type DataProvider, ProviderError } from '../provider.js';
+import { type BarEventHandler, type DataProvider, ProviderError } from '../provider.js';
 import { intervalToMs, type Interval } from '@tv/core';
 
 const SUPPORTED_INTERVALS: Record<string, string> = {
@@ -108,25 +108,46 @@ export class CcxtProvider implements DataProvider {
     }
   }
 
-  subscribe(symbol: Symbol, onBar: (b: Bar) => void, interval: Interval = '1m'): () => void {
+  subscribe(symbol: Symbol, onEvent: BarEventHandler, interval: Interval = '1m'): () => void {
     let stopped = false;
-    // Polling-based subscription. CCXT Binance doesn't expose watchOHLCV directly
-    // in this build; we poll every 5s, fetch the latest 2 bars, emit new ones.
-    // Cheap, reliable, and works without a long-lived WebSocket connection.
-    let lastTime = 0;
+    // Polling-based subscription. CCXT Binance's watchOHLCV requires a Pro key,
+    // so we poll every 1s and emit the latest bar on every poll. `update` is
+    // emitted for the in-progress bar (re-fires while its time is unchanged);
+    // `close` is emitted exactly once when the bar's time changes.
+    let inProgressBar: Bar | null = null;
+    let inProgressTime: number | null = null;
     let backoffMs = 1000;
     const tick = async () => {
       while (!stopped) {
         try {
           const tf = SUPPORTED_INTERVALS[interval] ?? '1m';
           const ohlcv = await this.exchange.fetchOHLCV(symbol.ticker, tf, undefined, 2);
-          for (const c of ohlcv) {
-            const [ts, o, h, l, close, v] = c;
-            if (ts === undefined || o === undefined) continue;
-            const time = Math.floor(ts / 1000);
-            if (time > lastTime) {
-              onBar({ time, open: o, high: h ?? o, low: l ?? o, close: close ?? o, volume: v ?? 0 });
-              lastTime = time;
+          const latest = ohlcv[ohlcv.length - 1];
+          if (latest) {
+            const [ts, o, h, l, cl, v] = latest;
+            if (ts !== undefined && o !== undefined) {
+              const time = Math.floor(ts / 1000);
+              const bar: Bar = {
+                time,
+                open: o,
+                high: h ?? o,
+                low: l ?? o,
+                close: cl ?? o,
+                volume: v ?? 0,
+              };
+              if (inProgressTime === null) {
+                onEvent({ kind: 'update', bar });
+                inProgressTime = time;
+                inProgressBar = bar;
+              } else if (time > inProgressTime) {
+                if (inProgressBar) onEvent({ kind: 'close', bar: inProgressBar });
+                onEvent({ kind: 'update', bar });
+                inProgressTime = time;
+                inProgressBar = bar;
+              } else {
+                onEvent({ kind: 'update', bar });
+                inProgressBar = bar;
+              }
             }
           }
           backoffMs = 1000;

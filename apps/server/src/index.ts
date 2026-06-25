@@ -34,6 +34,7 @@ import { superAdminContext } from './middleware/super-admin.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
+import { initBarStore, getBarStore, shutdownBarStore } from './services/data.js';
 
 const env = loadEnv();
 
@@ -41,6 +42,13 @@ const db = createDb({ url: env.DATABASE_URL });
 
 const redis: import('redis').RedisClientType = createRedisClient({ url: env.REDIS_URL }) as never;
 await redis.connect();
+
+// BarStore: the single source of truth for live market data. One upstream per
+// (provider, ticker, interval) globally; fanout to N WS clients. Persistence
+// to TimescaleDB happens on bar close via a batched write queue.
+const barStore = initBarStore(db, {
+  systemUserId: env.SYSTEM_USER_ID ?? 'system',
+});
 
 const app = new Hono();
 
@@ -58,6 +66,9 @@ app.use(
 app.onError(errorHandler);
 
 app.get('/', (c) => c.json({ name: 'tradingviu', status: 'ok', version: '0.1.0' }));
+
+// Public diagnostics for the bar store. No tenant context required.
+app.get('/chart/status', (c) => c.json({ streams: barStore.stats() }));
 
 app.route('/auth', authRoutes);
 app.route('/health', healthRoutes);
@@ -115,6 +126,19 @@ const _server: ReturnType<typeof Bun.serve> = Bun.serve({
 });
 const server = _server;
 
+// Graceful shutdown: flush the persist queue, close all streams.
+const shutdown = async (): Promise<void> => {
+  console.log('[shutdown] draining bar store…');
+  await shutdownBarStore();
+  console.log('[shutdown] done');
+  process.exit(0);
+};
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());
+
+// Avoid unused-import warning when getBarStore is not called here directly.
+void getBarStore;
+
 export default server;
 
-export { app, db, redis };
+export { app, db, redis, barStore };

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { eq } from 'drizzle-orm';
 import { symbols, exchanges, dataSubscriptions } from '@tv/db/schema';
-import { DomQuerySchema, NotFoundError, tryGetTenant, type TenantContext } from '@tv/core';
+import { DomQuerySchema, IntervalSchema, NotFoundError, tryGetTenant, type TenantContext } from '@tv/core';
 import { buildDomBook } from '../services/depth.js';
+import { getBarStore, getProvider } from '../services/data.js';
 
 const QuerySchema = z.object({
   q: z.string().min(1).max(80),
@@ -14,10 +15,12 @@ const QuerySchema = z.object({
 
 const HistoricalQuery = z.object({
   symbol: z.string().min(1),
-  interval: z.enum(['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']),
+  interval: IntervalSchema,
   from: z.coerce.number().int().optional(),
   to: z.coerce.number().int().optional(),
-  limit: z.coerce.number().int().positive().max(1000).default(500),
+  before: z.coerce.number().int().optional(),
+  after: z.coerce.number().int().optional(),
+  limit: z.coerce.number().int().positive().max(5000).default(500),
 });
 
 const ccxtMap: Record<string, string> = {
@@ -97,15 +100,49 @@ export const chartRoutes = new Hono()
     const db = c.get('db');
     const row = await findSymbol(db, q.symbol);
     const providerId = ccxtMap[row.exchange] ?? 'binance';
+    const barStore = getBarStore();
 
-    const { getProvider } = await import('../services/data.js');
-    const provider = getProvider(providerId);
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
+    // Normalize the range: `before`/`after` are convenience aliases for `to`/`from`.
+    // `before` means "give me bars older than this" (the classic infinite-scroll
+    // request), `after` means "give me bars newer than this".
+    const rangeFrom = q.from ?? q.after;
+    const rangeTo = q.to ?? (q.before !== undefined ? q.before - 1 : undefined);
+
+    const fromBarStore = await barStore.getRange(
+      { provider: providerId, ticker: row.ticker, interval: q.interval },
+      {
+        ...(rangeFrom !== undefined ? { from: rangeFrom } : {}),
+        ...(rangeTo !== undefined ? { to: rangeTo } : {}),
+        limit: q.limit,
+      },
+    );
+
+    let bars = fromBarStore;
+    let fellBackToExchange = false;
+
+    // If memory + DB came up short, fall back to the exchange for a one-shot
+    // backfill of the requested range. This is rare (only when a brand-new
+    // key is queried for a range the BarStore hasn't backfilled yet).
+    if (bars.length < q.limit) {
+      const provider = getProvider(providerId);
+      const exchangeBars = await provider.fetchHistorical({
+        symbol: row.ticker,
+        interval: q.interval,
+        ...(rangeFrom !== undefined ? { from: rangeFrom } : {}),
+        ...(rangeTo !== undefined ? { to: rangeTo } : {}),
+        limit: q.limit,
+      });
+      if (exchangeBars.length > bars.length) {
+        bars = exchangeBars;
+        fellBackToExchange = true;
+      }
+    }
+
+    // Touch the stream so the WS path is hot for the next chart interaction.
+    void barStore.ensureStream({
+      provider: providerId,
+      ticker: row.ticker,
       interval: q.interval,
-      from: q.from,
-      to: q.to,
-      limit: q.limit,
     });
 
     const tenant = tryGetTenant() as TenantContext;
@@ -122,14 +159,18 @@ export const chartRoutes = new Hono()
       })
       .onConflictDoNothing();
 
-    return c.json({ symbol: row, interval: q.interval, bars });
+    return c.json({
+      symbol: row,
+      interval: q.interval,
+      bars,
+      source: fellBackToExchange ? ('exchange' as const) : ('barstore' as const),
+    });
   })
   .get('/chart/dom', zValidator('query', DomQuerySchema), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
     const row = await findSymbol(db, q.symbol);
     const providerId = ccxtMap[row.exchange] ?? 'binance';
-    const { getProvider } = await import('../services/data.js');
     const provider = getProvider(providerId);
     const bars = await provider.fetchHistorical({
       symbol: row.ticker,

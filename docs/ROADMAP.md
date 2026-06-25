@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, and volume profile. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, and volume profile. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -13,7 +13,8 @@
 | Slice | Scope                                                                                                      | Status                   |
 | ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------ |
 | 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)      |
-| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`)      |
+| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`), **superseded by 2.5** |
+| 2.5   | Real-time market data: BarStore (1 upstream per key, fanout), TimescaleDB hypertable, paginated history, status events, in-progress bars, timezone-correct chart | ✅ done (this slice)     |
 | 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)      |
 | 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)      |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                  |
@@ -158,6 +159,19 @@ tradingviu/
 - Watchlists full CRUD with RLS isolation
 - Chart UI: interval selector, indicator dropdown, multi-pane with bands, WS live updates
 
+### Slice 2.5 (done) — Real-time market data infrastructure
+
+- **BarStore** (`apps/server/src/services/bar-store.ts`) — single upstream per `(provider, ticker, interval)`, ref-counted subscriptions, ring buffer (5000 bars) per key, 60s idle grace period before closing upstream
+- **Stream layer** (`apps/server/src/services/streams/`) — Binance native WS (`wss://stream.binance.com:9443/ws/<sym>@kline_<tf>`) and CCXT polling fallback for Coinbase/Kraken/Bybit; emits `{kind: 'update' | 'close', bar}` events; auto-reconnect with exponential backoff
+- **PersistQueue** (`apps/server/src/services/persist-queue.ts`) — batched writes to `bars` table (100ms window, max 500/batch), idempotent via `ON CONFLICT … DO UPDATE`
+- **TimescaleDB hypertable** `bars(provider, ticker, interval, time, ohlc, volume, is_closed)` — 1-day chunks, public read, super_admin write
+- **Paginated history** — `GET /api/chart/history?symbol=&interval=&before=&after=&limit=`, BarStore-first with DB and exchange fallbacks
+- **WS protocol additions** — `bar` event now carries `phase: 'update' | 'close'`; new `status` event (`connecting | live | reconnecting | down | idle`)
+- **Backfill CLI** (`pnpm backfill:bars`) — idempotent seed from CCXT for any `(provider, ticker, interval)` combo
+- **Client** — `useChartHistory` (paginated, `loadMore`, dedup), `useBarStream` (auto-reconnect, status), `subscribeVisibleTimeRange` triggers `loadMore` on scroll-left, `chart-engine` uses local timezone
+- **Test coverage** — `bar-store.test.ts` (ring buffer, ref-count, range query, fanout, deactivation), `persist-queue.test.ts` (batching, retry, stop), extended `binance.test.ts` (in-progress bar, close on time change)
+- See [`docs/SLICE-2.5.md`](SLICE-2.5.md) for the full design.
+
 ### Slice 3 (done) — Pine Script + Multi-chart + Search
 
 - **Pine Script v5 subset parser** — PEG grammar (peggy) → AST. Subset: indicators, plots, plotshape, inputs, request.security, ta.\* builtins, simple strategies.
@@ -287,7 +301,7 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 
 | File                                           | What it does                                                        |
 | ---------------------------------------------- | ------------------------------------------------------------------- |
-| `apps/server/src/index.ts`                     | Server entrypoint, route mounting, WS upgrade                       |
+| `apps/server/src/index.ts`                     | Server entrypoint, route mounting, WS upgrade, BarStore boot        |
 | `apps/server/src/middleware/tenant.ts`         | JWT verify + transactional RLS context (the most subtle code)       |
 | `apps/server/src/middleware/super-admin.ts`    | Same but bypasses RLS (gated by `claims.sa`)                        |
 | `apps/server/src/middleware/error.ts`          | TvError → JSON response                                             |
@@ -299,28 +313,36 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 | `packages/options-engine/src/black-scholes.ts` | BS pricing, greeks, implied vol                                     |
 | `packages/options-engine/src/strategy.ts`      | Strategy templates + payoff/greeks analysis                         |
 | `apps/web/src/pages/OptionsPage.tsx`           | Options strategy builder + SVG payoff diagram                       |
-| `apps/server/src/services/ws.ts`               | WebSocket handlers, broadcast, CCXT subscribe                       |
+| `apps/server/src/services/ws.ts`               | WebSocket fanout via BarStore                                       |
+| `apps/server/src/services/bar-store.ts`        | **Slice 2.5** — single upstream per key, ref-counted fanout         |
+| `apps/server/src/services/persist-queue.ts`    | **Slice 2.5** — batched writes to `bars` table                      |
+| `apps/server/src/services/streams/binance.ts`  | **Slice 2.5** — Binance native WS kline stream                      |
+| `apps/server/src/services/streams/ccxt.ts`     | **Slice 2.5** — CCXT polling stream wrapper                         |
 | `apps/server/src/services/alert-engine.ts`     | Pure alert condition evaluator                                      |
 | `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic                                     |
 | `apps/server/src/services/paper-trading.ts`    | Pure paper fill model                                               |
-| `apps/server/src/services/data.ts`             | CCXT provider registry                                              |
+| `apps/server/src/services/data.ts`             | CCXT provider registry + BarStore singleton factory                 |
 | `apps/web/src/pages/ChartPage.tsx`             | The chart UI: indicators, live bars, multi-pane                     |
+| `apps/web/src/hooks/use-chart-history.ts`      | **Slice 2.5** — paginated history hook with `loadMore`              |
+| `apps/web/src/hooks/use-bar-stream.ts`         | **Slice 2.5** — WS hook with status + auto-reconnect                |
 | `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                   |
 | `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                         |
 | `packages/db/src/seed.ts`                      | Plan + exchange + symbol seed                                       |
 | `packages/ta-lib/src/registry.ts`              | All 31 indicators with their params                                 |
 | `packages/auth/src/signup.ts`                  | Signup flow (chicken-and-egg tenant context)                        |
 | `infra/postgres-init/02-app-role.sql`          | Creates the `tv_app` role that respects RLS                         |
+| `tools/backfill-bars/src/index.ts`             | **Slice 2.5** — idempotent CLI to seed `bars` from CCXT             |
 | `.env.example`                                 | All env vars documented                                             |
 
 ### Common pitfalls
 
 1. **Forgetting `db.transaction()` for RLS work** — the `set_config` calls and queries must run on the same connection. Without transaction, you'll see "Tenant membership missing" or wrong tenant returns.
 2. **Using `DATABASE_URL` (tv_app role) for admin operations** — admin endpoints that bypass RLS (signup, super admin) need the admin connection. Look at how `auth.ts` does it.
-3. **Adding data to global tables (exchanges, symbols) without super_admin** — RLS lets everyone read these, but only super_admin can write.
+3. **Adding data to global tables (exchanges, symbols) without super_admin** — RLS lets everyone read these, but only super_admin can write. The `bars` table (slice 2.5) is also super_admin-write; the `PersistQueue` runs inside a transaction with `withSuperAdminRls` to satisfy RLS.
 4. **Schema files use `*.js` imports** — Drizzle's bundler requires it. Don't change to `.ts` imports.
 5. **Loading env twice in same process** — `loadEnv()` is cached. If you need a new var, add it to `EnvSchema` in `packages/core/src/env.ts`.
-6. **The CcxtProvider's `subscribe` doesn't use `watchOHLCV`** — Binance in CCXT 4.5 doesn't support it directly. It polls `fetchOHLCV` every 1s. Reliable, but not real WS. Other exchanges (Bybit, Kraken) might support `watchOHLCV` better.
+6. **BarStore is per-process** — ref-counted fanout works for a single server process. If you scale to multiple processes (PM2 cluster, Kubernetes), each process will open its own upstream per active key. For multi-process fanout, swap in Redis pub/sub (not in slice 2.5). The `bars` table is the cross-process shared state.
+7. **The chart's `series.update()` vs `setData()`** — `setData()` replaces all data (used on initial load and `loadMore`); `series.update()` overwrites a single bar (used for in-progress updates). Mixing them up causes the chart to reset on every WS tick. The `useBarStream` hook only calls `series.update()`.
 
 ### How to add a new indicator
 
