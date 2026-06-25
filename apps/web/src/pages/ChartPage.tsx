@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
-import { api, getToken } from '../api/client';
+import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import {
   createTvChart,
@@ -11,6 +11,7 @@ import {
   createMarkers,
   removeChart,
   darkTheme,
+  subscribeVisibleTimeRange,
 } from '@tv/chart-engine';
 import type {
   IChartApi,
@@ -23,6 +24,8 @@ import type {
   UTCTimestamp,
 } from 'lightweight-charts';
 import type { DomLevel } from '../api/types';
+import { useChartHistory } from '../hooks/use-chart-history';
+import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'] as const;
 type Interval = (typeof INTERVALS)[number];
@@ -90,12 +93,14 @@ export function ChartPage() {
     staleTime: Infinity,
   });
 
-  const historyQ = useQuery({
-    queryKey: ['history', symbolId, interval],
-    queryFn: () => api.history(symbolId!, interval, 500),
-    enabled: !!symbolId,
-    refetchInterval: 30_000,
-  });
+  const historyQ = useChartHistory({ symbolId: symbolId ?? null, interval, pageSize: 500 });
+  const symbolInfo = historyQ.symbol;
+  // Only enable the bar stream when the fetched symbol matches the URL param.
+  // Prevents writing stale bars of the previous symbol to the new chart during
+  // a symbol/interval switch.
+  const streamEnabled = !!symbolId && symbolInfo?.id === symbolId;
+  const streamExchange = streamEnabled ? (symbolInfo?.exchange ?? '') : '';
+  const streamTicker = streamEnabled ? (symbolInfo?.ticker ?? '') : '';
 
   const patternsQ = useQuery({
     queryKey: ['patterns', symbolId, interval],
@@ -146,7 +151,7 @@ export function ChartPage() {
     })),
   });
 
-  const lastPrice = domQ.data?.book.mid ?? historyQ.data?.bars.at(-1)?.close;
+  const lastPrice = domQ.data?.book.mid ?? historyQ.bars.at(-1)?.close;
 
   useEffect(() => {
     if (!paperAccountId && paperAccountsQ.data?.accounts[0]) {
@@ -189,7 +194,7 @@ export function ChartPage() {
         });
       }
       if (!brokerConnectionId) throw new Error('Select a broker connection');
-      const ticker = historyQ.data?.symbol.ticker ?? domQ.data?.symbol.ticker;
+      const ticker = symbolInfo?.ticker ?? domQ.data?.symbol.ticker;
       if (!ticker) throw new Error('Broker symbol is not available');
       return api.placeBrokerOrder(brokerConnectionId, {
         symbol: ticker,
@@ -207,9 +212,28 @@ export function ChartPage() {
   });
 
   useEffect(() => {
+    // NOTE: deps include [user, symbolId] on purpose. The component has
+    // early returns for !user / !symbolId *after* all the hooks. On
+    // client-side navigation from /, the first render sees user=null
+    // (bootstrap in flight) → early return → containerRef.current is
+    // null → this effect's first run does nothing. Once user lands, the
+    // component re-renders past the early return, the div with the ref
+    // mounts, and *this* deps change re-runs the effect with a live ref.
+    // If deps were [] we'd be stuck in the first-run state forever.
+    if (!user || !symbolId) return;
     if (!containerRef.current) return;
     const chart = createTvChart({ container: containerRef.current, theme: darkTheme });
+    const candle = addSeries(chart, 'candles');
+    const volume = addSeries(chart, 'histogram', {
+      priceScaleId: '',
+      priceFormat: { type: 'volume' },
+      color: 'rgba(38, 166, 154, 0.35)',
+    });
+    volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
     chartRef.current = chart;
+    candleRef.current = candle;
+    volumeRef.current = volume;
+    isFirstSetDataRef.current = true;
     return () => {
       removeChart(chart);
       chartRef.current = null;
@@ -221,48 +245,37 @@ export function ChartPage() {
       indicatorSeriesRef.current.clear();
       indicatorBandSeriesRef.current.clear();
     };
-  }, []);
+  }, [user, symbolId]);
 
+  const isFirstSetDataRef = useRef(true);
+
+  // Push the latest bars into the existing series. We do NOT recreate the
+  // series here so the user's pan/zoom, markers, and price lines are
+  // preserved. fitContent runs only on the first load per symbol/interval.
   useEffect(() => {
-    if (!chartRef.current || !historyQ.data) return;
-    if (candleRef.current) {
-      chartRef.current.removeSeries(candleRef.current);
-      candleRef.current = null;
-      // The markers plugin and price lines were attached to the series we
-      // just removed; their handles are now stale.
-      markersRef.current = null;
-      volumeProfileLinesRef.current = [];
-    }
-    if (volumeRef.current) {
-      chartRef.current.removeSeries(volumeRef.current);
-      volumeRef.current = null;
-    }
-    const candle = addSeries(chartRef.current, 'candles');
-    const volume = addSeries(chartRef.current, 'histogram', {
-      priceScaleId: '',
-      priceFormat: { type: 'volume' },
-      color: 'rgba(38, 166, 154, 0.35)',
-    });
-    const bars = historyQ.data.bars.map((b) => ({
-      time: b.time as UTCTimestamp,
-      open: b.open,
-      high: b.high,
-      low: b.low,
-      close: b.close,
-    }));
-    setData(candle, bars);
+    if (!candleRef.current || !volumeRef.current || historyQ.bars.length === 0) return;
     setData(
-      volume,
-      historyQ.data.bars.map((b) => ({
+      candleRef.current,
+      historyQ.bars.map((b) => ({
+        time: b.time as UTCTimestamp,
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+      })),
+    );
+    setData(
+      volumeRef.current,
+      historyQ.bars.map((b) => ({
         time: b.time as UTCTimestamp,
         value: b.volume,
       })),
     );
-    volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-    chartRef.current.timeScale().fitContent();
-    candleRef.current = candle;
-    volumeRef.current = volume;
-  }, [historyQ.data]);
+    if (isFirstSetDataRef.current) {
+      chartRef.current?.timeScale().fitContent();
+      isFirstSetDataRef.current = false;
+    }
+  }, [historyQ.bars]);
 
   useEffect(() => {
     if (!candleRef.current) return;
@@ -306,7 +319,7 @@ export function ChartPage() {
       };
     });
     markersRef.current.setMarkers(markers);
-  }, [patternsQ.data, showPatterns, historyQ.data]);
+  }, [patternsQ.data, showPatterns, historyQ.bars]);
 
   // Draw each detected chart pattern as a polyline through its structural
   // points (pivots → breakout), colored by direction. One line series per
@@ -337,7 +350,7 @@ export function ChartPage() {
       line.setData(m.points.map((p) => ({ time: p.time as UTCTimestamp, value: p.price })));
       chartPatternSeriesRef.current.push(line);
     }
-  }, [chartPatternsQ.data, showChartPatterns, historyQ.data]);
+  }, [chartPatternsQ.data, showChartPatterns, historyQ.bars]);
 
   // Volume profile: overlay the Point of Control and value-area bounds as
   // horizontal price lines on the candle series. Rebuilt whenever the data,
@@ -382,7 +395,7 @@ export function ChartPage() {
         title: 'VAL',
       }),
     ];
-  }, [volumeProfileQ.data, showVolumeProfile, historyQ.data]);
+  }, [volumeProfileQ.data, showVolumeProfile, historyQ.bars]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -411,7 +424,7 @@ export function ChartPage() {
   }, [activeIndicators]);
 
   useEffect(() => {
-    if (!chartRef.current || !historyQ.data) return;
+    if (!chartRef.current || historyQ.bars.length === 0) return;
     for (let i = 0; i < indicatorQueries.length; i++) {
       const q = indicatorQueries[i];
       const ind = activeIndicators[i];
@@ -462,40 +475,60 @@ export function ChartPage() {
         }
       }
     }
-  }, [indicatorQueries, historyQ.data]);
+  }, [indicatorQueries, historyQ.bars]);
 
+  const stream = useBarStream({
+    symbolId: streamEnabled ? symbolId : null,
+    exchange: streamExchange,
+    ticker: streamTicker,
+    interval,
+    onBar: (bar) => {
+      if (!candleRef.current || !volumeRef.current) return;
+      // Push directly to the chart via series.update(). The React state
+      // (historyQ.bars) is only updated on loadMore so we don't reset the
+      // visible range on every tick.
+      update(candleRef.current, {
+        time: bar.time as UTCTimestamp,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+      });
+      update(volumeRef.current, { time: bar.time as UTCTimestamp, value: bar.volume });
+    },
+  });
+  const streamStatus = stream.status;
+
+  // Paginated history: when the user scrolls into the empty zone on the left,
+  // pull more bars. We trigger `loadMore` when the visible-range's left edge
+  // is within ~5 bars of the loaded buffer's leftmost time. We read the
+  // latest hook state via refs so the subscription isn't torn down on every
+  // render.
+  const historyQRef = useRef(historyQ);
+  historyQRef.current = historyQ;
+  const intervalSec = (() => {
+    const map: Record<string, number> = {
+      '1m': 60, '5m': 300, '15m': 900, '30m': 1800,
+      '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800,
+    };
+    return map[interval] ?? 60;
+  })();
+  const triggerZone = 5 * intervalSec;
   useEffect(() => {
-    if (!symbolId || !historyQ.data) return;
-    const token = getToken();
-    if (!token) return;
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/ws?token=${token}`);
-    ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          type: 'subscribe',
-          symbol: `${historyQ.data!.symbol.exchange}:${historyQ.data!.symbol.ticker}`,
-          interval,
-        }),
-      );
-    };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'bar' && candleRef.current && volumeRef.current) {
-          update(candleRef.current, {
-            time: msg.bar.time as UTCTimestamp,
-            open: msg.bar.open,
-            high: msg.bar.high,
-            low: msg.bar.low,
-            close: msg.bar.close,
-          });
-          update(volumeRef.current, { time: msg.bar.time as UTCTimestamp, value: msg.bar.volume });
-        }
-      } catch {}
-    };
-    return () => ws.close();
-  }, [symbolId, interval, historyQ.data?.symbol.exchange, historyQ.data?.symbol.ticker]);
+    const chart = chartRef.current;
+    if (!chart) return;
+    const unsub = subscribeVisibleTimeRange(chart, (range) => {
+      if (!range || !range.from) return;
+      const from = typeof range.from === 'number' ? range.from : Number(range.from);
+      const hq = historyQRef.current;
+      const earliest = hq.bars[0]?.time;
+      if (earliest === undefined) return;
+      if (from - earliest < triggerZone && hq.hasMore && !hq.isLoadingMore) {
+        void hq.loadMore();
+      }
+    });
+    return () => unsub();
+  }, [interval, triggerZone]);
 
   const addIndicator = useCallback(
     (id: string) => {
@@ -622,10 +655,17 @@ export function ChartPage() {
   );
 
   return (
-    <div className="chart-layout" style={{ gridTemplateColumns: 'minmax(0, 1fr) 340px' }}>
+    <div className="chart-layout" style={{ gridTemplateColumns: 'minmax(320px, 1fr) 340px' }}>
       <div
         ref={containerRef}
-        style={{ width: '100%', height: '100%', minWidth: 0, background: '#0e0e0e' }}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          minWidth: 200,
+          minHeight: 200,
+          background: '#0e0e0e',
+        }}
       />
       <aside
         className="col"
@@ -644,8 +684,8 @@ export function ChartPage() {
             <div>
               <div style={{ fontWeight: 600 }}>DOM</div>
               <div className="muted small mono">
-                {historyQ.data
-                  ? `${historyQ.data.symbol.exchange}:${historyQ.data.symbol.ticker}`
+                {symbolInfo
+                  ? `${symbolInfo.exchange}:${symbolInfo.ticker}`
                   : symbolId}
               </div>
             </div>
@@ -780,7 +820,7 @@ export function ChartPage() {
             disabled={placeOrder.isPending || !symbolId}
             onClick={() => placeOrder.mutate()}
           >
-            {orderSide === 'buy' ? 'Buy' : 'Sell'} {historyQ.data?.symbol.ticker ?? 'symbol'}
+            {orderSide === 'buy' ? 'Buy' : 'Sell'} {symbolInfo?.ticker ?? 'symbol'}
           </button>
           <div className="small muted">
             {destination === 'paper' && selectedPaper && `Paper: ${selectedPaper.name}`}
@@ -1060,13 +1100,32 @@ export function ChartPage() {
           <span className="muted small">computing…</span>
         )}
         <span className="grow" />
-        {historyQ.data && (
+        {symbolInfo && (
           <span className="mono small">
-            {historyQ.data.symbol.exchange}:{historyQ.data.symbol.ticker} ·{' '}
-            {historyQ.data.bars.length} bars · {activeIndicators.length} indicators
+            {symbolInfo.exchange}:{symbolInfo.ticker} ·{' '}
+            {historyQ.bars.length} bars · {activeIndicators.length} indicators
           </span>
         )}
-        {historyQ.isFetching && <span className="muted small">refreshing…</span>}
+        {historyQ.isLoadingMore && <span className="muted small">loading more…</span>}
+        <span
+          className={
+            streamStatus === 'live'
+              ? 'up small mono'
+              : streamStatus === 'down' || streamStatus === 'reconnecting'
+                ? 'down small mono'
+                : 'muted small mono'
+          }
+        >
+          {streamStatus === 'live'
+            ? '● live'
+            : streamStatus === 'connecting'
+              ? '○ connecting'
+              : streamStatus === 'reconnecting'
+                ? '○ reconnecting'
+                : streamStatus === 'down'
+                  ? '○ down'
+                  : '○ idle'}
+        </span>
         <Link to="/" className="muted small">
           home
         </Link>

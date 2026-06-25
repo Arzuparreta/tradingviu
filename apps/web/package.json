@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "echo skip",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test test/"
   },
   "dependencies": {
     "@tv/chart-engine": "workspace:*",
@@ -28,9 +29,12 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^15.11.0",
+    "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.16",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "happy-dom": "^15.11.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
   }
