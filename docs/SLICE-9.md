@@ -318,9 +318,47 @@ Notes:
   single-chart `ChartPage`; the layout panels are price/volume only, so
   multi-chart replay reveals candles + volume in lockstep.
 
+## 9h — Pivot Points
+
+Status: done.
+
+Delivered:
+
+- `packages/pivot-points`: a pure, deterministic pivot engine over OHLCV bars.
+  Bars are grouped into calendar **D / W / M** periods (UTC; weeks anchored to
+  Monday), and each current period's levels are derived from the **prior**
+  period's range. Five methods:
+  - **Standard** (PP, R1–R3, S1–S3), **Fibonacci** (0.382 / 0.618 / 1.0 of the
+    range), **Camarilla** (R1–R4 / S1–S4 off the close), **Woodie** (folds in
+    the current period's open), and **DeMark** (single PP/R1/S1, switching on
+    prior close vs open).
+  - Output is the per-period `sets` (each with its prior-period basis HLOC and
+    named `levels`) plus `latest` — today's pivots — or null when there isn't a
+    prior period yet.
+- `computePivotPoints(bars, { method?, period? })` returning a Zod-described
+  `PivotPoints`.
+- `POST /api/pivot-points` (`{ symbol, interval, limit, method, period }`) in
+  `apps/server/src/routes/pivot-points.ts`, fetching bars through the same CCXT
+  provider path as the other overlays.
+- A **Pivots** toggle on `ChartPage` with method + period selectors that draws
+  the latest period's levels as horizontal price lines (PP amber/solid,
+  resistances red, supports green, dashed) plus a side panel listing the levels
+  top-down and the prior-period H/L/C basis.
+- Deterministic `bun test` suite (`packages/pivot-points/src/pivots.test.ts`)
+  covering period grouping + basis, the textbook formulas for all five methods
+  (hand-computed), weekly Monday-boundary grouping, the single-period and empty
+  cases, schema validity, and determinism.
+
+Notes:
+
+- Levels are computed from completed prior periods, so the latest set is stable
+  for the whole current period — exactly how floor-trader pivots are used.
+- No DB migration and no new env vars — it reads the same historical bars the
+  chart already fetches.
+
 ## Slice 9 status
 
-Slices **9a–9g are done**. The only remaining item — **per-candle footprint
+Slices **9a–9h are done**. The only remaining item — **per-candle footprint
 cells** (true bid/ask aggressor split) — is **deferred**: it needs trade-level
 (tick) data, which the current OHLCV provider path does not expose. It will be
 picked up when a trade-tape source lands. With that one data-blocked exception,

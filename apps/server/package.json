@@ -28,6 +28,7 @@
     "@tv/options-engine": "workspace:*",
     "@tv/pine-parser": "workspace:*",
     "@tv/pine-runtime": "workspace:*",
+    "@tv/pivot-points": "workspace:*",
     "@tv/quotas": "workspace:*",
     "@tv/screener-engine": "workspace:*",
     "@tv/ta-lib": "workspace:*",

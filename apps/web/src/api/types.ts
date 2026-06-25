@@ -327,6 +327,29 @@ export interface OptimizeResult {
   results: OptimizeResultRow[];
 }
 
+export type PivotMethod = 'standard' | 'fibonacci' | 'camarilla' | 'woodie' | 'demark';
+export type PivotPeriod = 'D' | 'W' | 'M';
+export interface PivotLevel {
+  name: string;
+  value: number;
+}
+export interface PivotSet {
+  startTime: number;
+  endTime: number;
+  basisHigh: number;
+  basisLow: number;
+  basisClose: number;
+  basisOpen: number;
+  levels: PivotLevel[];
+}
+export interface PivotPoints {
+  method: PivotMethod;
+  period: PivotPeriod;
+  periodCount: number;
+  sets: PivotSet[];
+  latest: PivotSet | null;
+}
+
 export interface Watchlist {
   id: string;
   name: string;

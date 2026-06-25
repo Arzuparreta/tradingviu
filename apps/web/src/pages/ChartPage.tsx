@@ -26,7 +26,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import type { DomLevel, StrategyType, OptimizeObjective } from '../api/types';
+import type { DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPeriod } from '../api/types';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import {
@@ -74,6 +74,7 @@ export function ChartPage() {
   const chartPatternSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
   const volumeProfileLinesRef = useRef<IPriceLine[]>([]);
   const tpoLinesRef = useRef<IPriceLine[]>([]);
+  const pivotLinesRef = useRef<IPriceLine[]>([]);
   const ichimokuSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
   const ichimokuCloudRef = useRef<IchimokuCloudHandle | null>(null);
   const backtestMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
@@ -88,6 +89,9 @@ export function ChartPage() {
   const [showChartPatterns, setShowChartPatterns] = useState(false);
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [showTpo, setShowTpo] = useState(false);
+  const [showPivots, setShowPivots] = useState(false);
+  const [pivotMethod, setPivotMethod] = useState<PivotMethod>('standard');
+  const [pivotPeriod, setPivotPeriod] = useState<PivotPeriod>('D');
   const [showIchimoku, setShowIchimoku] = useState(false);
   const [showBacktest, setShowBacktest] = useState(false);
   const [strategyType, setStrategyType] = useState<StrategyType>('maCross');
@@ -171,6 +175,13 @@ export function ChartPage() {
     queryKey: ['ichimoku', symbolId, interval],
     queryFn: () => api.ichimoku(symbolId!, interval, 500),
     enabled: !!symbolId && showIchimoku,
+    staleTime: 30_000,
+  });
+
+  const pivotsQ = useQuery({
+    queryKey: ['pivot-points', symbolId, interval, pivotMethod, pivotPeriod],
+    queryFn: () => api.pivotPoints(symbolId!, interval, pivotMethod, pivotPeriod, 500),
+    enabled: !!symbolId && showPivots,
     staleTime: 30_000,
   });
 
@@ -363,6 +374,7 @@ export function ChartPage() {
       chartPatternSeriesRef.current = [];
       volumeProfileLinesRef.current = [];
       tpoLinesRef.current = [];
+      pivotLinesRef.current = [];
       ichimokuSeriesRef.current = [];
       ichimokuCloudRef.current = null;
       indicatorSeriesRef.current.clear();
@@ -595,6 +607,34 @@ export function ChartPage() {
       }),
     ];
   }, [tpoQ.data, showTpo, historyQ.bars]);
+
+  // Pivot Points: draw the latest period's levels as horizontal price lines on
+  // the candle series (PP amber, resistances red, supports green).
+  useEffect(() => {
+    const candle = candleRef.current;
+    if (!candle) return;
+    for (const line of pivotLinesRef.current) {
+      try {
+        candle.removePriceLine(line);
+      } catch {
+        // candle series was recreated; the old handles are already gone
+      }
+    }
+    pivotLinesRef.current = [];
+    if (!showPivots || !pivotsQ.data?.pivots.latest) return;
+    const colorFor = (name: string): string =>
+      name === 'PP' ? '#f0b90b' : name.startsWith('R') ? '#ef5350' : '#26a69a';
+    pivotLinesRef.current = pivotsQ.data.pivots.latest.levels.map((lv) =>
+      candle.createPriceLine({
+        price: lv.value,
+        color: colorFor(lv.name),
+        lineWidth: lv.name === 'PP' ? 2 : 1,
+        lineStyle: lv.name === 'PP' ? 0 : 2,
+        axisLabelVisible: true,
+        title: lv.name,
+      }),
+    );
+  }, [pivotsQ.data, showPivots, historyQ.bars]);
 
   // Ichimoku: five line series (Tenkan, Kijun, Senkou A/B, Chikou) plus the
   // kumo cloud primitive between the spans. Senkou spans carry forward-displaced
@@ -1486,6 +1526,50 @@ export function ChartPage() {
           </section>
         )}
 
+        {showPivots && (
+          <section className="col" style={{ gap: 6 }}>
+            <div className="row">
+              <div style={{ fontWeight: 600 }}>Pivot Points</div>
+              <span className="grow" />
+              {pivotsQ.isFetching && <span className="muted small">computing…</span>}
+            </div>
+            {pivotsQ.data && !pivotsQ.data.pivots.latest && (
+              <div className="muted small">Not enough history for a {pivotPeriod} pivot.</div>
+            )}
+            {pivotsQ.data?.pivots.latest &&
+              (() => {
+                const s = pivotsQ.data!.pivots.latest!;
+                const colorFor = (name: string) =>
+                  name === 'PP' ? '#f0b90b' : name.startsWith('R') ? '#ef5350' : '#26a69a';
+                // Highest level first for a top-down ladder.
+                const rows = s.levels.slice().sort((a, b) => b.value - a.value);
+                return (
+                  <>
+                    <div className="col" style={{ gap: 1 }}>
+                      {rows.map((lv) => (
+                        <div key={lv.name} className="row small">
+                          <span className="mono" style={{ color: colorFor(lv.name), width: 34 }}>
+                            {lv.name}
+                          </span>
+                          <span className="grow" />
+                          <span className="mono">{formatPrice(lv.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="row muted small">
+                      <span>prior {pivotPeriod}</span>
+                      <span className="grow" />
+                      <span className="mono">
+                        H {formatPrice(s.basisHigh)} · L {formatPrice(s.basisLow)} · C{' '}
+                        {formatPrice(s.basisClose)}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
+          </section>
+        )}
+
         {showBacktest && (
           <section className="col" style={{ gap: 6 }}>
             <div className="row">
@@ -1801,6 +1885,38 @@ export function ChartPage() {
           TPO
         </button>
         {showTpo && tpoQ.isFetching && <span className="muted small">computing…</span>}
+        <button
+          className={showPivots ? 'primary' : ''}
+          onClick={() => setShowPivots((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          Pivots
+        </button>
+        {showPivots && (
+          <>
+            <select
+              value={pivotMethod}
+              onChange={(e) => setPivotMethod(e.target.value as PivotMethod)}
+              style={{ width: 110, fontSize: 12 }}
+            >
+              <option value="standard">Standard</option>
+              <option value="fibonacci">Fibonacci</option>
+              <option value="camarilla">Camarilla</option>
+              <option value="woodie">Woodie</option>
+              <option value="demark">DeMark</option>
+            </select>
+            <select
+              value={pivotPeriod}
+              onChange={(e) => setPivotPeriod(e.target.value as PivotPeriod)}
+              style={{ width: 56, fontSize: 12 }}
+            >
+              <option value="D">Daily</option>
+              <option value="W">Weekly</option>
+              <option value="M">Monthly</option>
+            </select>
+          </>
+        )}
+        {showPivots && pivotsQ.isFetching && <span className="muted small">computing…</span>}
         <button
           className={showIchimoku ? 'primary' : ''}
           onClick={() => setShowIchimoku((s) => !s)}

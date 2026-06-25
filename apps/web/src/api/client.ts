@@ -18,6 +18,9 @@ import type {
   BacktestResult,
   OptimizeObjective,
   OptimizeResult,
+  PivotMethod,
+  PivotPeriod,
+  PivotPoints,
   LayoutRow,
   Plan,
   Symbol,
@@ -277,6 +280,22 @@ export const api = {
     }>('/api/ichimoku', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, tenkan, kijun, senkou, displacement }),
+    }),
+  pivotPoints: (
+    symbol: string,
+    interval = '1h',
+    method: PivotMethod = 'standard',
+    period: PivotPeriod = 'D',
+    limit = 500,
+  ) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      pivots: PivotPoints;
+    }>('/api/pivot-points', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, method, period, limit }),
     }),
   backtestStrategies: () =>
     request<{ strategies: StrategyDef[] }>('/api/backtest/strategies'),
