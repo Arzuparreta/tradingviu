@@ -309,6 +309,24 @@ export interface BacktestResult {
   stats: BacktestStats;
 }
 
+export type OptimizeObjective =
+  | 'netProfitPct'
+  | 'sharpe'
+  | 'profitFactor'
+  | 'winRate'
+  | 'maxDrawdownPct';
+export interface OptimizeResultRow {
+  params: Record<string, number>;
+  stats: BacktestStats;
+}
+export interface OptimizeResult {
+  type: StrategyType;
+  objective: OptimizeObjective;
+  evaluated: number;
+  truncated: boolean;
+  results: OptimizeResultRow[];
+}
+
 export interface Watchlist {
   id: string;
   name: string;

@@ -101,8 +101,45 @@ Notes:
   strategies cleanly. True `strategy.entry`/`exit` semantics (stops, targets,
   pyramiding) would need a bar-by-bar interpreter mode — a later step.
 
+## 11c — Parameter optimization
+
+Status: done.
+
+Delivered:
+
+- **`optimize(bars, type, paramGrid, settings, opts)`** in `@tv/backtest-engine`:
+  a pure, deterministic grid search. It builds the cartesian product of the
+  candidate values in `paramGrid`, runs a full `runBacktest` for each
+  combination, and ranks them **best-first** by `objective`
+  (`netProfitPct` | `sharpe` | `profitFactor` | `winRate` | `maxDrawdownPct`),
+  via a single higher-is-better score (drawdown negated; a null profit factor
+  sinks). Evaluation is capped at `maxCombos` (reported through `truncated`) and
+  only the top `topN` rows are returned. The sort is stable, so ties keep grid
+  order — fully reproducible.
+- `OptimizeResult` (Zod-described): `type`, `objective`, `evaluated`,
+  `truncated`, and `results` (each row = `{ params, stats }`).
+- **`POST /api/backtest/optimize`** (`{ symbol, interval, limit, type,
+  paramGrid, settings, objective, maxCombos?, topN? }`): fetches bars once and
+  runs the optimizer.
+- In the **ChartPage** backtest panel: an objective selector and an **Optimize
+  parameters** button that sweeps the current strategy's params with a coarse
+  auto-grid (~7 evenly-spaced values per param, snapped to each param's step, so
+  ≤ 3 params stay within `maxCombos`), then shows a ranked top-12 table (one
+  column per param + net %, win %, profit factor, max drawdown). Clicking a row
+  applies that combination to the single-run controls.
+- Engine tests cover full-grid evaluation, best-first ranking matching a direct
+  backtest, the `maxDrawdownPct` (minimize) objective, `maxCombos` truncation +
+  `topN`, schema validity, and determinism.
+
+Notes:
+
+- The auto-grid is intentionally coarse (it's a fast scan, not exhaustive); the
+  API accepts arbitrary explicit grids for finer sweeps.
+- This is a single in-sample grid search — walk-forward / out-of-sample
+  validation is the natural next step.
+
 ## Remaining Slice 11 Work
 
 - Event-driven Pine `strategy.*` (stops / targets / trailing exits, pyramiding).
 - A dedicated backtest report page with a trade list and drawdown chart.
-- Walk-forward / parameter optimization.
+- Walk-forward / out-of-sample optimization.

@@ -143,6 +143,42 @@ export const BacktestResultSchema = z.object({
   stats: BacktestStatsSchema,
 });
 
+/** Metric an optimization run ranks parameter combinations by. */
+export const OptimizeObjectiveSchema = z.enum([
+  'netProfitPct',
+  'sharpe',
+  'profitFactor',
+  'winRate',
+  'maxDrawdownPct',
+]);
+export type OptimizeObjective = z.infer<typeof OptimizeObjectiveSchema>;
+
+export interface OptimizeResultRow {
+  readonly params: Record<string, number>;
+  readonly stats: BacktestStats;
+}
+
+export interface OptimizeResult {
+  readonly type: StrategyType;
+  readonly objective: OptimizeObjective;
+  /** Number of parameter combinations actually evaluated. */
+  readonly evaluated: number;
+  /** True when the grid exceeded `maxCombos` and was capped. */
+  readonly truncated: boolean;
+  /** Rows ranked best-first by the objective; at most `topN`. */
+  readonly results: readonly OptimizeResultRow[];
+}
+
+export const OptimizeResultSchema = z.object({
+  type: StrategyTypeSchema,
+  objective: OptimizeObjectiveSchema,
+  evaluated: z.number().int().nonnegative(),
+  truncated: z.boolean(),
+  results: z.array(
+    z.object({ params: z.record(z.string(), z.number()), stats: BacktestStatsSchema }),
+  ),
+});
+
 /** Catalog entry describing a strategy and its tunable parameters. */
 export interface StrategyParamDef {
   readonly key: string;

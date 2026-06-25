@@ -26,7 +26,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import type { DomLevel, StrategyType } from '../api/types';
+import type { DomLevel, StrategyType, OptimizeObjective } from '../api/types';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import {
@@ -102,6 +102,7 @@ export function ChartPage() {
     allowShort: false,
     positionPct: 1,
   });
+  const [optimizeObjective, setOptimizeObjective] = useState<OptimizeObjective>('netProfitPct');
   const [replayActive, setReplayActive] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
@@ -197,6 +198,35 @@ export function ChartPage() {
     const def = strategiesQ.data?.strategies.find((s) => s.type === type);
     if (def) setStrategyParams(Object.fromEntries(def.params.map((p) => [p.key, p.default])));
   };
+  // Coarse grid for optimization: ~7 evenly-spaced values per param, snapped.
+  const buildParamGrid = (): Record<string, number[]> => {
+    const grid: Record<string, number[]> = {};
+    for (const p of currentStrategy?.params ?? []) {
+      const count = 7;
+      const vals: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const raw = p.min + ((p.max - p.min) * i) / (count - 1);
+        const snapped = p.step >= 1 ? Math.round(raw / p.step) * p.step : raw;
+        vals.push(Math.round(snapped * 1e6) / 1e6);
+      }
+      grid[p.key] = [...new Set(vals)];
+    }
+    return grid;
+  };
+  const optimizeM = useMutation({
+    mutationFn: () => {
+      if (!symbolId) throw new Error('Symbol is required');
+      return api.backtestOptimize(
+        symbolId,
+        interval,
+        strategyType,
+        buildParamGrid(),
+        btSettings,
+        optimizeObjective,
+        1000,
+      );
+    },
+  });
 
   const domQ = useQuery({
     queryKey: ['dom', symbolId],
@@ -1592,6 +1622,86 @@ export function ChartPage() {
                     {stat('Max drawdown', `-${(st.maxDrawdownPct * 100).toFixed(1)}%`, 'down')}
                     {stat('Sharpe (bar)', st.sharpe.toFixed(2))}
                     {stat('Exposure', `${(st.exposurePct * 100).toFixed(0)}%`)}
+                  </>
+                );
+              })()}
+
+            <div className="row small" style={{ gap: 6, marginTop: 4 }}>
+              <span className="muted">Optimize by</span>
+              <span className="grow" />
+              <select
+                value={optimizeObjective}
+                onChange={(e) => setOptimizeObjective(e.target.value as OptimizeObjective)}
+                style={{ width: 120 }}
+              >
+                <option value="netProfitPct">Net profit</option>
+                <option value="sharpe">Sharpe</option>
+                <option value="profitFactor">Profit factor</option>
+                <option value="winRate">Win rate</option>
+                <option value="maxDrawdownPct">Min drawdown</option>
+              </select>
+            </div>
+            <button
+              onClick={() => optimizeM.mutate()}
+              disabled={!symbolId || optimizeM.isPending}
+              style={{ fontSize: 12 }}
+            >
+              {optimizeM.isPending ? 'Optimizing…' : 'Optimize parameters'}
+            </button>
+            {optimizeM.isError && <div className="down small">Optimization failed.</div>}
+            {optimizeM.data &&
+              (() => {
+                const opt = optimizeM.data.optimization;
+                const keys = currentStrategy?.params.map((p) => p.key) ?? [];
+                return (
+                  <>
+                    <div className="muted small">
+                      {opt.evaluated} combos{opt.truncated ? ' (capped)' : ''} · top{' '}
+                      {Math.min(12, opt.results.length)} · click to apply
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="discovery-table" style={{ minWidth: 0, fontSize: 11 }}>
+                        <thead>
+                          <tr>
+                            {keys.map((k) => (
+                              <th key={k}>{k}</th>
+                            ))}
+                            <th>Net</th>
+                            <th>Win</th>
+                            <th>PF</th>
+                            <th>DD</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {opt.results.slice(0, 12).map((r, i) => (
+                            <tr
+                              key={i}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setStrategyParams(r.params)}
+                              title="Apply these parameters"
+                            >
+                              {keys.map((k) => (
+                                <td key={k} className="mono">
+                                  {r.params[k]}
+                                </td>
+                              ))}
+                              <td className={`mono ${r.stats.netProfitPct >= 0 ? 'up' : 'down'}`}>
+                                {(r.stats.netProfitPct * 100).toFixed(1)}%
+                              </td>
+                              <td className="mono">{(r.stats.winRate * 100).toFixed(0)}%</td>
+                              <td className="mono">
+                                {r.stats.profitFactor == null
+                                  ? '∞'
+                                  : r.stats.profitFactor.toFixed(2)}
+                              </td>
+                              <td className="mono down">
+                                -{(r.stats.maxDrawdownPct * 100).toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 );
               })()}

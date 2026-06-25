@@ -23,7 +23,7 @@
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
 | 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | ✅ done (9a–9g; footprint deferred — needs trade tape) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
-| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11b done) |
+| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11c done) |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -129,7 +129,7 @@ tradingviu/
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
 │   ├── SLICE-9.md               # what slice 9 delivers (9a–9g: patterns, chart patterns, volume profile, TPO, bar replay, Ichimoku)
-│   ├── SLICE-11.md              # what slice 11 delivers (11a–11b: backtest engine, built-in strategies, Pine signal backtest)
+│   ├── SLICE-11.md              # what slice 11 delivers (11a–11c: backtest engine, strategies, Pine signal backtest, optimization)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -314,8 +314,14 @@ tradingviu/
   of its `signal` plot (reusing the vectorized interpreter, no event-driven order
   engine), and the Pine editor gains a **⚗ Backtest** button + allow-shorts
   toggle + result panel (equity sparkline + stats). See `docs/SLICE-11.md`.
+- **11c (done) — Parameter optimization:** a pure `optimize(bars, type,
+  paramGrid, settings, opts)` grid search that ranks param combinations by
+  objective (net profit / Sharpe / profit factor / win rate / min drawdown) with
+  cap + topN; `POST /api/backtest/optimize`; and an **Optimize parameters**
+  button + objective selector + ranked top-12 table (click to apply) in the
+  ChartPage backtest panel. See `docs/SLICE-11.md`.
 - Later — event-driven Pine `strategy.*` (stops/targets/trailing), a dedicated
-  report page, and walk-forward / parameter optimization.
+  report page, and walk-forward / out-of-sample optimization.
 
 ## Working with this codebase
 

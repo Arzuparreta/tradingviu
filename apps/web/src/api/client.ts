@@ -13,8 +13,11 @@ import type {
   Ichimoku,
   StrategyConfig,
   StrategyDef,
+  StrategyType,
   BacktestSettings,
   BacktestResult,
+  OptimizeObjective,
+  OptimizeResult,
   LayoutRow,
   Plan,
   Symbol,
@@ -277,6 +280,24 @@ export const api = {
     }),
   backtestStrategies: () =>
     request<{ strategies: StrategyDef[] }>('/api/backtest/strategies'),
+  backtestOptimize: (
+    symbol: string,
+    interval: string,
+    type: StrategyType,
+    paramGrid: Record<string, number[]>,
+    settings: Partial<BacktestSettings> = {},
+    objective: OptimizeObjective = 'netProfitPct',
+    limit = 1000,
+  ) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      optimization: OptimizeResult;
+    }>('/api/backtest/optimize', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, type, paramGrid, settings, objective }),
+    }),
   backtest: (
     symbol: string,
     interval: string,

@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   BacktestSettingsSchema,
+  OptimizeObjectiveSchema,
   StrategyConfigSchema,
+  StrategyTypeSchema,
+  optimize,
   runBacktest,
   simulate,
   signalsFromSeries,
@@ -32,6 +35,18 @@ const PineBacktestBody = z.object({
   /** Which plot to read as the position signal; defaults to "signal" or plot 0. */
   signalPlot: z.string().optional(),
   settings: BacktestSettingsSchema.default({}),
+});
+
+const OptimizeBody = z.object({
+  symbol: z.string(),
+  interval: z.enum(['1m', '5m', '15m', '1h', '4h', '1d', '1w']).default('1h'),
+  limit: z.coerce.number().int().positive().max(5000).default(1000),
+  type: StrategyTypeSchema,
+  paramGrid: z.record(z.string(), z.array(z.coerce.number().finite()).min(1).max(50)),
+  settings: BacktestSettingsSchema.default({}),
+  objective: OptimizeObjectiveSchema.default('netProfitPct'),
+  maxCombos: z.coerce.number().int().positive().max(2000).default(400),
+  topN: z.coerce.number().int().positive().max(200).default(50),
 });
 
 const ccxtMap: Record<string, string> = {
@@ -66,6 +81,33 @@ export const backtestRoutes = new Hono()
     const result = runBacktest(bars, body.strategy, body.settings);
 
     return c.json({ symbol: row, interval: body.interval, bars: bars.length, result });
+  })
+  .post('/backtest/optimize', zValidator('json', OptimizeBody), async (c) => {
+    const body = c.req.valid('json');
+
+    const db = c.get('db');
+    const [row] = await db
+      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
+      .from(symbols)
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(eq(symbols.id, body.symbol))
+      .limit(1);
+    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
+
+    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
+    const bars = await provider.fetchHistorical({
+      symbol: row.ticker,
+      interval: body.interval,
+      limit: body.limit,
+    });
+
+    const optimization = optimize(bars, body.type, body.paramGrid, body.settings, {
+      objective: body.objective,
+      maxCombos: body.maxCombos,
+      topN: body.topN,
+    });
+
+    return c.json({ symbol: row, interval: body.interval, bars: bars.length, optimization });
   })
   .post('/backtest/pine', zValidator('json', PineBacktestBody), async (c) => {
     const body = c.req.valid('json');
