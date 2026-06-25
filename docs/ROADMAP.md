@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, and Ichimoku cloud — only per-candle footprint is deferred (needs a trade tape). This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, and Ichimoku cloud — only per-candle footprint is deferred (needs a trade tape). Slice 11 (strategy backtesting) is in progress: a deterministic simulator with three built-in strategies, equity curve, and full performance stats. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -23,6 +23,7 @@
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
 | 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | ✅ done (9a–9g; footprint deferred — needs trade tape) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
+| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a done)   |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -94,7 +95,7 @@ tradingviu/
 │   ├── indicators/              # [TODO] indicator catalog with display info
 │   ├── screener-engine/         # [TODO] SQL-based screener
 │   ├── alert-engine/            # (placeholder — alert evaluator lives in apps/server/src/services/alert-engine.ts)
-│   ├── backtest-engine/         # [TODO] strategy simulator
+│   ├── backtest-engine/         # deterministic strategy simulator: 3 built-ins, trades, equity curve, stats (slice 11)
 │   ├── paper-trading/           # (placeholder — fill model lives in apps/server/src/services/paper-trading.ts)
 │   ├── options-engine/          # Black-Scholes pricing, greeks, IV, chain, strategy builder + payoff
 │   ├── broker-adapters/         # [TODO] Alpaca, IBKR, Binance live trading (slice 5b)
@@ -127,7 +128,8 @@ tradingviu/
 │   ├── SLICE-3.md               # what slice 3 delivered
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
-│   ├── SLICE-9.md               # what slice 9 delivers (9a–9f: patterns, chart patterns, volume profile, TPO, bar replay, Ichimoku)
+│   ├── SLICE-9.md               # what slice 9 delivers (9a–9g: patterns, chart patterns, volume profile, TPO, bar replay, Ichimoku)
+│   ├── SLICE-11.md              # what slice 11 delivers (11a: backtest engine + built-in strategies)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -295,6 +297,19 @@ tradingviu/
 - Webhook out
 - Plugin SDK
 - Pine v6 compatibility (matrices, maps, UDTs, methods)
+
+### Slice 11 — Strategy Backtesting
+
+- **11a (done) — Backtest engine + built-in strategies:** `packages/backtest-engine`
+  (pure, deterministic strategy simulator — 3 built-in strategies: MA cross, RSI
+  reversal, Donchian breakout; no-lookahead next-bar-open execution; fees +
+  slippage; long/optional-short; trades + equity curve + full stats incl. net
+  profit, win rate, profit factor, max drawdown, Sharpe, buy & hold), `POST
+  /api/backtest` + `GET /api/backtest/strategies`, and a **Backtest** toggle on
+  `ChartPage` with strategy/param/settings controls, entry/exit markers, an
+  equity-curve sparkline, and headline stats. See `docs/SLICE-11.md`.
+- Later — backtest arbitrary Pine strategies, stops/targets/trailing exits,
+  a dedicated report page, and walk-forward / parameter optimization.
 
 ## Working with this codebase
 

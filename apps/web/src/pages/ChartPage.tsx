@@ -26,7 +26,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import type { DomLevel } from '../api/types';
+import type { DomLevel, StrategyType } from '../api/types';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import {
@@ -76,6 +76,7 @@ export function ChartPage() {
   const tpoLinesRef = useRef<IPriceLine[]>([]);
   const ichimokuSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
   const ichimokuCloudRef = useRef<IchimokuCloudHandle | null>(null);
+  const backtestMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, tenant } = useAuth();
@@ -88,6 +89,19 @@ export function ChartPage() {
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [showTpo, setShowTpo] = useState(false);
   const [showIchimoku, setShowIchimoku] = useState(false);
+  const [showBacktest, setShowBacktest] = useState(false);
+  const [strategyType, setStrategyType] = useState<StrategyType>('maCross');
+  const [strategyParams, setStrategyParams] = useState<Record<string, number>>({
+    fast: 10,
+    slow: 30,
+  });
+  const [btSettings, setBtSettings] = useState({
+    initialCapital: 10_000,
+    feeBps: 5,
+    slippageBps: 2,
+    allowShort: false,
+    positionPct: 1,
+  });
   const [replayActive, setReplayActive] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
@@ -158,6 +172,31 @@ export function ChartPage() {
     enabled: !!symbolId && showIchimoku,
     staleTime: 30_000,
   });
+
+  const strategiesQ = useQuery({
+    queryKey: ['backtest-strategies'],
+    queryFn: () => api.backtestStrategies(),
+    enabled: showBacktest,
+    staleTime: Infinity,
+  });
+  const currentStrategy = strategiesQ.data?.strategies.find((s) => s.type === strategyType);
+  const backtestM = useMutation({
+    mutationFn: () => {
+      if (!symbolId) throw new Error('Symbol is required');
+      return api.backtest(
+        symbolId,
+        interval,
+        { type: strategyType, params: strategyParams },
+        btSettings,
+        1000,
+      );
+    },
+  });
+  const selectStrategy = (type: StrategyType) => {
+    setStrategyType(type);
+    const def = strategiesQ.data?.strategies.find((s) => s.type === type);
+    if (def) setStrategyParams(Object.fromEntries(def.params.map((p) => [p.key, p.default])));
+  };
 
   const domQ = useQuery({
     queryKey: ['dom', symbolId],
@@ -290,6 +329,7 @@ export function ChartPage() {
       candleRef.current = null;
       volumeRef.current = null;
       markersRef.current = null;
+      backtestMarkersRef.current = null;
       chartPatternSeriesRef.current = [];
       volumeProfileLinesRef.current = [];
       tpoLinesRef.current = [];
@@ -581,6 +621,42 @@ export function ChartPage() {
     );
     ichimokuCloudRef.current = handle;
   }, [ichimokuQ.data, showIchimoku, historyQ.bars, replayCutoff]);
+
+  // Backtest: entry/exit markers on the candle series (separate markers plugin
+  // from the candlestick-pattern overlay). Clipped to the cursor in replay.
+  useEffect(() => {
+    if (!candleRef.current) return;
+    if (!backtestMarkersRef.current) {
+      backtestMarkersRef.current = createMarkers(candleRef.current, []);
+    }
+    if (!showBacktest || !backtestM.data) {
+      backtestMarkersRef.current.setMarkers([]);
+      return;
+    }
+    const markers: SeriesMarker<Time>[] = [];
+    for (const tr of backtestM.data.result.trades) {
+      if (replayCutoff == null || tr.entryTime <= replayCutoff) {
+        markers.push({
+          time: tr.entryTime as UTCTimestamp,
+          position: tr.side === 'long' ? 'belowBar' : 'aboveBar',
+          color: tr.side === 'long' ? '#26a69a' : '#ef5350',
+          shape: tr.side === 'long' ? 'arrowUp' : 'arrowDown',
+          text: tr.side === 'long' ? 'L' : 'S',
+        });
+      }
+      if (replayCutoff == null || tr.exitTime <= replayCutoff) {
+        markers.push({
+          time: tr.exitTime as UTCTimestamp,
+          position: 'aboveBar',
+          color: tr.pnl >= 0 ? '#26a69a' : '#ef5350',
+          shape: 'circle',
+          text: `${tr.pnl >= 0 ? '+' : ''}${(tr.pnlPct * 100).toFixed(1)}%`,
+        });
+      }
+    }
+    markers.sort((a, b) => (a.time as number) - (b.time as number));
+    backtestMarkersRef.current.setMarkers(markers);
+  }, [backtestM.data, showBacktest, historyQ.bars, replayCutoff]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -1379,6 +1455,148 @@ export function ChartPage() {
               })()}
           </section>
         )}
+
+        {showBacktest && (
+          <section className="col" style={{ gap: 6 }}>
+            <div className="row">
+              <div style={{ fontWeight: 600 }}>Backtest</div>
+              <span className="grow" />
+              {backtestM.isPending && <span className="muted small">running…</span>}
+            </div>
+
+            <select
+              value={strategyType}
+              onChange={(e) => selectStrategy(e.target.value as StrategyType)}
+            >
+              {(strategiesQ.data?.strategies ?? []).map((s) => (
+                <option key={s.type} value={s.type}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            {currentStrategy && <div className="muted small">{currentStrategy.description}</div>}
+
+            {currentStrategy?.params.map((p) => (
+              <div key={p.key} className="row small" style={{ gap: 6 }}>
+                <span className="muted" style={{ width: 120 }}>
+                  {p.label}
+                </span>
+                <span className="grow" />
+                <input
+                  type="number"
+                  min={p.min}
+                  max={p.max}
+                  step={p.step}
+                  value={strategyParams[p.key] ?? p.default}
+                  onChange={(e) =>
+                    setStrategyParams((sp) => ({ ...sp, [p.key]: Number(e.target.value) }))
+                  }
+                  style={{ width: 84 }}
+                />
+              </div>
+            ))}
+
+            {(
+              [
+                ['initialCapital', 'Capital', 1],
+                ['feeBps', 'Fee (bps)', 1],
+                ['slippageBps', 'Slippage (bps)', 1],
+                ['positionPct', 'Position size', 0.05],
+              ] as const
+            ).map(([key, label, step]) => (
+              <div key={key} className="row small" style={{ gap: 6 }}>
+                <span className="muted" style={{ width: 120 }}>
+                  {label}
+                </span>
+                <span className="grow" />
+                <input
+                  type="number"
+                  step={step}
+                  value={btSettings[key]}
+                  onChange={(e) =>
+                    setBtSettings((s) => ({ ...s, [key]: Number(e.target.value) }))
+                  }
+                  style={{ width: 84 }}
+                />
+              </div>
+            ))}
+            <label className="row small" style={{ gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={btSettings.allowShort}
+                onChange={(e) => setBtSettings((s) => ({ ...s, allowShort: e.target.checked }))}
+              />
+              Allow shorts
+            </label>
+
+            <button
+              className="primary"
+              onClick={() => backtestM.mutate()}
+              disabled={!symbolId || backtestM.isPending}
+              style={{ fontSize: 12 }}
+            >
+              Run backtest
+            </button>
+            {backtestM.isError && <div className="down small">Backtest failed.</div>}
+
+            {backtestM.data &&
+              (() => {
+                const st = backtestM.data.result.stats;
+                const eq = backtestM.data.result.equityCurve;
+                const pct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
+                const minE = Math.min(st.initialCapital, ...eq.map((p) => p.equity));
+                const maxE = Math.max(st.initialCapital, ...eq.map((p) => p.equity));
+                const W = 200;
+                const H = 64;
+                const x = (i: number) => (eq.length > 1 ? (i / (eq.length - 1)) * W : 0);
+                const y = (e: number) => (maxE > minE ? H - ((e - minE) / (maxE - minE)) * H : H / 2);
+                const path = eq
+                  .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`)
+                  .join(' ');
+                const up = st.netProfit >= 0;
+                const stat = (label: string, value: string, cls = '') => (
+                  <div className="row small">
+                    <span className="muted">{label}</span>
+                    <span className="grow" />
+                    <span className={`mono ${cls}`}>{value}</span>
+                  </div>
+                );
+                return (
+                  <>
+                    <svg
+                      width="100%"
+                      height={H}
+                      viewBox={`0 0 ${W} ${H}`}
+                      preserveAspectRatio="none"
+                      style={{ display: 'block', marginTop: 4 }}
+                    >
+                      <line
+                        x1={0}
+                        x2={W}
+                        y1={y(st.initialCapital)}
+                        y2={y(st.initialCapital)}
+                        stroke="#787b86"
+                        strokeWidth={0.5}
+                        strokeDasharray="3 3"
+                      />
+                      <path d={path} fill="none" stroke={up ? '#26a69a' : '#ef5350'} strokeWidth={1.5} />
+                    </svg>
+                    {stat('Net profit', pct(st.netProfitPct), up ? 'up' : 'down')}
+                    {stat('Buy & hold', pct(st.buyHoldReturnPct))}
+                    {stat('Trades', `${st.totalTrades} (${st.winningTrades}/${st.losingTrades})`)}
+                    {stat('Win rate', `${(st.winRate * 100).toFixed(0)}%`)}
+                    {stat(
+                      'Profit factor',
+                      st.profitFactor == null ? '∞' : st.profitFactor.toFixed(2),
+                    )}
+                    {stat('Max drawdown', `-${(st.maxDrawdownPct * 100).toFixed(1)}%`, 'down')}
+                    {stat('Sharpe (bar)', st.sharpe.toFixed(2))}
+                    {stat('Exposure', `${(st.exposurePct * 100).toFixed(0)}%`)}
+                  </>
+                );
+              })()}
+          </section>
+        )}
       </aside>
       <div className="chart-toolbar" style={{ flexWrap: 'wrap', gap: 8, gridColumn: 1 }}>
         <select
@@ -1483,6 +1701,14 @@ export function ChartPage() {
         {showIchimoku && ichimokuQ.isFetching && (
           <span className="muted small">computing…</span>
         )}
+        <button
+          className={showBacktest ? 'primary' : ''}
+          onClick={() => setShowBacktest((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          Backtest
+        </button>
+        {showBacktest && backtestM.isPending && <span className="muted small">running…</span>}
         <span className="muted small">|</span>
         <button
           className={replayActive ? 'primary' : ''}

@@ -231,6 +231,84 @@ export interface Ichimoku {
   params: { tenkan: number; kijun: number; senkou: number; displacement: number };
 }
 
+export type StrategyType = 'maCross' | 'rsiReversal' | 'donchianBreakout';
+
+export interface StrategyParamDef {
+  key: string;
+  label: string;
+  default: number;
+  min: number;
+  max: number;
+  step: number;
+}
+export interface StrategyDef {
+  type: StrategyType;
+  label: string;
+  description: string;
+  params: StrategyParamDef[];
+}
+export interface StrategyConfig {
+  type: StrategyType;
+  params: Record<string, number>;
+}
+export interface BacktestSettings {
+  initialCapital: number;
+  feeBps: number;
+  slippageBps: number;
+  allowShort: boolean;
+  positionPct: number;
+}
+export interface BacktestTrade {
+  side: 'long' | 'short';
+  entryIndex: number;
+  entryTime: number;
+  entryPrice: number;
+  exitIndex: number;
+  exitTime: number;
+  exitPrice: number;
+  qty: number;
+  pnl: number;
+  pnlPct: number;
+  barsHeld: number;
+  exitReason: 'signal' | 'end';
+}
+export interface BacktestStats {
+  initialCapital: number;
+  finalEquity: number;
+  netProfit: number;
+  netProfitPct: number;
+  buyHoldReturnPct: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;
+  grossProfit: number;
+  grossLoss: number;
+  profitFactor: number | null;
+  avgTrade: number;
+  avgWin: number;
+  avgLoss: number;
+  largestWin: number;
+  largestLoss: number;
+  maxDrawdown: number;
+  maxDrawdownPct: number;
+  longTrades: number;
+  shortTrades: number;
+  avgBarsHeld: number;
+  exposurePct: number;
+  sharpe: number;
+}
+export interface BacktestResult {
+  strategy: StrategyConfig;
+  settings: BacktestSettings;
+  barCount: number;
+  startTime: number;
+  endTime: number;
+  trades: BacktestTrade[];
+  equityCurve: { time: number; equity: number }[];
+  stats: BacktestStats;
+}
+
 export interface Watchlist {
   id: string;
   name: string;

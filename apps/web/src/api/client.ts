@@ -11,6 +11,10 @@ import type {
   VolumeProfile,
   TpoProfile,
   Ichimoku,
+  StrategyConfig,
+  StrategyDef,
+  BacktestSettings,
+  BacktestResult,
   LayoutRow,
   Plan,
   Symbol,
@@ -270,6 +274,24 @@ export const api = {
     }>('/api/ichimoku', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, tenkan, kijun, senkou, displacement }),
+    }),
+  backtestStrategies: () =>
+    request<{ strategies: StrategyDef[] }>('/api/backtest/strategies'),
+  backtest: (
+    symbol: string,
+    interval: string,
+    strategy: StrategyConfig,
+    settings: Partial<BacktestSettings> = {},
+    limit = 1000,
+  ) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      result: BacktestResult;
+    }>('/api/backtest', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, strategy, settings }),
     }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>
