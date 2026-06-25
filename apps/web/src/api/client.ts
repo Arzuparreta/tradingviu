@@ -6,6 +6,8 @@ import type {
   IndicatorOutput,
   PatternCatalogEntry,
   PatternMatch,
+  ChartPatternCatalogEntry,
+  ChartPatternMatch,
   LayoutRow,
   Plan,
   Symbol,
@@ -197,6 +199,18 @@ export const api = {
       bars: number;
       matches: PatternMatch[];
     }>('/api/patterns/scan', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, ...(ids ? { ids } : {}) }),
+    }),
+  chartPatterns: () =>
+    request<{ patterns: ChartPatternCatalogEntry[] }>('/api/chart-patterns'),
+  scanChartPatterns: (symbol: string, interval = '1h', limit = 500, ids?: string[]) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      matches: ChartPatternMatch[];
+    }>('/api/chart-patterns/scan', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, ...(ids ? { ids } : {}) }),
     }),

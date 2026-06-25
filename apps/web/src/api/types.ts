@@ -109,6 +109,38 @@ export interface PatternMatch {
   time: number;
 }
 
+export type ChartPatternCategory = 'reversal' | 'continuation';
+
+export interface ChartPatternCatalogEntry {
+  id: string;
+  name: string;
+  direction: PatternDirection;
+  category: ChartPatternCategory;
+  description: string;
+}
+
+export interface ChartPatternPoint {
+  index: number;
+  time: number;
+  price: number;
+  role: string;
+}
+
+export interface ChartPatternMatch {
+  id: string;
+  name: string;
+  direction: PatternDirection;
+  category: ChartPatternCategory;
+  startIndex: number;
+  endIndex: number;
+  startTime: number;
+  endTime: number;
+  points: ChartPatternPoint[];
+  breakoutLevel: number;
+  target: number;
+  confidence: number;
+}
+
 export interface Watchlist {
   id: string;
   name: string;

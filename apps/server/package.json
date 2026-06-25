@@ -17,6 +17,7 @@
     "@tv/billing": "workspace:*",
     "@tv/broker-adapters": "workspace:*",
     "@tv/candlestick-patterns": "workspace:*",
+    "@tv/chart-patterns": "workspace:*",
     "@tv/core": "workspace:*",
     "@tv/data-adapters": "workspace:*",
     "@tv/data-types": "workspace:*",

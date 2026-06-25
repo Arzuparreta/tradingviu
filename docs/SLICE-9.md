@@ -45,9 +45,61 @@ Notes:
   crypto feeds that seldom gap; the star condition uses the prior body midpoint rather than
   a strict price gap so they still surface when the structure is present.
 
+## 9b — Auto Chart-Pattern Detection
+
+Status: done.
+
+Delivered:
+
+- `packages/chart-patterns`: a pure, deterministic chart-pattern engine over OHLCV
+  bars. Like the candlestick engine, detection is a function of the bar array — no
+  time, randomness, or I/O — so results are reproducible and unit-testable. Unlike
+  candlestick patterns (fixed width, single completing bar), chart patterns span a
+  variable window of swing pivots and only fire once price **confirms** them by
+  breaking the relevant trendline.
+- **Swing-pivot foundation:** `findPivots(bars, lookback)` detects local highs/lows
+  (strictly the extreme within `±lookback`), and `alternatePivots` collapses
+  same-kind runs into a strictly alternating high/low sequence that the detectors
+  consume.
+- 11 patterns across two families:
+  - **Reversals:** Double Top, Double Bottom, Triple Top, Triple Bottom,
+    Head & Shoulders, Inverse Head & Shoulders. Necklines may slope (H&S projects
+    the trough line to the breakout bar); flat necklines (double/triple) use the
+    trough/peak level.
+  - **Continuations:** Ascending Triangle, Descending Triangle, Symmetrical Triangle
+    (direction taken from the breakout), Rising Wedge, Falling Wedge.
+- Each match carries the structural `points` in chronological order (pivots →
+  breakout), the `breakoutLevel`, a measured-move `target`, a deterministic
+  `confidence` in `[0, 1]` (from level equality / line convergence), and the
+  start/end indices and times.
+- A catalog (`allChartPatterns`) with id, name, direction, category, and a one-line
+  description; `findChartPattern(id)`; and a `scanChartPatterns(bars, { ids?, ... })`
+  scanner that computes pivots once, runs every detector, and returns matches in
+  breakout order.
+- `GET /api/chart-patterns` (catalog) and `POST /api/chart-patterns/scan`
+  (`{ symbol, interval, limit, ids? }`) in `apps/server/src/routes/chart-patterns.ts`.
+  Scan fetches bars through the same CCXT provider path as `/api/patterns/scan`,
+  runs `scanChartPatterns`, and returns matches.
+- A **Chart Patterns** toggle on `ChartPage` that draws each detected pattern as a
+  dashed polyline through its structural points (colored by direction) on the candle
+  chart, plus a results panel listing each pattern's direction, category, breakout
+  level, target, and confidence.
+- Deterministic `bun test` suite (`packages/chart-patterns/src/chart-patterns.test.ts`)
+  covering pivot detection, every detector with hand-crafted zig-zags, the catalog,
+  the id filter, breakout ordering, and the no-false-positive-on-flat-noise case.
+
+Notes:
+
+- Confirmation requires a real breakout, not just the structure, which keeps false
+  positives low; un-confirmed (still-forming) patterns are intentionally not returned.
+- Multiple patterns can confirm in the same window (e.g. a double top inside a triple
+  top, or a symmetrical triangle alongside a wedge); each is returned separately and
+  the chart stacks the shapes.
+- Detection requires no DB migration and no new env vars — it reads the same
+  historical bars the chart already fetches.
+
 ## Remaining Slice 9 Work
 
-- Auto chart-pattern detection (head & shoulders, double top/bottom, triangles).
 - Volume Footprint (candle-by-candle volume-at-price distribution).
 - TPO (Time Price Opportunity) profiles.
 - Bar Replay across multi-chart layouts.

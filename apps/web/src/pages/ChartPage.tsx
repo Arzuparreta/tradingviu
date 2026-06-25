@@ -48,6 +48,7 @@ export function ChartPage() {
     >
   >(new Map());
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const chartPatternSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, tenant } = useAuth();
@@ -56,6 +57,7 @@ export function ChartPage() {
   const [interval, setInterval] = useState<Interval>('1h');
   const [activeIndicators, setActiveIndicators] = useState<IndicatorConfig[]>([]);
   const [showPatterns, setShowPatterns] = useState(false);
+  const [showChartPatterns, setShowChartPatterns] = useState(false);
   const [destination, setDestination] = useState<'paper' | 'broker'>('paper');
   const [paperAccountId, setPaperAccountId] = useState('');
   const [brokerConnectionId, setBrokerConnectionId] = useState('');
@@ -88,6 +90,13 @@ export function ChartPage() {
     queryKey: ['patterns', symbolId, interval],
     queryFn: () => api.scanPatterns(symbolId!, interval, 500),
     enabled: !!symbolId && showPatterns,
+    staleTime: 30_000,
+  });
+
+  const chartPatternsQ = useQuery({
+    queryKey: ['chart-patterns', symbolId, interval],
+    queryFn: () => api.scanChartPatterns(symbolId!, interval, 500),
+    enabled: !!symbolId && showChartPatterns,
     staleTime: 30_000,
   });
 
@@ -189,6 +198,7 @@ export function ChartPage() {
       candleRef.current = null;
       volumeRef.current = null;
       markersRef.current = null;
+      chartPatternSeriesRef.current = [];
       indicatorSeriesRef.current.clear();
       indicatorBandSeriesRef.current.clear();
     };
@@ -276,6 +286,37 @@ export function ChartPage() {
     });
     markersRef.current.setMarkers(markers);
   }, [patternsQ.data, showPatterns, historyQ.data]);
+
+  // Draw each detected chart pattern as a polyline through its structural
+  // points (pivots → breakout), colored by direction. One line series per
+  // match; rebuilt whenever the data, the toggle, or the candles change.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    for (const s of chartPatternSeriesRef.current) {
+      try {
+        chart.removeSeries(s);
+      } catch {
+        // series already detached with the candle series; ignore
+      }
+    }
+    chartPatternSeriesRef.current = [];
+    if (!showChartPatterns || !chartPatternsQ.data) return;
+    const colorFor = (d: string): string =>
+      d === 'bullish' ? '#26a69a' : d === 'bearish' ? '#ef5350' : '#b2b5be';
+    for (const m of chartPatternsQ.data.matches.slice(0, 12)) {
+      const line = addSeries(chart, 'line', {
+        color: colorFor(m.direction),
+        lineWidth: 2,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      line.setData(m.points.map((p) => ({ time: p.time as UTCTimestamp, value: p.price })));
+      chartPatternSeriesRef.current.push(line);
+    }
+  }, [chartPatternsQ.data, showChartPatterns, historyQ.data]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -693,6 +734,71 @@ export function ChartPage() {
             </p>
           )}
         </section>
+
+        {showChartPatterns && (
+          <section className="col" style={{ gap: 8 }}>
+            <div className="row">
+              <div style={{ fontWeight: 600 }}>Chart Patterns</div>
+              <span className="grow" />
+              {chartPatternsQ.isFetching && <span className="muted small">scanning…</span>}
+            </div>
+            {chartPatternsQ.data && chartPatternsQ.data.matches.length === 0 && (
+              <div className="muted small">No confirmed patterns in the last 500 bars.</div>
+            )}
+            <div className="col" style={{ gap: 6 }}>
+              {chartPatternsQ.data?.matches
+                .slice()
+                .reverse()
+                .slice(0, 12)
+                .map((m) => (
+                  <div
+                    key={`${m.id}-${m.endIndex}`}
+                    className="col"
+                    style={{
+                      gap: 2,
+                      padding: '6px 8px',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 4,
+                      borderLeft: `3px solid ${
+                        m.direction === 'bullish'
+                          ? '#26a69a'
+                          : m.direction === 'bearish'
+                            ? '#ef5350'
+                            : '#b2b5be'
+                      }`,
+                    }}
+                  >
+                    <div className="row">
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</span>
+                      <span className="grow" />
+                      <span
+                        className={
+                          m.direction === 'bullish'
+                            ? 'up small'
+                            : m.direction === 'bearish'
+                              ? 'down small'
+                              : 'muted small'
+                        }
+                      >
+                        {m.direction}
+                      </span>
+                    </div>
+                    <div className="row muted small mono">
+                      <span>{m.category}</span>
+                      <span className="grow" />
+                      <span>target {formatPrice(m.target)}</span>
+                    </div>
+                    <div className="row muted small">
+                      <span>break {formatPrice(m.breakoutLevel)}</span>
+                      <span className="grow" />
+                      <span>conf {(m.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </section>
+        )}
       </aside>
       <div className="chart-toolbar" style={{ flexWrap: 'wrap', gap: 8, gridColumn: 1 }}>
         <select
@@ -756,6 +862,19 @@ export function ChartPage() {
           {showPatterns && patternsQ.data ? ` (${patternsQ.data.matches.length})` : ''}
         </button>
         {showPatterns && patternsQ.isFetching && <span className="muted small">scanning…</span>}
+        <button
+          className={showChartPatterns ? 'primary' : ''}
+          onClick={() => setShowChartPatterns((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          Chart Patterns
+          {showChartPatterns && chartPatternsQ.data
+            ? ` (${chartPatternsQ.data.matches.length})`
+            : ''}
+        </button>
+        {showChartPatterns && chartPatternsQ.isFetching && (
+          <span className="muted small">scanning…</span>
+        )}
         <span className="grow" />
         {historyQ.data && (
           <span className="mono small">

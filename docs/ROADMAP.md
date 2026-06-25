@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) has started with candlestick pattern recognition. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition and auto chart-pattern detection. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -20,7 +20,7 @@
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6k done)                   |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done)                   |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
-| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                  | in progress (9a done)                      |
+| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                  | in progress (9a–9b done)                   |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                    |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
@@ -83,6 +83,7 @@ tradingviu/
 │   ├── chart-engine/            # wrapper over lightweight-charts (themes, series helpers)
 │   ├── ta-lib/                  # 31 technical indicators (TS port)
 │   ├── candlestick-patterns/    # 22 candlestick pattern detectors (slice 9a)
+│   ├── chart-patterns/          # 11 auto chart-pattern detectors over swing pivots (slice 9b)
 │   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
 │   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
 │   ├── drawing-tools/           # [TODO] 110+ drawing primitives
@@ -223,6 +224,13 @@ tradingviu/
   catalog + `detectAll` scanner), `/api/patterns` + `/api/patterns/scan`, a `createMarkers`
   helper in `@tv/chart-engine`, and a **Patterns** toggle on `ChartPage` that overlays
   bullish/bearish markers. See `docs/SLICE-9.md`.
+- **9b (done) — Auto chart-pattern detection:** `packages/chart-patterns` (swing-pivot
+  detection + 11 deterministic detectors across reversals — double/triple top & bottom,
+  head & shoulders, inverse head & shoulders — and continuations — ascending/descending/
+  symmetrical triangles, rising/falling wedges), breakout-confirmed matches with
+  structural points, neckline/target, and a `[0,1]` confidence; `/api/chart-patterns`
+  + `/api/chart-patterns/scan`; and a **Chart Patterns** toggle on `ChartPage` that
+  draws each shape as a dashed polyline plus a results panel. See `docs/SLICE-9.md`.
 - Volume Footprint (candle-by-candle volume distribution)
 - TPO (Time Price Opportunity)
 - Bar Replay multi-chart
