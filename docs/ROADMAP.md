@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) has started with candlestick pattern recognition. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -20,7 +20,7 @@
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6k done)                   |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done)                   |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
-| 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                    |
+| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                  | in progress (9a done)                      |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                                    |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
@@ -82,6 +82,7 @@ tradingviu/
 │   ├── data-adapters/           # CCXT providers (Binance, Coinbase, Kraken, Bybit)
 │   ├── chart-engine/            # wrapper over lightweight-charts (themes, series helpers)
 │   ├── ta-lib/                  # 31 technical indicators (TS port)
+│   ├── candlestick-patterns/    # 22 candlestick pattern detectors (slice 9a)
 │   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
 │   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
 │   ├── drawing-tools/           # [TODO] 110+ drawing primitives
@@ -121,6 +122,7 @@ tradingviu/
 │   ├── SLICE-3.md               # what slice 3 delivered
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
+│   ├── SLICE-9.md               # what slice 9 delivers (9a candlestick patterns)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -216,11 +218,15 @@ tradingviu/
 
 ### Slice 9 — Advanced TA
 
+- **9a (done) — Candlestick pattern recognition:** `packages/candlestick-patterns` (22 pure,
+  deterministic detectors across single/two/three-bar families, trend-aware disambiguation,
+  catalog + `detectAll` scanner), `/api/patterns` + `/api/patterns/scan`, a `createMarkers`
+  helper in `@tv/chart-engine`, and a **Patterns** toggle on `ChartPage` that overlays
+  bullish/bearish markers. See `docs/SLICE-9.md`.
 - Volume Footprint (candle-by-candle volume distribution)
 - TPO (Time Price Opportunity)
 - Bar Replay multi-chart
-- Auto chart patterns
-- Candlestick pattern recognition
+- Auto chart patterns (head & shoulders, double top/bottom, triangles)
 - Ichimoku cloud rendering
 
 ### Slice 10 — Ecosystem

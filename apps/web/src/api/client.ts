@@ -4,6 +4,8 @@ import type {
   DomBook,
   IndicatorDef,
   IndicatorOutput,
+  PatternCatalogEntry,
+  PatternMatch,
   LayoutRow,
   Plan,
   Symbol,
@@ -186,6 +188,17 @@ export const api = {
     }>('/api/indicators/compute', {
       method: 'POST',
       body: JSON.stringify({ id, symbol, interval, params, limit }),
+    }),
+  patterns: () => request<{ patterns: PatternCatalogEntry[] }>('/api/patterns'),
+  scanPatterns: (symbol: string, interval = '1h', limit = 500, ids?: string[]) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      matches: PatternMatch[];
+    }>('/api/patterns/scan', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, ...(ids ? { ids } : {}) }),
     }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>
@@ -471,8 +484,7 @@ export const api = {
     },
   ) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteIdea: (id: string) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'DELETE' }),
-  ideaComments: (id: string) =>
-    request<{ comments: CommentRow[] }>(`/api/ideas/${id}/comments`),
+  ideaComments: (id: string) => request<{ comments: CommentRow[] }>(`/api/ideas/${id}/comments`),
   addIdeaComment: (id: string, body: { body: string; parentId?: string }) =>
     request<{ id: string }>(`/api/ideas/${id}/comments`, {
       method: 'POST',
@@ -520,10 +532,8 @@ export const api = {
       license?: string;
       priceCents?: number;
     },
-  ) =>
-    request<{ ok: true }>(`/api/scripts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  deleteScript: (id: string) =>
-    request<{ ok: true }>(`/api/scripts/${id}`, { method: 'DELETE' }),
+  ) => request<{ ok: true }>(`/api/scripts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteScript: (id: string) => request<{ ok: true }>(`/api/scripts/${id}`, { method: 'DELETE' }),
   installScript: (id: string) =>
     request<{ downloads: number; source: string | null; locked: boolean }>(
       `/api/scripts/${id}/install`,

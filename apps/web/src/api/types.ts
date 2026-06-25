@@ -87,6 +87,28 @@ export interface IndicatorOutput {
   histogram?: IndicatorPoint[];
 }
 
+export type PatternDirection = 'bullish' | 'bearish' | 'neutral';
+export type PatternKind = 'single' | 'double' | 'triple';
+
+export interface PatternCatalogEntry {
+  id: string;
+  name: string;
+  kind: PatternKind;
+  direction: PatternDirection;
+  bars: number;
+  description: string;
+}
+
+export interface PatternMatch {
+  id: string;
+  name: string;
+  kind: PatternKind;
+  direction: PatternDirection;
+  index: number;
+  startIndex: number;
+  time: number;
+}
+
 export interface Watchlist {
   id: string;
   name: string;

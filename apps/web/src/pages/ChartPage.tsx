@@ -8,10 +8,19 @@ import {
   addSeries,
   setData,
   update,
+  createMarkers,
   removeChart,
   darkTheme,
 } from '@tv/chart-engine';
-import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
+import type {
+  IChartApi,
+  ISeriesApi,
+  ISeriesMarkersPluginApi,
+  SeriesMarker,
+  SeriesType,
+  Time,
+  UTCTimestamp,
+} from 'lightweight-charts';
 import type { DomLevel } from '../api/types';
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'] as const;
@@ -38,6 +47,7 @@ export function ChartPage() {
       }
     >
   >(new Map());
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, tenant } = useAuth();
@@ -45,6 +55,7 @@ export function ChartPage() {
   const symbolId = params.symbol;
   const [interval, setInterval] = useState<Interval>('1h');
   const [activeIndicators, setActiveIndicators] = useState<IndicatorConfig[]>([]);
+  const [showPatterns, setShowPatterns] = useState(false);
   const [destination, setDestination] = useState<'paper' | 'broker'>('paper');
   const [paperAccountId, setPaperAccountId] = useState('');
   const [brokerConnectionId, setBrokerConnectionId] = useState('');
@@ -71,6 +82,13 @@ export function ChartPage() {
     queryFn: () => api.history(symbolId!, interval, 500),
     enabled: !!symbolId,
     refetchInterval: 30_000,
+  });
+
+  const patternsQ = useQuery({
+    queryKey: ['patterns', symbolId, interval],
+    queryFn: () => api.scanPatterns(symbolId!, interval, 500),
+    enabled: !!symbolId && showPatterns,
+    staleTime: 30_000,
   });
 
   const domQ = useQuery({
@@ -170,6 +188,7 @@ export function ChartPage() {
       chartRef.current = null;
       candleRef.current = null;
       volumeRef.current = null;
+      markersRef.current = null;
       indicatorSeriesRef.current.clear();
       indicatorBandSeriesRef.current.clear();
     };
@@ -180,6 +199,8 @@ export function ChartPage() {
     if (candleRef.current) {
       chartRef.current.removeSeries(candleRef.current);
       candleRef.current = null;
+      // The markers plugin was attached to the series we just removed.
+      markersRef.current = null;
     }
     if (volumeRef.current) {
       chartRef.current.removeSeries(volumeRef.current);
@@ -211,6 +232,50 @@ export function ChartPage() {
     candleRef.current = candle;
     volumeRef.current = volume;
   }, [historyQ.data]);
+
+  useEffect(() => {
+    if (!candleRef.current) return;
+    if (!markersRef.current) {
+      markersRef.current = createMarkers(candleRef.current, []);
+    }
+    if (!showPatterns || !patternsQ.data) {
+      markersRef.current.setMarkers([]);
+      return;
+    }
+    const markers: SeriesMarker<Time>[] = patternsQ.data.matches.map((m) => {
+      const abbrev = m.name
+        .split(' ')
+        .map((w) => w.charAt(0))
+        .join('')
+        .toUpperCase();
+      if (m.direction === 'bearish') {
+        return {
+          time: m.time as UTCTimestamp,
+          position: 'aboveBar',
+          color: '#ef5350',
+          shape: 'arrowDown',
+          text: abbrev,
+        };
+      }
+      if (m.direction === 'bullish') {
+        return {
+          time: m.time as UTCTimestamp,
+          position: 'belowBar',
+          color: '#26a69a',
+          shape: 'arrowUp',
+          text: abbrev,
+        };
+      }
+      return {
+        time: m.time as UTCTimestamp,
+        position: 'aboveBar',
+        color: '#b2b5be',
+        shape: 'circle',
+        text: abbrev,
+      };
+    });
+    markersRef.current.setMarkers(markers);
+  }, [patternsQ.data, showPatterns, historyQ.data]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -681,6 +746,16 @@ export function ChartPage() {
             </span>
           );
         })}
+        <span className="muted small">|</span>
+        <button
+          className={showPatterns ? 'primary' : ''}
+          onClick={() => setShowPatterns((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          Patterns
+          {showPatterns && patternsQ.data ? ` (${patternsQ.data.matches.length})` : ''}
+        </button>
+        {showPatterns && patternsQ.isFetching && <span className="muted small">scanning…</span>}
         <span className="grow" />
         {historyQ.data && (
           <span className="mono small">

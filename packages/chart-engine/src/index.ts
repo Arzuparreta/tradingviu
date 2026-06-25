@@ -1,5 +1,6 @@
 import {
   createChart,
+  createSeriesMarkers,
   CandlestickSeries,
   LineSeries,
   AreaSeries,
@@ -8,12 +9,14 @@ import {
   HistogramSeries,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type SeriesType,
   type Time,
   type UTCTimestamp,
   type BusinessDay,
   type SeriesMarker,
   type SeriesMarkerPosition,
+  type SeriesMarkerShape,
   type LineStyle,
   type LineWidth,
   type IPriceLine,
@@ -24,12 +27,14 @@ import {
 export type {
   IChartApi,
   ISeriesApi,
+  ISeriesMarkersPluginApi,
   SeriesType,
   Time,
   UTCTimestamp,
   BusinessDay,
   SeriesMarker,
   SeriesMarkerPosition,
+  SeriesMarkerShape,
   LineStyle,
   LineWidth,
   IPriceLine,
@@ -115,7 +120,10 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
 
   if (opts.autoSize) {
     const ro = new ResizeObserver(() => {
-      chart.applyOptions({ width: opts.container.clientWidth, height: opts.container.clientHeight });
+      chart.applyOptions({
+        width: opts.container.clientWidth,
+        height: opts.container.clientHeight,
+      });
     });
     ro.observe(opts.container);
     (chart as unknown as { __ro?: ResizeObserver }).__ro = ro;
@@ -145,7 +153,17 @@ export const addSeries = <T extends SeriesKind>(
   }
 };
 
-export const setData = (series: ISeriesApi<SeriesType>, data: ReadonlyArray<{ time: Time; value?: number; open?: number; high?: number; low?: number; close?: number }>): void => {
+export const setData = (
+  series: ISeriesApi<SeriesType>,
+  data: ReadonlyArray<{
+    time: Time;
+    value?: number;
+    open?: number;
+    high?: number;
+    low?: number;
+    close?: number;
+  }>,
+): void => {
   if (series.seriesType() === 'Candlestick' || series.seriesType() === 'Bar') {
     series.setData(
       data.map((d) => ({
@@ -161,7 +179,18 @@ export const setData = (series: ISeriesApi<SeriesType>, data: ReadonlyArray<{ ti
   }
 };
 
-export const update = (series: ISeriesApi<SeriesType>, bar: { time: Time; value?: number; open?: number; high?: number; low?: number; close?: number; volume?: number }): void => {
+export const update = (
+  series: ISeriesApi<SeriesType>,
+  bar: {
+    time: Time;
+    value?: number;
+    open?: number;
+    high?: number;
+    low?: number;
+    close?: number;
+    volume?: number;
+  },
+): void => {
   if (series.seriesType() === 'Candlestick' || series.seriesType() === 'Bar') {
     series.update({
       time: bar.time,
@@ -174,6 +203,11 @@ export const update = (series: ISeriesApi<SeriesType>, bar: { time: Time; value?
     series.update({ time: bar.time, value: bar.value ?? bar.close ?? 0 });
   }
 };
+
+export const createMarkers = (
+  series: ISeriesApi<SeriesType>,
+  markers: SeriesMarker<Time>[] = [],
+): ISeriesMarkersPluginApi<Time> => createSeriesMarkers(series, markers);
 
 export const removeChart = (chart: IChartApi): void => {
   const ro = (chart as unknown as { __ro?: ResizeObserver }).__ro;
