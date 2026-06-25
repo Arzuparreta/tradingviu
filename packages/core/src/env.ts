@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 
 const optionalDatetimeEnv = z.preprocess(
   (value) => (value === '' ? undefined : value),
@@ -57,9 +59,60 @@ export type Env = z.infer<typeof EnvSchema>;
 
 let cached: Env | undefined;
 
+function findEnvFile(): string | undefined {
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i++) {
+    const path = resolve(dir, '.env');
+    try {
+      readFileSync(path);
+      return path;
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  return undefined;
+}
+
+function parseEnvFile(content: string): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    vars[key] = value;
+  }
+  return vars;
+}
+
 export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
   if (cached) return cached;
-  const parsed = EnvSchema.safeParse(source);
+
+  const merged = { ...source };
+  const envPath = findEnvFile();
+  if (envPath) {
+    const fileVars = parseEnvFile(readFileSync(envPath, 'utf-8'));
+    for (const [k, v] of Object.entries(fileVars)) {
+      if (merged[k] === undefined) {
+        merged[k] = v;
+        if (source === process.env) {
+          process.env[k] = v;
+        }
+      }
+    }
+  }
+
+  const parsed = EnvSchema.safeParse(merged);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)

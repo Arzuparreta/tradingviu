@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   EnvSchema,
   MacroIngestQuerySchema,
+  loadEnv,
   type MacroIngestQuery,
   type NormalizedMacroSeriesObservation,
   type NormalizedYieldCurvePoint,
@@ -130,6 +131,7 @@ export const ingestMacroOnce = async (
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const run = async (): Promise<void> => {
+  loadEnv();
   const env = MacroIngestEnvSchema.parse(process.env);
   const provider = createMacroProvider(
     env.MACRO_PROVIDER,

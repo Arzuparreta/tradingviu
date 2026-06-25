@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   EnvSchema,
   NewsIngestQuerySchema,
+  loadEnv,
   type NewsIngestQuery,
   type NormalizedNewsArticle,
 } from '@tv/core';
@@ -93,6 +94,7 @@ export const ingestNewsOnce = async (
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const run = async (): Promise<void> => {
+  loadEnv();
   const env = NewsIngestEnvSchema.parse(process.env);
   const provider = createNewsProvider(env.NEWS_PROVIDER, {
     ...(env.NEWSAPI_KEY ? { newsApiKey: env.NEWSAPI_KEY } : {}),

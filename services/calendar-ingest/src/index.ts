@@ -2,6 +2,7 @@ import { inArray, sql } from 'drizzle-orm';
 import {
   CalendarIngestQuerySchema,
   EnvSchema,
+  loadEnv,
   type CalendarIngestQuery,
   type NormalizedDividendEvent,
   type NormalizedEarningsEvent,
@@ -212,6 +213,7 @@ export const ingestCalendarOnce = async (
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const run = async (): Promise<void> => {
+  loadEnv();
   const env = CalendarIngestEnvSchema.parse(process.env);
   const provider = createCalendarProvider(
     env.CALENDAR_PROVIDER,

@@ -1,6 +1,9 @@
 import { createDb } from './client.js';
 import { applyRls } from './rls-policies.js';
 import { and, eq } from 'drizzle-orm';
+import { loadEnv } from '@tv/core';
+
+loadEnv();
 import {
   earningsCalendar,
   dividendCalendar,

@@ -18,7 +18,7 @@ cp .env.example .env
 # edit .env, set DOMAIN, JWT_SECRET, POSTGRES_PASSWORD
 
 # 3. Start
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml --env-file .env up -d
 
 # 4. Migrate DB
 pnpm install
@@ -32,11 +32,34 @@ open https://tradingviu.localhost
 ## Development
 
 ```bash
+# 1. Install
 pnpm install
+
+# 2. Configure
+cp .env.example .env
+# edit .env
+
+# 3. Start infrastructure (Postgres, Redis, MinIO, Meilisearch, Mailpit)
+docker compose -f infra/docker-compose.yml --env-file .env up -d postgres redis minio meilisearch mailpit
+
+# 4. Migrate and seed DB
+pnpm db:migrate
+pnpm db:seed
+
+# 5. Start dev servers
 pnpm dev
+
+# 6. Open
+open http://localhost:5147
 ```
 
 `pnpm dev` boots all packages in watch mode via Turbo.
+
+> **Firewall note:** If you're accessing the dev server from another device on the same LAN, make sure ports 5147 (web) and 3001 (API) are open:
+> ```bash
+> sudo ufw allow 5147/tcp
+> sudo ufw allow 3001/tcp
+> ```
 
 ## Architecture
 

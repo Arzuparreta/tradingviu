@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   EnvSchema,
   FundamentalsIngestQuerySchema,
+  loadEnv,
   type FundamentalsIngestQuery,
   type NormalizedFundamentalSnapshot,
 } from '@tv/core';
@@ -178,6 +179,7 @@ export const ingestFundamentalsOnce = async (
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const run = async (): Promise<void> => {
+  loadEnv();
   const env = FundamentalsIngestEnvSchema.parse(process.env);
   const provider = createFundamentalsProvider(
     env.FUNDAMENTALS_PROVIDER,
