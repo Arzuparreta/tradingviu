@@ -1,6 +1,7 @@
 import {
   createChart,
   createSeriesMarkers,
+  CrosshairMode,
   CandlestickSeries,
   LineSeries,
   AreaSeries,
@@ -177,7 +178,9 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
       ...opts.timeScale,
     },
     crosshair: {
-      mode: 1,
+      // Free-moving crosshair (TradingView default). `Magnet` (1) snapped the
+      // crosshair to candle OHLC values, which felt broken to users.
+      mode: CrosshairMode.Normal,
       ...opts.crosshair,
     },
     autoSize: opts.autoSize ?? true,
