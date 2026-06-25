@@ -1,11 +1,12 @@
 import type { Bar, BarQuery, Symbol, ProviderCapabilities, ProviderHealth } from '@tv/data-types';
+import type { Interval } from '@tv/core';
 
 export interface DataProvider {
   readonly id: string;
   readonly capabilities: ProviderCapabilities;
   fetchSymbols(): Promise<Symbol[]>;
   fetchHistorical(q: BarQuery): Promise<Bar[]>;
-  subscribe?(symbol: Symbol, onBar: (b: Bar) => void): () => void;
+  subscribe?(symbol: Symbol, onBar: (b: Bar) => void, interval?: Interval): () => void;
   healthCheck(): Promise<ProviderHealth>;
 }
 

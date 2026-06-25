@@ -41,7 +41,11 @@ export function ChartPanel({ panel, active, live, onActivate, onChange, onReady,
     if (!containerRef.current) return;
     const chart = createTvChart({ container: containerRef.current, theme: darkTheme, autoSize: true });
     const candle = addSeries(chart, 'candles');
-    const volume = addSeries(chart, 'histogram');
+    const volume = addSeries(chart, 'histogram', {
+      priceScaleId: '',
+      priceFormat: { type: 'volume' },
+      color: 'rgba(38, 166, 154, 0.35)',
+    });
     volume.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
     chartRef.current = chart;
     candleRef.current = candle;

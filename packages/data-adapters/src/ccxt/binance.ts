@@ -1,7 +1,7 @@
 import ccxt, { type Exchange as CcxtExchange } from 'ccxt';
 import type { Bar, BarQuery, Symbol, ProviderHealth, ProviderCapabilities } from '@tv/data-types';
 import { type DataProvider, ProviderError } from '../provider.js';
-import { IntervalSchema } from '@tv/core';
+import { intervalToMs, type Interval } from '@tv/core';
 
 const SUPPORTED_INTERVALS: Record<string, string> = {
   '1m': '1m',
@@ -17,6 +17,8 @@ const SUPPORTED_INTERVALS: Record<string, string> = {
 };
 
 const CCXT_INTERVALS = new Set(Object.keys(SUPPORTED_INTERVALS));
+
+const toCcxtTimestamp = (value: number): number => (value < 10_000_000_000 ? value * 1000 : value);
 
 export class CcxtProvider implements DataProvider {
   readonly id: string;
@@ -70,8 +72,14 @@ export class CcxtProvider implements DataProvider {
     }
     try {
       const tf = SUPPORTED_INTERVALS[q.interval]!;
-      const since = q.from ?? Date.now() - 1000 * 60 * 60 * 24 * 365;
       const limit = Math.min(q.limit, 1000);
+      const toMs = q.to === undefined ? undefined : toCcxtTimestamp(q.to);
+      const since =
+        q.from === undefined
+          ? toMs === undefined
+            ? undefined
+            : Math.max(0, toMs - intervalToMs(q.interval) * limit)
+          : toCcxtTimestamp(q.from);
       const ohlcv = await this.exchange.fetchOHLCV(q.symbol, tf, since, limit);
       const isSeconds = q.interval === '1s' || q.interval === '5s' || q.interval === '15s' || q.interval === '30s';
       return ohlcv
@@ -89,13 +97,18 @@ export class CcxtProvider implements DataProvider {
           low: l,
           close: c,
           volume: v ?? 0,
-        }));
+        }))
+        .filter(
+          (bar) =>
+            (q.from === undefined || bar.time >= Math.floor(toCcxtTimestamp(q.from) / 1000)) &&
+            (q.to === undefined || bar.time <= Math.floor(toCcxtTimestamp(q.to) / 1000)),
+        );
     } catch (e) {
       throw new ProviderError(this.id, `fetchOHLCV failed for ${q.symbol}`, e);
     }
   }
 
-  subscribe(symbol: Symbol, onBar: (b: Bar) => void): () => void {
+  subscribe(symbol: Symbol, onBar: (b: Bar) => void, interval: Interval = '1m'): () => void {
     let stopped = false;
     // Polling-based subscription. CCXT Binance doesn't expose watchOHLCV directly
     // in this build; we poll every 5s, fetch the latest 2 bars, emit new ones.
@@ -105,7 +118,8 @@ export class CcxtProvider implements DataProvider {
     const tick = async () => {
       while (!stopped) {
         try {
-          const ohlcv = await this.exchange.fetchOHLCV(symbol.ticker, '1m', undefined, 2);
+          const tf = SUPPORTED_INTERVALS[interval] ?? '1m';
+          const ohlcv = await this.exchange.fetchOHLCV(symbol.ticker, tf, undefined, 2);
           for (const c of ohlcv) {
             const [ts, o, h, l, close, v] = c;
             if (ts === undefined || o === undefined) continue;

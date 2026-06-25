@@ -186,7 +186,11 @@ export function ChartPage() {
       volumeRef.current = null;
     }
     const candle = addSeries(chartRef.current, 'candles');
-    const volume = addSeries(chartRef.current, 'histogram');
+    const volume = addSeries(chartRef.current, 'histogram', {
+      priceScaleId: '',
+      priceFormat: { type: 'volume' },
+      color: 'rgba(38, 166, 154, 0.35)',
+    });
     const bars = historyQ.data.bars.map((b) => ({
       time: b.time as UTCTimestamp,
       open: b.open,
@@ -207,20 +211,6 @@ export function ChartPage() {
     candleRef.current = candle;
     volumeRef.current = volume;
   }, [historyQ.data]);
-
-  useEffect(() => {
-    if (!chartRef.current || !historyQ.data?.bars.length) return;
-    if (!candleRef.current || !volumeRef.current) return;
-    const last = historyQ.data.bars.at(-1)!;
-    update(candleRef.current, {
-      time: last.time as UTCTimestamp,
-      open: last.open,
-      high: last.high,
-      low: last.low,
-      close: last.close,
-    });
-    update(volumeRef.current, { time: last.time as UTCTimestamp, value: last.volume });
-  }, [historyQ.dataUpdatedAt]);
 
   useEffect(() => {
     if (!chartRef.current) return;

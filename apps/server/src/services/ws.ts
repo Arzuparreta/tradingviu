@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from 'bun';
-import type { ClientMessage, ServerMessage } from '@tv/core';
+import { ClientMessageSchema, type ServerMessage } from '@tv/core';
 import { getProvider, initDataProviders } from './data.js';
 
 initDataProviders();
@@ -32,13 +32,19 @@ export const wsHandlers = {
     ws.send(JSON.stringify({ type: 'hello', serverTime: Date.now() } satisfies ServerMessage));
   },
   message(ws: Ws, raw: string | Uint8Array): void {
-    let msg: ClientMessage;
+    let rawMsg: unknown;
     try {
-      msg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)) as ClientMessage;
+      rawMsg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)) as unknown;
     } catch {
       ws.send(JSON.stringify({ type: 'error', error: 'invalid_json' } satisfies ServerMessage));
       return;
     }
+    const parsed = ClientMessageSchema.safeParse(rawMsg);
+    if (!parsed.success) {
+      ws.send(JSON.stringify({ type: 'error', error: 'invalid_message' } satisfies ServerMessage));
+      return;
+    }
+    const msg = parsed.data;
     if (msg.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong', t: Date.now() } satisfies ServerMessage));
       return;
@@ -73,6 +79,7 @@ export const wsHandlers = {
         (bar) => {
           broadcast(symbolKey, { type: 'bar', symbol: msg.symbol, interval: msg.interval, bar });
         },
+        msg.interval,
       );
       ws.send(JSON.stringify({ type: 'subscribed', symbol: msg.symbol } satisfies ServerMessage));
     }
