@@ -23,6 +23,10 @@ import {
   type IPriceLine,
   type MouseEventParams,
   type TimeChartOptions,
+  type ISeriesPrimitive,
+  type IPrimitivePaneView,
+  type IPrimitivePaneRenderer,
+  type SeriesAttachedParameter,
 } from 'lightweight-charts';
 
 export type {
@@ -337,4 +341,139 @@ export const removeChart = (chart: IChartApi): void => {
   const ro = (chart as unknown as { __ro?: ResizeObserver }).__ro;
   if (ro) ro.disconnect();
   chart.remove();
+};
+
+// --- Ichimoku cloud (kumo) primitive ------------------------------------
+
+/** One column of the cloud: both leading spans at the same (displaced) time. */
+export interface IchimokuCloudPoint {
+  readonly time: number;
+  readonly spanA: number;
+  readonly spanB: number;
+}
+
+export interface IchimokuCloudColors {
+  /** Fill where Span A ≥ Span B (bullish kumo). */
+  bull?: string;
+  /** Fill where Span A < Span B (bearish kumo). */
+  bear?: string;
+}
+
+export interface IchimokuCloudHandle {
+  setData(points: ReadonlyArray<IchimokuCloudPoint>): void;
+  remove(): void;
+}
+
+/**
+ * Attach an Ichimoku cloud (kumo) to `series`: a filled band between Senkou
+ * Span A and Span B — green where A ≥ B, red where A < B, with the fill split at
+ * each twist (A/B crossover, where the band has zero width). Drawn beneath the
+ * candles. The span line series must carry the (forward-displaced) cloud times
+ * so the time scale can resolve `timeToCoordinate` for them.
+ */
+export const createIchimokuCloud = (
+  series: ISeriesApi<SeriesType>,
+  colors: IchimokuCloudColors = {},
+): IchimokuCloudHandle => {
+  const bull = colors.bull ?? 'rgba(38, 166, 154, 0.20)';
+  const bear = colors.bear ?? 'rgba(239, 83, 80, 0.20)';
+
+  let chart: IChartApi | null = null;
+  let attached: ISeriesApi<SeriesType> = series;
+  let requestUpdate: (() => void) | null = null;
+  let data: IchimokuCloudPoint[] = [];
+
+  const fillTrap = (
+    ctx: CanvasRenderingContext2D,
+    x0: number, a0: number, b0: number,
+    x1: number, a1: number, b1: number,
+    color: string,
+  ): void => {
+    ctx.beginPath();
+    ctx.moveTo(x0, a0);
+    ctx.lineTo(x1, a1);
+    ctx.lineTo(x1, b1);
+    ctx.lineTo(x0, b0);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  };
+
+  const renderer: IPrimitivePaneRenderer = {
+    draw(target) {
+      const c = chart;
+      if (!c || data.length < 2) return;
+      target.useBitmapCoordinateSpace((scope) => {
+        const ctx = scope.context;
+        const ts = c.timeScale();
+        const hpr = scope.horizontalPixelRatio;
+        const vpr = scope.verticalPixelRatio;
+        type XY = { x: number; a: number; b: number } | null;
+        const pts: XY[] = data.map((d) => {
+          const x = ts.timeToCoordinate(d.time as Time);
+          const ya = attached.priceToCoordinate(d.spanA);
+          const yb = attached.priceToCoordinate(d.spanB);
+          if (x == null || ya == null || yb == null) return null;
+          return {
+            x: (x as number) * hpr,
+            a: (ya as number) * vpr,
+            b: (yb as number) * vpr,
+          };
+        });
+        for (let i = 0; i + 1 < pts.length; i++) {
+          const p0 = pts[i];
+          const p1 = pts[i + 1];
+          if (!p0 || !p1) continue;
+          const d0 = data[i]!.spanA - data[i]!.spanB;
+          const d1 = data[i + 1]!.spanA - data[i + 1]!.spanB;
+          if ((d0 >= 0) === (d1 >= 0) || d0 === 0 || d1 === 0) {
+            fillTrap(ctx, p0.x, p0.a, p0.b, p1.x, p1.a, p1.b, d0 + d1 >= 0 ? bull : bear);
+          } else {
+            // Twist: split at the crossing, where the two spans meet.
+            const f = d0 / (d0 - d1);
+            const xc = p0.x + (p1.x - p0.x) * f;
+            const yc = p0.a + (p1.a - p0.a) * f;
+            fillTrap(ctx, p0.x, p0.a, p0.b, xc, yc, yc, d0 >= 0 ? bull : bear);
+            fillTrap(ctx, xc, yc, yc, p1.x, p1.a, p1.b, d1 >= 0 ? bull : bear);
+          }
+        }
+      });
+    },
+  };
+
+  const paneView: IPrimitivePaneView = {
+    zOrder: () => 'bottom',
+    renderer: () => renderer,
+  };
+
+  const primitive: ISeriesPrimitive<Time> = {
+    attached(param: SeriesAttachedParameter<Time>) {
+      chart = param.chart as IChartApi;
+      attached = param.series as ISeriesApi<SeriesType>;
+      requestUpdate = param.requestUpdate;
+    },
+    detached() {
+      chart = null;
+      requestUpdate = null;
+    },
+    updateAllViews() {},
+    paneViews: () => [paneView],
+  };
+
+  series.attachPrimitive(primitive);
+
+  return {
+    setData(points) {
+      data = points.slice();
+      requestUpdate?.();
+    },
+    remove() {
+      try {
+        series.detachPrimitive(primitive);
+      } catch {
+        // series already removed with the chart; nothing to detach
+      }
+      chart = null;
+    },
+  };
 };

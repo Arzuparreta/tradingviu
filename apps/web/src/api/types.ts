@@ -209,6 +209,28 @@ export interface TpoProfile {
   rows: TpoProfileRow[];
 }
 
+export interface IchimokuLinePoint {
+  time: number;
+  value: number;
+}
+
+export interface IchimokuCloudPoint {
+  time: number;
+  spanA: number;
+  spanB: number;
+  bullish: boolean;
+}
+
+export interface Ichimoku {
+  tenkan: IchimokuLinePoint[];
+  kijun: IchimokuLinePoint[];
+  senkouA: IchimokuLinePoint[];
+  senkouB: IchimokuLinePoint[];
+  chikou: IchimokuLinePoint[];
+  cloud: IchimokuCloudPoint[];
+  params: { tenkan: number; kijun: number; senkou: number; displacement: number };
+}
+
 export interface Watchlist {
   id: string;
   name: string;

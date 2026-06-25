@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, and bar replay. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, paginated history, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. Slice 9 (advanced TA) is in progress with candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, bar replay, and Ichimoku cloud. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -21,7 +21,7 @@
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6k done) |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
-| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | in progress (9a–9e done) |
+| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | in progress (9a–9f done) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
@@ -87,6 +87,7 @@ tradingviu/
 │   ├── chart-patterns/          # 11 auto chart-pattern detectors over swing pivots (slice 9b)
 │   ├── volume-profile/          # volume-at-price engine: POC, value area, buy/sell delta (slice 9c)
 │   ├── tpo-profile/             # TPO / Market Profile engine: letter ladder, POC, value area, IB, single prints (slice 9d)
+│   ├── ichimoku/                # Ichimoku engine: Tenkan/Kijun/Senkou A-B/Chikou + displaced cloud (slice 9f)
 │   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
 │   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
 │   ├── drawing-tools/           # [TODO] 110+ drawing primitives
@@ -126,7 +127,7 @@ tradingviu/
 │   ├── SLICE-3.md               # what slice 3 delivered
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
-│   ├── SLICE-9.md               # what slice 9 delivers (9a–9e: patterns, chart patterns, volume profile, TPO, bar replay)
+│   ├── SLICE-9.md               # what slice 9 delivers (9a–9f: patterns, chart patterns, volume profile, TPO, bar replay, Ichimoku)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -266,9 +267,15 @@ tradingviu/
   causal indicators / pattern markers / chart-pattern lines to the cursor's
   time. Pure index/timing math in `apps/web/src/lib/replay.ts` with unit tests.
   No new endpoint — reuses paginated history. See `docs/SLICE-9.md`.
+- **9f (done) — Ichimoku Cloud:** `packages/ichimoku` (pure, deterministic
+  Tenkan/Kijun/Senkou A-B/Chikou with forward-displaced leading spans + future
+  time synthesis and a bullish-flagged cloud array); a `createIchimokuCloud`
+  canvas primitive in `@tv/chart-engine` that fills the green/red kumo between
+  the spans (twist-split, drawn under the candles); `POST /api/ichimoku`; and an
+  **Ichimoku** toggle on `ChartPage` drawing the five lines + cloud, clipped to
+  the cursor in Bar Replay. See `docs/SLICE-9.md`.
 - Per-candle footprint cells (bid/ask split, needs trade-level data)
 - Bar Replay multi-chart (single-chart shipped in 9e)
-- Ichimoku cloud rendering
 
 ### Slice 10 — Ecosystem
 

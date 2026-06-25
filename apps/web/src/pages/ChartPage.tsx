@@ -12,6 +12,8 @@ import {
   removeChart,
   darkTheme,
   subscribeVisibleTimeRange,
+  createIchimokuCloud,
+  type IchimokuCloudHandle,
 } from '@tv/chart-engine';
 import type {
   IChartApi,
@@ -72,6 +74,8 @@ export function ChartPage() {
   const chartPatternSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
   const volumeProfileLinesRef = useRef<IPriceLine[]>([]);
   const tpoLinesRef = useRef<IPriceLine[]>([]);
+  const ichimokuSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
+  const ichimokuCloudRef = useRef<IchimokuCloudHandle | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, tenant } = useAuth();
@@ -83,6 +87,7 @@ export function ChartPage() {
   const [showChartPatterns, setShowChartPatterns] = useState(false);
   const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [showTpo, setShowTpo] = useState(false);
+  const [showIchimoku, setShowIchimoku] = useState(false);
   const [replayActive, setReplayActive] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
@@ -144,6 +149,13 @@ export function ChartPage() {
     queryKey: ['tpo-profile', symbolId, interval],
     queryFn: () => api.tpoProfile(symbolId!, interval, 240, 24, 10),
     enabled: !!symbolId && showTpo,
+    staleTime: 30_000,
+  });
+
+  const ichimokuQ = useQuery({
+    queryKey: ['ichimoku', symbolId, interval],
+    queryFn: () => api.ichimoku(symbolId!, interval, 500),
+    enabled: !!symbolId && showIchimoku,
     staleTime: 30_000,
   });
 
@@ -281,6 +293,8 @@ export function ChartPage() {
       chartPatternSeriesRef.current = [];
       volumeProfileLinesRef.current = [];
       tpoLinesRef.current = [];
+      ichimokuSeriesRef.current = [];
+      ichimokuCloudRef.current = null;
       indicatorSeriesRef.current.clear();
       indicatorBandSeriesRef.current.clear();
     };
@@ -511,6 +525,62 @@ export function ChartPage() {
       }),
     ];
   }, [tpoQ.data, showTpo, historyQ.bars]);
+
+  // Ichimoku: five line series (Tenkan, Kijun, Senkou A/B, Chikou) plus the
+  // kumo cloud primitive between the spans. Senkou spans carry forward-displaced
+  // times so the scale resolves them; the cloud attaches to the candle series.
+  // In replay every series is clipped to the cursor time.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candle = candleRef.current;
+    if (!chart || !candle) return;
+
+    for (const s of ichimokuSeriesRef.current) {
+      try {
+        chart.removeSeries(s);
+      } catch {
+        // series already detached with the candle series; ignore
+      }
+    }
+    ichimokuSeriesRef.current = [];
+    if (ichimokuCloudRef.current) {
+      ichimokuCloudRef.current.remove();
+      ichimokuCloudRef.current = null;
+    }
+    if (!showIchimoku || !ichimokuQ.data) return;
+
+    const ich = ichimokuQ.data.ichimoku;
+    const passCut = (t: number) => replayCutoff == null || t <= replayCutoff;
+    const mk = (color: string, points: { time: number; value: number }[]) => {
+      const s = addSeries(chart, 'line', {
+        color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      s.setData(
+        points
+          .filter((p) => passCut(p.time))
+          .map((p) => ({ time: p.time as UTCTimestamp, value: p.value })),
+      );
+      ichimokuSeriesRef.current.push(s);
+    };
+
+    mk('#3b82f6', ich.tenkan); // Tenkan-sen
+    mk('#f97316', ich.kijun); // Kijun-sen
+    mk('#10b981', ich.senkouA); // Senkou Span A
+    mk('#ef5350', ich.senkouB); // Senkou Span B
+    mk('#a855f7', ich.chikou); // Chikou Span
+
+    const handle = createIchimokuCloud(candle);
+    handle.setData(
+      ich.cloud
+        .filter((c) => passCut(c.time))
+        .map((c) => ({ time: c.time, spanA: c.spanA, spanB: c.spanB })),
+    );
+    ichimokuCloudRef.current = handle;
+  }, [ichimokuQ.data, showIchimoku, historyQ.bars, replayCutoff]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -1403,6 +1473,16 @@ export function ChartPage() {
           TPO
         </button>
         {showTpo && tpoQ.isFetching && <span className="muted small">computing…</span>}
+        <button
+          className={showIchimoku ? 'primary' : ''}
+          onClick={() => setShowIchimoku((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          Ichimoku
+        </button>
+        {showIchimoku && ichimokuQ.isFetching && (
+          <span className="muted small">computing…</span>
+        )}
         <span className="muted small">|</span>
         <button
           className={replayActive ? 'primary' : ''}

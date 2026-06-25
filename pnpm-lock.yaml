@@ -53,6 +53,9 @@ importers:
       '@tv/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@tv/ichimoku':
+        specifier: workspace:*
+        version: link:../../packages/ichimoku
       '@tv/layout-sync':
         specifier: workspace:*
         version: link:../../packages/layout-sync
@@ -442,6 +445,22 @@ importers:
       '@tv/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@types/bun':
+        specifier: ^1.1.14
+        version: 1.3.14
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/ichimoku:
+    dependencies:
+      '@tv/data-types':
+        specifier: workspace:*
+        version: link:../data-types
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       '@types/bun':
         specifier: ^1.1.14

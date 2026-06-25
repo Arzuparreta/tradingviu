@@ -10,6 +10,7 @@ import type {
   ChartPatternMatch,
   VolumeProfile,
   TpoProfile,
+  Ichimoku,
   LayoutRow,
   Plan,
   Symbol,
@@ -250,6 +251,24 @@ export const api = {
     }>('/api/tpo-profile', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, bins, barsPerPeriod }),
+    }),
+  ichimoku: (
+    symbol: string,
+    interval = '1h',
+    limit = 500,
+    tenkan = 9,
+    kijun = 26,
+    senkou = 52,
+    displacement = 26,
+  ) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      ichimoku: Ichimoku;
+    }>('/api/ichimoku', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, tenkan, kijun, senkou, displacement }),
     }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>

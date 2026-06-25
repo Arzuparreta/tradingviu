@@ -238,8 +238,51 @@ Notes:
   replay window in this slice — they remain explicit toggles computed over the
   fetched history. Per-window replay recompute can come later.
 
+## 9f — Ichimoku Cloud
+
+Status: done.
+
+Delivered:
+
+- `packages/ichimoku`: a pure, deterministic Ichimoku Kinkō Hyō engine over
+  OHLCV bars. Computes Tenkan-sen, Kijun-sen, Senkou Span A/B, and Chikou Span,
+  with the leading spans **displaced forward** `displacement` bars (default 26)
+  and the lagging span displaced back. Beyond the last bar, the forward times
+  are synthesized from the smallest positive bar step, so the cloud projects
+  ahead exactly like TradingView. The `cloud` array aligns Span A/B on each
+  (future) time with a `bullish` flag (A ≥ B). Pure: a function of the bars and
+  periods only.
+- A **cloud (kumo) primitive** in `@tv/chart-engine` (`createIchimokuCloud`): a
+  lightweight-charts `ISeriesPrimitive` attached to the candle series that fills
+  the band between Span A and Span B in a bitmap-space canvas renderer — green
+  where A ≥ B, red where A < B — splitting the fill at each **twist** (the A/B
+  crossover, where the band has zero width) and drawing at `zOrder: 'bottom'` so
+  it sits beneath the candles. Exposes `setData` / `remove`.
+- `POST /api/ichimoku` (`{ symbol, interval, limit, tenkan?, kijun?, senkou?,
+  displacement? }`) in `apps/server/src/routes/ichimoku.ts`, fetching bars
+  through the same CCXT provider path as `/api/volume-profile`.
+- An **Ichimoku** toggle on `ChartPage` that draws the five lines (Tenkan blue,
+  Kijun orange, Senkou A green, Senkou B red, Chikou purple) plus the kumo. The
+  span line series carry the forward-displaced times so the time scale can place
+  the projected cloud. In Bar Replay every series and the cloud are clipped to
+  the cursor time.
+- Deterministic `bun test` suite (`packages/ichimoku/src/ichimoku.test.ts`)
+  covering Tenkan/Kijun/Senkou math, forward/back displacement and future-time
+  synthesis, cloud span alignment + the bullish flag, a bearish case, the
+  default-displacement rule, the empty input, schema validity, and determinism.
+
+Notes:
+
+- The legacy `ichimoku` entry in `@tv/ta-lib` only produced Tenkan/Kijun through
+  the single-`points` generic indicator contract, which can't express five
+  displaced series plus a filled band. 9f supersedes it with the dedicated
+  engine + cloud primitive (the established slice-9 overlay pattern).
+- Forward-displaced leading spans extend the time scale into the future, so the
+  chart shows empty space to the right with the projected cloud — the authentic
+  Ichimoku look.
+- Computation requires no DB migration and no new env vars.
+
 ## Remaining Slice 9 Work
 
 - Per-candle footprint cells (bid/ask split) once trade-level data is available.
 - Bar Replay across multi-chart layouts (single-chart replay shipped in 9e).
-- Ichimoku cloud rendering (the indicator math already exists in `@tv/ta-lib`).
