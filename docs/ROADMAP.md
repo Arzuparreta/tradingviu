@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2 (indicators + live bars + watchlists), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, and calendar provider ingestion delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -17,7 +17,7 @@
 | 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)                        |
 | 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)                        |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                                    |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6j done)                   |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6k done)                   |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done)                   |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                                    |
 | 9     | Volume footprint, TPO, Bar Replay multi-chart, custom intervals, auto chart patterns                       | pending                                    |
@@ -193,7 +193,8 @@ tradingviu/
 - **6h (done) — Yield curve + macro provider ingestion:** `packages/macro` provider contract with mock + FRED adapters, `services/macro-ingest` worker, admin/RLS-safe upserts into `yield_curves` and `macro_series_observations`, and `pnpm macro:ingest`. See `docs/SLICE-6.md`.
 - **6i (done) — Calendar provider ingestion:** `packages/calendar` provider contract with mock + FMP adapters, `services/calendar-ingest` worker, admin/RLS-safe upserts into `earnings_calendar`/`dividend_calendar`/`economic_events` (new `economic_events` unique index), and `pnpm calendars:ingest`. See `docs/SLICE-6.md`.
 - **6j (done) — Real news provider ingestion:** `NewsApiProvider` (NewsAPI.org `/v2/everything`) in `packages/news` with per-symbol brand-news tagging, `NEWS_PROVIDER=mock|newsapi`, and `NEWSAPI_KEY` wired through `services/news-ingest`. See `docs/SLICE-6.md`.
-- Additional news providers (Finnhub, Benzinga)
+- **6k (done) — Finnhub news provider:** `FinnhubNewsProvider` in `packages/news` over `/api/v1/company-news` (per-symbol) and `/api/v1/news` (general), unix-second timestamp normalization, `related`-ticker tagging, `NEWS_PROVIDER=mock|newsapi|finnhub`, and `FINNHUB_KEY` wired through `services/news-ingest`. See `docs/SLICE-6.md`.
+- Additional news providers (Benzinga)
 - Calendars: earnings, economic, dividends
 - Additional fundamentals providers and broader metric coverage
 - Additional macro providers and non-US country mappings

@@ -177,9 +177,25 @@ Notes:
 - `mock` remains the default provider for deterministic local development and tests.
 - `newsapi` requires `NEWSAPI_KEY`; symbol tagging is query-based (ticker as the search term) since NewsAPI does not return native symbol tags.
 
+## 6k — Finnhub News Provider
+
+Status: done.
+
+Delivered:
+
+- `FinnhubNewsProvider` in `packages/news`: a real Finnhub adapter with an injectable fetcher, authenticating via the `token` query parameter.
+- Per-symbol brand news through `/api/v1/company-news?symbol=&from=&to=` (one call per symbol, tagged with that symbol plus any tickers in Finnhub's `related` field; overlapping URLs merge symbol lists). With no symbols it calls `/api/v1/news?category=general` and tags from `related`.
+- Finnhub returns unix-second `datetime`; the adapter converts to `publishedAt` Date and re-applies the `from`/`to` window after fetching. When the query omits a window for company news, it defaults to the trailing 7 days (clock injectable for deterministic tests).
+- `createNewsProvider` supports `finnhub` via a `finnhubKey` option; `NEWS_PROVIDER` accepts `mock | newsapi | finnhub`; `services/news-ingest` passes `FINNHUB_KEY` through.
+- `FINNHUB_KEY` is now validated in `EnvSchema` and documented next to the news block in `.env.example`.
+
+Notes:
+
+- `finnhub` requires `FINNHUB_KEY`; symbol tagging combines the queried ticker with Finnhub's native `related` tickers, so general-market news still gets symbol associations.
+
 ## Remaining Slice 6 Work
 
-- Additional news providers (Finnhub, Benzinga) and richer sentiment.
+- Additional news providers (Benzinga) and richer sentiment.
 - Additional fundamentals providers and broader metric coverage.
 - Additional macro providers and non-US country mappings.
 - Additional calendar providers (Finnhub, Benzinga) and per-symbol brand calendars.

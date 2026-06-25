@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  FinnhubNewsProvider,
   MockNewsProvider,
   NewsApiProvider,
+  createNewsProvider,
   fetchNormalizedNews,
   normalizeNewsArticle,
 } from './index.js';
+
+const unix = (iso: string): number => Math.floor(Date.parse(iso) / 1000);
 
 const jsonResponse = (body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -91,5 +95,102 @@ describe('news provider normalization', () => {
     const appleOnly = articles.find((a) => a.url === 'https://example.com/news/aapl-only');
     expect(appleOnly?.symbols).toEqual(['AAPL']);
     expect(appleOnly?.body).toBe('Desk chatter centered on services margins.');
+  });
+
+  test('Finnhub provider fetches company news per symbol and parses unix timestamps', async () => {
+    const calls: Array<{ path: string; symbol: string | null; from: string | null; token: string | null }> =
+      [];
+    const fetcher = async (input: URL | RequestInfo): Promise<Response> => {
+      const url = new URL(String(input));
+      calls.push({
+        path: url.pathname,
+        symbol: url.searchParams.get('symbol'),
+        from: url.searchParams.get('from'),
+        token: url.searchParams.get('token'),
+      });
+      const symbol = url.searchParams.get('symbol');
+      if (symbol === 'AAPL') {
+        return jsonResponse([
+          {
+            datetime: unix('2026-06-24T08:00:00.000Z'),
+            headline: 'Apple ships new chip',
+            summary: 'Margins in focus.',
+            source: 'Finnhub Wire',
+            url: 'https://example.com/finnhub/aapl',
+            related: 'AAPL',
+          },
+          {
+            datetime: unix('2026-06-24T10:00:00.000Z'),
+            headline: 'Suppliers rally on demand',
+            summary: '',
+            source: 'Finnhub Wire',
+            url: 'https://example.com/finnhub/shared',
+            related: 'AAPL,MSFT',
+          },
+        ]);
+      }
+      if (symbol === 'MSFT') {
+        return jsonResponse([
+          {
+            datetime: unix('2026-06-24T10:00:00.000Z'),
+            headline: 'Suppliers rally on demand',
+            source: 'Finnhub Wire',
+            url: 'https://example.com/finnhub/shared',
+            related: 'MSFT',
+          },
+        ]);
+      }
+      return jsonResponse([]);
+    };
+
+    const provider = new FinnhubNewsProvider('demo-key', 'https://finnhub.example.test', fetcher);
+    const articles = await fetchNormalizedNews(provider, {
+      symbols: ['aapl', 'MSFT'],
+      from: '2026-06-24T00:00:00.000Z',
+      to: '2026-06-25T00:00:00.000Z',
+      limit: 10,
+    });
+
+    expect(calls.map((c) => c.path)).toEqual(['/api/v1/company-news', '/api/v1/company-news']);
+    expect(calls[0]?.symbol).toBe('AAPL');
+    expect(calls[0]?.from).toBe('2026-06-24');
+    expect(calls[0]?.token).toBe('demo-key');
+    const shared = articles.find((a) => a.url === 'https://example.com/finnhub/shared');
+    expect(shared?.symbols).toEqual(['AAPL', 'MSFT']);
+    const apple = articles.find((a) => a.url === 'https://example.com/finnhub/aapl');
+    expect(apple?.body).toBe('Margins in focus.');
+    expect(apple?.source).toBe('Finnhub Wire');
+  });
+
+  test('Finnhub provider falls back to general market news when no symbols are given', async () => {
+    const paths: string[] = [];
+    const fetcher = async (input: URL | RequestInfo): Promise<Response> => {
+      const url = new URL(String(input));
+      paths.push(`${url.pathname}?category=${url.searchParams.get('category') ?? ''}`);
+      return jsonResponse([
+        {
+          datetime: unix('2026-06-24T12:00:00.000Z'),
+          headline: 'Markets steady ahead of data',
+          summary: 'Breadth improved across sectors.',
+          source: 'Finnhub',
+          url: 'https://example.com/finnhub/general',
+          related: 'SPY,QQQ',
+        },
+      ]);
+    };
+
+    const provider = new FinnhubNewsProvider('demo-key', 'https://finnhub.example.test', fetcher);
+    const articles = await fetchNormalizedNews(provider, { limit: 10 });
+
+    expect(paths).toEqual(['/api/v1/news?category=general']);
+    expect(articles).toHaveLength(1);
+    expect(articles[0]?.symbols).toEqual(['QQQ', 'SPY']);
+    expect(articles[0]?.source).toBe('Finnhub');
+  });
+
+  test('createNewsProvider builds the finnhub provider', () => {
+    const provider = createNewsProvider('finnhub', { finnhubKey: 'demo-key' });
+    expect(provider.id).toBe('finnhub');
+    expect(provider.displayName).toBe('Finnhub');
   });
 });
