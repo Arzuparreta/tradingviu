@@ -141,6 +141,40 @@ export interface ChartPatternMatch {
   confidence: number;
 }
 
+export interface VolumeProfileRow {
+  index: number;
+  priceLow: number;
+  priceHigh: number;
+  priceMid: number;
+  volume: number;
+  buyVolume: number;
+  sellVolume: number;
+  delta: number;
+  isPoc: boolean;
+  inValueArea: boolean;
+}
+
+export interface VolumeProfile {
+  bins: number;
+  binSize: number;
+  priceLow: number;
+  priceHigh: number;
+  barCount: number;
+  startTime: number;
+  endTime: number;
+  totalVolume: number;
+  buyVolume: number;
+  sellVolume: number;
+  delta: number;
+  poc: number;
+  pocIndex: number;
+  vah: number;
+  val: number;
+  valueAreaVolume: number;
+  valueAreaPct: number;
+  rows: VolumeProfileRow[];
+}
+
 export interface Watchlist {
   id: string;
   name: string;

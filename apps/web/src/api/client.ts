@@ -8,6 +8,7 @@ import type {
   PatternMatch,
   ChartPatternCatalogEntry,
   ChartPatternMatch,
+  VolumeProfile,
   LayoutRow,
   Plan,
   Symbol,
@@ -202,8 +203,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, ...(ids ? { ids } : {}) }),
     }),
-  chartPatterns: () =>
-    request<{ patterns: ChartPatternCatalogEntry[] }>('/api/chart-patterns'),
+  chartPatterns: () => request<{ patterns: ChartPatternCatalogEntry[] }>('/api/chart-patterns'),
   scanChartPatterns: (symbol: string, interval = '1h', limit = 500, ids?: string[]) =>
     request<{
       symbol: { id: string; ticker: string; exchange: string };
@@ -213,6 +213,16 @@ export const api = {
     }>('/api/chart-patterns/scan', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, ...(ids ? { ids } : {}) }),
+    }),
+  volumeProfile: (symbol: string, interval = '1h', limit = 500, bins = 24) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      profile: VolumeProfile;
+    }>('/api/volume-profile', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, interval, limit, bins }),
     }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>

@@ -14,6 +14,7 @@ import {
 } from '@tv/chart-engine';
 import type {
   IChartApi,
+  IPriceLine,
   ISeriesApi,
   ISeriesMarkersPluginApi,
   SeriesMarker,
@@ -29,6 +30,14 @@ type Interval = (typeof INTERVALS)[number];
 interface IndicatorConfig {
   id: string;
   params: Record<string, number>;
+}
+
+/** Compact volume label: 1234567 → "1.23M", 4500 → "4.5K". */
+function formatVol(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
+  return v.toFixed(v < 1 ? 2 : 0);
 }
 
 export function ChartPage() {
@@ -49,6 +58,7 @@ export function ChartPage() {
   >(new Map());
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const chartPatternSeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
+  const volumeProfileLinesRef = useRef<IPriceLine[]>([]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, tenant } = useAuth();
@@ -58,6 +68,7 @@ export function ChartPage() {
   const [activeIndicators, setActiveIndicators] = useState<IndicatorConfig[]>([]);
   const [showPatterns, setShowPatterns] = useState(false);
   const [showChartPatterns, setShowChartPatterns] = useState(false);
+  const [showVolumeProfile, setShowVolumeProfile] = useState(false);
   const [destination, setDestination] = useState<'paper' | 'broker'>('paper');
   const [paperAccountId, setPaperAccountId] = useState('');
   const [brokerConnectionId, setBrokerConnectionId] = useState('');
@@ -97,6 +108,13 @@ export function ChartPage() {
     queryKey: ['chart-patterns', symbolId, interval],
     queryFn: () => api.scanChartPatterns(symbolId!, interval, 500),
     enabled: !!symbolId && showChartPatterns,
+    staleTime: 30_000,
+  });
+
+  const volumeProfileQ = useQuery({
+    queryKey: ['volume-profile', symbolId, interval],
+    queryFn: () => api.volumeProfile(symbolId!, interval, 500, 24),
+    enabled: !!symbolId && showVolumeProfile,
     staleTime: 30_000,
   });
 
@@ -199,6 +217,7 @@ export function ChartPage() {
       volumeRef.current = null;
       markersRef.current = null;
       chartPatternSeriesRef.current = [];
+      volumeProfileLinesRef.current = [];
       indicatorSeriesRef.current.clear();
       indicatorBandSeriesRef.current.clear();
     };
@@ -209,8 +228,10 @@ export function ChartPage() {
     if (candleRef.current) {
       chartRef.current.removeSeries(candleRef.current);
       candleRef.current = null;
-      // The markers plugin was attached to the series we just removed.
+      // The markers plugin and price lines were attached to the series we
+      // just removed; their handles are now stale.
       markersRef.current = null;
+      volumeProfileLinesRef.current = [];
     }
     if (volumeRef.current) {
       chartRef.current.removeSeries(volumeRef.current);
@@ -317,6 +338,51 @@ export function ChartPage() {
       chartPatternSeriesRef.current.push(line);
     }
   }, [chartPatternsQ.data, showChartPatterns, historyQ.data]);
+
+  // Volume profile: overlay the Point of Control and value-area bounds as
+  // horizontal price lines on the candle series. Rebuilt whenever the data,
+  // the toggle, or the candles change (the candle series owns the lines).
+  useEffect(() => {
+    const candle = candleRef.current;
+    if (!candle) return;
+    for (const line of volumeProfileLinesRef.current) {
+      try {
+        candle.removePriceLine(line);
+      } catch {
+        // candle series was recreated; the old handles are already gone
+      }
+    }
+    volumeProfileLinesRef.current = [];
+    if (!showVolumeProfile || !volumeProfileQ.data) return;
+    const p = volumeProfileQ.data.profile;
+    if (p.bins === 0) return;
+    volumeProfileLinesRef.current = [
+      candle.createPriceLine({
+        price: p.poc,
+        color: '#f0b90b',
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: 'POC',
+      }),
+      candle.createPriceLine({
+        price: p.vah,
+        color: '#787b86',
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: 'VAH',
+      }),
+      candle.createPriceLine({
+        price: p.val,
+        color: '#787b86',
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: 'VAL',
+      }),
+    ];
+  }, [volumeProfileQ.data, showVolumeProfile, historyQ.data]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -799,6 +865,114 @@ export function ChartPage() {
             </div>
           </section>
         )}
+
+        {showVolumeProfile && (
+          <section className="col" style={{ gap: 8 }}>
+            <div className="row">
+              <div style={{ fontWeight: 600 }}>Volume Profile</div>
+              <span className="grow" />
+              {volumeProfileQ.isFetching && <span className="muted small">computing…</span>}
+            </div>
+            {volumeProfileQ.data && volumeProfileQ.data.profile.bins === 0 && (
+              <div className="muted small">No volume in the last 500 bars.</div>
+            )}
+            {volumeProfileQ.data &&
+              volumeProfileQ.data.profile.bins > 0 &&
+              (() => {
+                const p = volumeProfileQ.data.profile;
+                const rowH = 9;
+                const maxBarPx = 150;
+                const maxVol = Math.max(...p.rows.map((r) => r.volume), 1);
+                const display = p.rows.slice().reverse();
+                const height = display.length * rowH;
+                return (
+                  <>
+                    <div className="col" style={{ gap: 2 }}>
+                      <div className="row small">
+                        <span className="muted">POC</span>
+                        <span className="grow" />
+                        <span className="mono" style={{ color: '#f0b90b' }}>
+                          {formatPrice(p.poc)}
+                        </span>
+                      </div>
+                      <div className="row small">
+                        <span className="muted">Value area</span>
+                        <span className="grow" />
+                        <span className="mono">
+                          {formatPrice(p.val)} – {formatPrice(p.vah)}
+                        </span>
+                      </div>
+                      <div className="row small">
+                        <span className="muted">Total vol</span>
+                        <span className="grow" />
+                        <span className="mono">{formatVol(p.totalVolume)}</span>
+                      </div>
+                      <div className="row small">
+                        <span className="muted">Delta</span>
+                        <span className="grow" />
+                        <span className={p.delta >= 0 ? 'up mono' : 'down mono'}>
+                          {p.delta >= 0 ? '+' : '-'}
+                          {formatVol(Math.abs(p.delta))}
+                        </span>
+                      </div>
+                    </div>
+                    <svg
+                      width="100%"
+                      height={height}
+                      viewBox={`0 0 200 ${height}`}
+                      preserveAspectRatio="none"
+                      style={{ display: 'block' }}
+                    >
+                      {display.map((r, di) => {
+                        const y = di * rowH;
+                        const sellW = (r.sellVolume / maxVol) * maxBarPx;
+                        const buyW = (r.buyVolume / maxVol) * maxBarPx;
+                        return (
+                          <g key={r.index}>
+                            {r.inValueArea && (
+                              <rect
+                                x={0}
+                                y={y}
+                                width={200}
+                                height={rowH}
+                                fill="rgba(120,123,134,0.12)"
+                              />
+                            )}
+                            <rect
+                              x={0}
+                              y={y + 0.5}
+                              width={sellW}
+                              height={rowH - 1}
+                              fill="#ef5350"
+                              opacity={r.isPoc ? 1 : 0.75}
+                            />
+                            <rect
+                              x={sellW}
+                              y={y + 0.5}
+                              width={buyW}
+                              height={rowH - 1}
+                              fill="#26a69a"
+                              opacity={r.isPoc ? 1 : 0.75}
+                            />
+                            {r.isPoc && (
+                              <rect x={0} y={y} width={2.5} height={rowH} fill="#f0b90b" />
+                            )}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                    <div className="row muted small">
+                      <span>{formatVol(p.buyVolume)} buy</span>
+                      <span className="grow" />
+                      <span>
+                        {p.bins} bins · {(p.valueAreaPct * 100).toFixed(0)}% VA
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
+          </section>
+        )}
       </aside>
       <div className="chart-toolbar" style={{ flexWrap: 'wrap', gap: 8, gridColumn: 1 }}>
         <select
@@ -874,6 +1048,16 @@ export function ChartPage() {
         </button>
         {showChartPatterns && chartPatternsQ.isFetching && (
           <span className="muted small">scanning…</span>
+        )}
+        <button
+          className={showVolumeProfile ? 'primary' : ''}
+          onClick={() => setShowVolumeProfile((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          Volume Profile
+        </button>
+        {showVolumeProfile && volumeProfileQ.isFetching && (
+          <span className="muted small">computing…</span>
         )}
         <span className="grow" />
         {historyQ.data && (

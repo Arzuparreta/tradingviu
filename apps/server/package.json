@@ -29,6 +29,7 @@
     "@tv/quotas": "workspace:*",
     "@tv/screener-engine": "workspace:*",
     "@tv/ta-lib": "workspace:*",
+    "@tv/volume-profile": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.6.14",
     "libsodium-wrappers": "^0.8.4",

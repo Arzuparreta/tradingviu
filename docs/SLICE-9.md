@@ -98,9 +98,55 @@ Notes:
 - Detection requires no DB migration and no new env vars — it reads the same
   historical bars the chart already fetches.
 
+## 9c — Volume Profile
+
+Status: done.
+
+Delivered:
+
+- `packages/volume-profile`: a pure, deterministic volume-at-price engine over
+  OHLCV bars. Like the pattern engines, detection is a function of the bar array
+  and the bin/value-area settings only — no time, randomness, or I/O — so results
+  are reproducible and unit-testable.
+- **Volume distribution model:** the price range `[min low, max high]` is split
+  into `bins` horizontal rows; each bar's volume is spread across the rows its
+  `[low, high]` range overlaps, **proportional to the overlap** (a tall bar seeds
+  many rows, a doji one). Volume is split into a buy/sell estimate from where the
+  bar **closed inside its own range** (`buyFraction` — close at the high → all
+  buying, at the low → all selling, flat bar leans on open→close direction), so a
+  per-row and aggregate `delta = buy − sell` falls out without any tick/bid-ask
+  tape. Degenerate inputs (single flat price, zero-volume bars) collapse safely.
+- **Profile statistics:** total / buy / sell volume and delta; the **Point of
+  Control** (POC — highest-volume row); and the **Value Area** (VAH/VAL — the
+  contiguous band of rows around the POC holding `valueAreaPct`, default 70%, of
+  total volume, grown one row at a time toward whichever neighbour carries more
+  volume, ties expanding up). Each row reports its price bounds, buy/sell/total
+  volume, delta, and `isPoc` / `inValueArea` flags.
+- `computeVolumeProfile(bars, { bins?, valueAreaPct? })` returning a fully
+  Zod-described `VolumeProfile`, plus `buyFraction` / `overlap` helpers.
+- `POST /api/volume-profile` (`{ symbol, interval, limit, bins?, valueAreaPct? }`)
+  in `apps/server/src/routes/volume-profile.ts`. It fetches bars through the same
+  CCXT provider path as `/api/chart-patterns/scan`, runs `computeVolumeProfile`,
+  and returns the profile.
+- A **Volume Profile** toggle on `ChartPage` that overlays the POC (solid amber),
+  VAH and VAL (dashed grey) as horizontal price lines on the candle series, plus a
+  side panel with a stacked buy/sell SVG histogram (value-area rows tinted, POC row
+  flagged) and POC / value-area / total-volume / delta stats.
+- Deterministic `bun test` suite (`packages/volume-profile/src/volume-profile.test.ts`)
+  covering the buy/sell split, volume conservation, POC selection, value-area growth,
+  the degenerate single-price case, schema validity, and run-to-run determinism.
+
+Notes:
+
+- The buy/sell split is an OHLCV-only estimate; with no real tape it is a heuristic,
+  not exchange-reported aggressor volume. It is consistent and deterministic, which
+  is what the delta column is for.
+- Computation requires no DB migration and no new env vars — it reads the same
+  historical bars the chart already fetches.
+
 ## Remaining Slice 9 Work
 
-- Volume Footprint (candle-by-candle volume-at-price distribution).
+- Per-candle footprint cells (bid/ask split) once trade-level data is available.
 - TPO (Time Price Opportunity) profiles.
 - Bar Replay across multi-chart layouts.
 - Ichimoku cloud rendering (the indicator math already exists in `@tv/ta-lib`).

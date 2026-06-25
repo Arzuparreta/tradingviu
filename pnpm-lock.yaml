@@ -74,6 +74,9 @@ importers:
       '@tv/ta-lib':
         specifier: workspace:*
         version: link:../../packages/ta-lib
+      '@tv/volume-profile':
+        specifier: workspace:*
+        version: link:../../packages/volume-profile
       drizzle-orm:
         specifier: ^0.36.4
         version: 0.36.4(@types/react@18.3.31)(bun-types@1.3.14)(postgres@3.4.9)(react@18.3.1)
@@ -551,6 +554,22 @@ importers:
         version: 5.9.3
 
   packages/ta-lib:
+    dependencies:
+      '@tv/data-types':
+        specifier: workspace:*
+        version: link:../data-types
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/bun':
+        specifier: ^1.1.14
+        version: 1.3.14
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/volume-profile:
     dependencies:
       '@tv/data-types':
         specifier: workspace:*
