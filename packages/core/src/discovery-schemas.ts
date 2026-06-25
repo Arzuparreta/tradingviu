@@ -24,7 +24,19 @@ export const ScreenerSortFieldSchema = z.enum([
 ]);
 export type ScreenerSortField = z.infer<typeof ScreenerSortFieldSchema>;
 
-const numericFilter = z.coerce.number().finite().optional();
+/**
+ * A single numeric screener filter: a metric `key` (from the screener metric
+ * catalog) constrained by an optional `min` and/or `max`. Replaces the fixed
+ * per-metric `<metric>Min/<metric>Max` fields so the screener scales to the
+ * full catalog (and beyond, as metadata-backed metrics land) without a schema
+ * change per metric.
+ */
+export const ScreenerFilterSchema = z.object({
+  key: z.string().trim().min(1).max(60),
+  min: z.coerce.number().finite().optional(),
+  max: z.coerce.number().finite().optional(),
+});
+export type ScreenerFilter = z.infer<typeof ScreenerFilterSchema>;
 
 export const ScreenerQuerySchema = z.object({
   q: z.string().trim().min(1).max(160).optional(),
@@ -32,30 +44,11 @@ export const ScreenerQuerySchema = z.object({
   exchange: z.string().trim().min(1).max(40).optional(),
   country: z.string().trim().min(1).max(80).optional(),
   sector: z.string().trim().min(1).max(120).optional(),
+  industry: z.string().trim().min(1).max(120).optional(),
   active: z.coerce.boolean().default(true),
-  marketCapMin: numericFilter,
-  marketCapMax: numericFilter,
-  peRatioMin: numericFilter,
-  peRatioMax: numericFilter,
-  epsMin: numericFilter,
-  epsMax: numericFilter,
-  revenueMin: numericFilter,
-  revenueMax: numericFilter,
-  dividendYieldMin: numericFilter,
-  dividendYieldMax: numericFilter,
-  roeMin: numericFilter,
-  roeMax: numericFilter,
-  revenueGrowthMin: numericFilter,
-  revenueGrowthMax: numericFilter,
-  earningsGrowthMin: numericFilter,
-  earningsGrowthMax: numericFilter,
-  betaMin: numericFilter,
-  betaMax: numericFilter,
-  '52WeekHighMin': numericFilter,
-  '52WeekHighMax': numericFilter,
-  '52WeekLowMin': numericFilter,
-  '52WeekLowMax': numericFilter,
-  sort: ScreenerSortFieldSchema.default('marketCap'),
+  filters: z.array(ScreenerFilterSchema).max(60).default([]),
+  /** Catalog metric key, or one of ticker/name/exchange/assetClass. */
+  sort: z.string().trim().min(1).max(60).default('marketCap'),
   direction: z.enum(['asc', 'desc']).default('desc'),
   limit: z.coerce.number().int().positive().max(500).default(100),
 });

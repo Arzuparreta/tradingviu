@@ -8,6 +8,9 @@ import type {
   FundamentalSnapshot,
   MacroSeriesObservation,
   NewsArticle,
+  ScreenerFilter,
+  ScreenerMetricDef,
+  ScreenerMetricFormat,
   ScreenerQuery,
   ScreenerResult,
   YieldCurvePoint,
@@ -55,7 +58,31 @@ const numeric = (value: string): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-function ScreenerRow({ result }: { result: ScreenerResult }) {
+const formatScreenerMetric = (value: number | undefined, format: ScreenerMetricFormat): string => {
+  if (value === undefined) return '—';
+  switch (format) {
+    case 'percent':
+      return `${(value * 100).toFixed(1)}%`;
+    case 'compact':
+      return new Intl.NumberFormat(undefined, {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(value);
+    case 'price':
+    case 'ratio':
+      return value.toFixed(2);
+    case 'number':
+      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  }
+};
+
+function ScreenerRow({
+  result,
+  columns,
+}: {
+  result: ScreenerResult;
+  columns: ScreenerMetricDef[];
+}) {
   return (
     <tr>
       <td>
@@ -66,10 +93,11 @@ function ScreenerRow({ result }: { result: ScreenerResult }) {
         {result.name}
         <div className="muted small">{result.sector ?? result.assetClass}</div>
       </td>
-      <td className="mono">{metric(result.metrics.marketCap, 'compact')}</td>
-      <td className="mono">{metric(result.metrics.peRatio)}</td>
-      <td className="mono">{metric(result.metrics.dividendYield, 'percent')}</td>
-      <td className="mono">{metric(result.metrics.revenueGrowth, 'percent')}</td>
+      {columns.map((col) => (
+        <td key={col.key} className="mono">
+          {formatScreenerMetric(result.metrics[col.key], col.format)}
+        </td>
+      ))}
     </tr>
   );
 }
@@ -288,29 +316,88 @@ export function DiscoveryPage() {
   const [screenerText, setScreenerText] = useState('');
   const [assetClass, setAssetClass] = useState('stock');
   const [sector, setSector] = useState('');
-  const [marketCapMin, setMarketCapMin] = useState('1000000000');
-  const [peRatioMax, setPeRatioMax] = useState('40');
-  const [dividendYieldMin, setDividendYieldMin] = useState('');
+  const [filters, setFilters] = useState<ScreenerFilter[]>([
+    { key: 'marketCap', min: 1_000_000_000 },
+    { key: 'peRatio', max: 40 },
+  ]);
+  const [columns, setColumns] = useState<string[]>([
+    'marketCap',
+    'peRatio',
+    'dividendYield',
+    'revenueGrowth',
+    'roe',
+    'priceToBook',
+  ]);
+  const [sort, setSort] = useState('marketCap');
+  const [direction, setDirection] = useState<'asc' | 'desc'>('desc');
+  const [autoRefreshMs, setAutoRefreshMs] = useState(0);
   const [presetName, setPresetName] = useState('Large cap quality');
+
+  const metricsQ = useQuery({
+    queryKey: ['screener-metrics'],
+    queryFn: () => api.screenerMetrics(),
+    staleTime: Infinity,
+  });
+  const catalog = useMemo(() => metricsQ.data?.metrics ?? [], [metricsQ.data]);
+  const catalogByKey = useMemo(() => new Map(catalog.map((m) => [m.key, m])), [catalog]);
+  const catalogGroups = useMemo(() => {
+    const g = new Map<string, ScreenerMetricDef[]>();
+    for (const m of catalog) {
+      const list = g.get(m.group);
+      if (list) list.push(m);
+      else g.set(m.group, [m]);
+    }
+    return [...g.entries()];
+  }, [catalog]);
+  const columnDefs = useMemo(
+    () => columns.map((k) => catalogByKey.get(k)).filter((d): d is ScreenerMetricDef => !!d),
+    [columns, catalogByKey],
+  );
 
   const range = useMemo(() => ({ from, to }), [from, to]);
   const screenerParams = useMemo((): ScreenerQuery => {
     const params: ScreenerQuery = {
       assetClass,
-      sort: 'marketCap',
-      direction: 'desc',
-      limit: 50,
+      sort,
+      direction,
+      limit: 200,
+      filters: filters.filter((f) => f.min !== undefined || f.max !== undefined),
     };
     if (screenerText.trim()) params.q = screenerText.trim();
     if (sector.trim()) params.sector = sector.trim();
-    const parsedMarketCapMin = numeric(marketCapMin);
-    const parsedPeRatioMax = numeric(peRatioMax);
-    const parsedDividendYieldMin = numeric(dividendYieldMin);
-    if (parsedMarketCapMin !== undefined) params.marketCapMin = parsedMarketCapMin;
-    if (parsedPeRatioMax !== undefined) params.peRatioMax = parsedPeRatioMax;
-    if (parsedDividendYieldMin !== undefined) params.dividendYieldMin = parsedDividendYieldMin;
     return params;
-  }, [assetClass, dividendYieldMin, marketCapMin, peRatioMax, screenerText, sector]);
+  }, [assetClass, sort, direction, filters, screenerText, sector]);
+
+  const addFilter = () => {
+    const used = new Set(filters.map((f) => f.key));
+    const next = catalog.find((m) => !used.has(m.key))?.key ?? 'marketCap';
+    setFilters((f) => [...f, { key: next }]);
+  };
+  const updateFilter = (
+    i: number,
+    patch: { key?: string; min?: number | undefined; max?: number | undefined },
+  ) =>
+    setFilters((f) =>
+      f.map((x, j) => {
+        if (j !== i) return x;
+        const min = 'min' in patch ? patch.min : x.min;
+        const max = 'max' in patch ? patch.max : x.max;
+        const next: ScreenerFilter = { key: patch.key ?? x.key };
+        if (min !== undefined) next.min = min;
+        if (max !== undefined) next.max = max;
+        return next;
+      }),
+    );
+  const removeFilter = (i: number) => setFilters((f) => f.filter((_, j) => j !== i));
+  const toggleColumn = (key: string) =>
+    setColumns((c) => (c.includes(key) ? c.filter((k) => k !== key) : [...c, key]));
+  const sortByColumn = (key: string) => {
+    if (sort === key) setDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSort(key);
+      setDirection('desc');
+    }
+  };
 
   const newsQ = useQuery({
     queryKey: ['news', symbol, query, range],
@@ -349,6 +436,7 @@ export function DiscoveryPage() {
   const screenerQ = useQuery({
     queryKey: ['screener', screenerParams],
     queryFn: () => api.screener(screenerParams),
+    refetchInterval: autoRefreshMs || false,
   });
   const presetsQ = useQuery({
     queryKey: ['screener-presets', assetClass],
@@ -372,9 +460,9 @@ export function DiscoveryPage() {
     setScreenerText(next.q ?? '');
     setAssetClass(next.assetClass ?? 'stock');
     setSector(next.sector ?? '');
-    setMarketCapMin(next.marketCapMin === undefined ? '' : String(next.marketCapMin));
-    setPeRatioMax(next.peRatioMax === undefined ? '' : String(next.peRatioMax));
-    setDividendYieldMin(next.dividendYieldMin === undefined ? '' : String(next.dividendYieldMin));
+    setFilters(next.filters ?? []);
+    if (next.sort) setSort(next.sort);
+    if (next.direction) setDirection(next.direction);
   };
 
   return (
@@ -433,12 +521,27 @@ export function DiscoveryPage() {
           <div>
             <h2>Screener</h2>
             <p className="muted small">
-              Symbols filtered by reference fields and metadata metrics.
+              {catalog.length} metrics across {catalogGroups.length} groups · column- and
+              metadata-backed filters.
             </p>
           </div>
           <span className="grow" />
-          <span className="muted small">{screenerQ.data?.results.length ?? 0}</span>
+          <label className="row small" style={{ gap: 6 }}>
+            <span className="muted">Auto-refresh</span>
+            <select
+              value={autoRefreshMs}
+              onChange={(e) => setAutoRefreshMs(Number(e.target.value))}
+              style={{ width: 80 }}
+            >
+              <option value={0}>Off</option>
+              <option value={5000}>5s</option>
+              <option value={15000}>15s</option>
+              <option value={30000}>30s</option>
+            </select>
+          </label>
+          <span className="muted small mono">{screenerQ.data?.results.length ?? 0}</span>
         </div>
+
         <div className="discovery-screener-filters">
           <div>
             <label>Search</label>
@@ -461,21 +564,99 @@ export function DiscoveryPage() {
             <label>Sector</label>
             <input value={sector} onChange={(e) => setSector(e.target.value)} />
           </div>
-          <div>
-            <label>Min market cap</label>
-            <input value={marketCapMin} onChange={(e) => setMarketCapMin(e.target.value)} />
+        </div>
+
+        <div className="discovery-filter-builder">
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <strong className="small">Metric filters</strong>
+            <span className="grow" />
+            <button type="button" className="ghost" onClick={addFilter} disabled={catalog.length === 0}>
+              + Add filter
+            </button>
           </div>
-          <div>
-            <label>Max P/E</label>
-            <input value={peRatioMax} onChange={(e) => setPeRatioMax(e.target.value)} />
-          </div>
-          <div>
-            <label>Min dividend yield</label>
-            <input
-              value={dividendYieldMin}
-              onChange={(e) => setDividendYieldMin(e.target.value)}
-              placeholder="0.01"
-            />
+          {filters.length === 0 && (
+            <div className="muted small">No metric filters — add one to narrow results.</div>
+          )}
+          {filters.map((f, i) => (
+            <div key={i} className="row discovery-filter-row" style={{ gap: 6 }}>
+              <select
+                value={f.key}
+                onChange={(e) => updateFilter(i, { key: e.target.value })}
+                style={{ flex: 1, minWidth: 0 }}
+              >
+                {catalogGroups.map(([groupName, metrics]) => (
+                  <optgroup key={groupName} label={groupName}>
+                    {metrics.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <input
+                aria-label="min"
+                placeholder="min"
+                value={f.min === undefined ? '' : String(f.min)}
+                onChange={(e) => updateFilter(i, { min: numeric(e.target.value) })}
+                style={{ width: 90 }}
+              />
+              <input
+                aria-label="max"
+                placeholder="max"
+                value={f.max === undefined ? '' : String(f.max)}
+                onChange={(e) => updateFilter(i, { max: numeric(e.target.value) })}
+                style={{ width: 90 }}
+              />
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => removeFilter(i)}
+                aria-label="Remove filter"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="discovery-filter-builder">
+          <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <strong className="small">Columns</strong>
+            {columnDefs.map((col) => (
+              <span key={col.key} className="discovery-preset-pill">
+                {col.label}
+                <button
+                  type="button"
+                  className="ghost discovery-preset-delete"
+                  onClick={() => toggleColumn(col.key)}
+                  aria-label={`Remove ${col.label} column`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) toggleColumn(e.target.value);
+                e.target.value = '';
+              }}
+              style={{ width: 150 }}
+            >
+              <option value="">+ Add column…</option>
+              {catalogGroups.map(([groupName, metrics]) => (
+                <optgroup key={groupName} label={groupName}>
+                  {metrics
+                    .filter((m) => !columns.includes(m.key))
+                    .map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -524,15 +705,23 @@ export function DiscoveryPage() {
                 <tr>
                   <th>Symbol</th>
                   <th>Name</th>
-                  <th>Market cap</th>
-                  <th>P/E</th>
-                  <th>Yield</th>
-                  <th>Rev growth</th>
+                  {columnDefs.map((col) => (
+                    <th key={col.key}>
+                      <button
+                        type="button"
+                        className="ghost discovery-th-sort"
+                        onClick={() => sortByColumn(col.key)}
+                      >
+                        {col.label}
+                        {sort === col.key ? (direction === 'asc' ? ' ▲' : ' ▼') : ''}
+                      </button>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {screenerQ.data?.results.map((result) => (
-                  <ScreenerRow key={result.id} result={result} />
+                  <ScreenerRow key={result.id} result={result} columns={columnDefs} />
                 ))}
               </tbody>
             </table>

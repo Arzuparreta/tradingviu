@@ -11,11 +11,18 @@ import {
   type TenantContext,
 } from '@tv/core';
 import { exchanges, fundamentalSnapshots, screenerPresets, symbols } from '@tv/db/schema';
-import { buildScreenerFilters, maybeWhere, readScreenerMetrics, sortBy } from '@tv/screener-engine';
+import {
+  buildScreenerFilters,
+  maybeWhere,
+  readScreenerMetrics,
+  screenerMetricCatalog,
+  screenerOrderBy,
+} from '@tv/screener-engine';
 
 export const screenerRoutes = new Hono()
-  .get('/screener', zValidator('query', ScreenerQuerySchema), async (c) => {
-    const q = c.req.valid('query');
+  .get('/screener/metrics', (c) => c.json({ metrics: screenerMetricCatalog }))
+  .post('/screener', zValidator('json', ScreenerQuerySchema), async (c) => {
+    const q = c.req.valid('json');
     const db = c.get('db');
 
     const rows = await db
@@ -40,6 +47,7 @@ export const screenerRoutes = new Hono()
         beta: fundamentalSnapshots.beta,
         '52WeekHigh': fundamentalSnapshots.week52High,
         '52WeekLow': fundamentalSnapshots.week52Low,
+        metadata: fundamentalSnapshots.metadata,
         exchange: exchanges.code,
       })
       .from(symbols)
@@ -53,7 +61,7 @@ export const screenerRoutes = new Hono()
         ),
       )
       .where(maybeWhere(buildScreenerFilters(q)))
-      .orderBy(sortBy(q.sort, q.direction), symbols.ticker)
+      .orderBy(screenerOrderBy(q.sort, q.direction), symbols.ticker)
       .limit(q.limit);
 
     return c.json({
@@ -70,22 +78,27 @@ export const screenerRoutes = new Hono()
           beta,
           '52WeekHigh': week52High,
           '52WeekLow': week52Low,
+          metadata,
           ...row
         }) => ({
           ...row,
-          metrics: readScreenerMetrics({
-            marketCap,
-            peRatio,
-            eps,
-            revenue,
-            dividendYield,
-            roe,
-            revenueGrowth,
-            earningsGrowth,
-            beta,
-            '52WeekHigh': week52High,
-            '52WeekLow': week52Low,
-          }),
+          // Column-backed metrics overlaid by metadata-backed ones.
+          metrics: {
+            ...readScreenerMetrics(metadata),
+            ...readScreenerMetrics({
+              marketCap,
+              peRatio,
+              eps,
+              revenue,
+              dividendYield,
+              roe,
+              revenueGrowth,
+              earningsGrowth,
+              beta,
+              '52WeekHigh': week52High,
+              '52WeekLow': week52Low,
+            }),
+          },
         }),
       ),
     });

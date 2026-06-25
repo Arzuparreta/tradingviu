@@ -459,12 +459,37 @@ label {
 }
 .discovery-screener-filters {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.7fr) minmax(140px, 1fr) repeat(
-      3,
-      minmax(120px, 0.85fr)
-    );
+  grid-template-columns: minmax(180px, 1.6fr) minmax(110px, 0.7fr) minmax(140px, 1fr);
   gap: var(--gap);
   margin-bottom: var(--gap);
+}
+.discovery-filter-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  margin-bottom: var(--gap);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.discovery-filter-row {
+  align-items: center;
+}
+.discovery-filter-row select,
+.discovery-filter-row input {
+  height: 30px;
+}
+.discovery-th-sort {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.discovery-th-sort:hover {
+  color: var(--text);
 }
 .discovery-preset-row {
   align-items: stretch;

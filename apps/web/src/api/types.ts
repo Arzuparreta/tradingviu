@@ -539,20 +539,21 @@ export interface MacroSeriesObservation {
   fetchedAt: string;
 }
 
-export type ScreenerMetric =
-  | 'marketCap'
-  | 'peRatio'
-  | 'eps'
-  | 'revenue'
-  | 'dividendYield'
-  | 'roe'
-  | 'revenueGrowth'
-  | 'earningsGrowth'
-  | 'beta'
-  | '52WeekHigh'
-  | '52WeekLow';
+export type ScreenerMetricFormat = 'compact' | 'price' | 'ratio' | 'percent' | 'number';
 
-export type ScreenerSortField = 'ticker' | 'name' | 'exchange' | 'assetClass' | ScreenerMetric;
+export interface ScreenerMetricDef {
+  key: string;
+  label: string;
+  group: string;
+  format: ScreenerMetricFormat;
+  stored: boolean;
+}
+
+export interface ScreenerFilter {
+  key: string;
+  min?: number;
+  max?: number;
+}
 
 export interface ScreenerQuery {
   q?: string;
@@ -560,30 +561,11 @@ export interface ScreenerQuery {
   exchange?: string;
   country?: string;
   sector?: string;
+  industry?: string;
   active?: boolean;
-  marketCapMin?: number;
-  marketCapMax?: number;
-  peRatioMin?: number;
-  peRatioMax?: number;
-  epsMin?: number;
-  epsMax?: number;
-  revenueMin?: number;
-  revenueMax?: number;
-  dividendYieldMin?: number;
-  dividendYieldMax?: number;
-  roeMin?: number;
-  roeMax?: number;
-  revenueGrowthMin?: number;
-  revenueGrowthMax?: number;
-  earningsGrowthMin?: number;
-  earningsGrowthMax?: number;
-  betaMin?: number;
-  betaMax?: number;
-  '52WeekHighMin'?: number;
-  '52WeekHighMax'?: number;
-  '52WeekLowMin'?: number;
-  '52WeekLowMax'?: number;
-  sort?: ScreenerSortField;
+  filters?: ScreenerFilter[];
+  /** Catalog metric key or one of ticker/name/exchange/assetClass. */
+  sort?: string;
   direction?: 'asc' | 'desc';
   limit?: number;
 }
@@ -599,7 +581,7 @@ export interface ScreenerResult {
   industry: string | null;
   active: boolean;
   exchange: string;
-  metrics: Partial<Record<ScreenerMetric, number>>;
+  metrics: Record<string, number>;
 }
 
 export interface ScreenerPreset {

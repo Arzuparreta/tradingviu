@@ -193,9 +193,53 @@ Notes:
 
 - `finnhub` requires `FINNHUB_KEY`; symbol tagging combines the queried ticker with Finnhub's native `related` tickers, so general-market news still gets symbol associations.
 
+## 6l — Screener Expansion (catalog + filter builder + auto-refresh)
+
+Status: done.
+
+Delivered:
+
+- **Metric catalog** in `packages/screener-engine`: a large, grouped catalog
+  (~90 metrics across Valuation, Per-share, Profitability, Income, Growth,
+  Dividends, Balance sheet, Solvency & liquidity, Performance, Technical &
+  volume, and Ownership & sentiment). Eleven metrics are **column-backed** by
+  `fundamental_snapshots` (fast/indexed); every other metric is **metadata-backed**
+  (`fundamental_snapshots.metadata ->> key`), so the catalog scales to hundreds
+  of metrics with no migration or per-metric code.
+- **Generic filters:** the fixed `<metric>Min/<metric>Max` query fields are
+  replaced by a `filters: { key, min?, max? }[]` list (`ScreenerFilterSchema` in
+  `@tv/core`), plus categorical filters (`q`, `assetClass`, `exchange`, `country`,
+  `sector`, `industry`). `metricExpr` resolves a column or a **guarded numeric
+  cast** (`CASE WHEN text ~ '^-?[0-9]…' THEN text::double precision END`) so a bad
+  metadata value can never abort the query, and unknown keys resolve to `null`
+  (never injected into SQL). Sorting works on any catalog key with **NULLS LAST**
+  so symbols missing a metric sink to the bottom.
+- **API:** `/api/screener` is now `POST` (JSON body) to carry the filter list,
+  returning each row's metrics merged from columns + metadata. New
+  `GET /api/screener/metrics` serves the catalog (key, label, group, format,
+  stored) for the client's filter/column builder.
+- **Discovery UI:** a real **filter builder** (add/remove rows, grouped metric
+  picker, min/max), a **column picker** (add/remove any catalog metric as a
+  sortable column), **click-to-sort** headers, and an **auto-refresh** selector
+  (Off / 5s / 15s / 30s). Presets save and re-apply the new query shape.
+- **Seed:** the demo AAPL/MSFT snapshots carry a rich `metadata` block (~65
+  extra metrics each) so the expanded catalog has data to filter and sort on.
+- Engine tests cover catalog integrity (size, unique keys, the eleven stored
+  metrics), metadata coercion + column/metadata merge, `metricExpr` null-safety
+  for unknown keys, generic filter clause counting, and order-by fallback.
+
+Notes:
+
+- The catalog ships ~90 curated metrics today; because metadata-backed metrics
+  need no schema change, the architecture scales to the 400+ TradingView-style
+  filter set as provider data lands — only the catalog list grows.
+- Metadata-backed filters/sorts are not indexed; for very large universes a
+  GIN/expression index on the hot metadata keys would be the next step.
+
 ## Remaining Slice 6 Work
 
 - Additional news providers (Benzinga) and richer sentiment.
-- Additional fundamentals providers and broader metric coverage.
+- Additional fundamentals providers and broader metric coverage (fills more of
+  the metadata-backed catalog with real data).
 - Additional macro providers and non-US country mappings.
 - Additional calendar providers (Finnhub, Benzinga) and per-symbol brand calendars.

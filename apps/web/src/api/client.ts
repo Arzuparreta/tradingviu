@@ -40,6 +40,7 @@ import type {
   ScreenerPreset,
   ScreenerQuery,
   ScreenerResult,
+  ScreenerMetricDef,
   YieldCurvePoint,
   PriceAlertCondition,
   OptionPriceResult,
@@ -510,7 +511,12 @@ export const api = {
   ) =>
     request<{ observations: MacroSeriesObservation[] }>(`/api/macro/series${queryString(params)}`),
   screener: (params: ScreenerQuery = {}) =>
-    request<{ results: ScreenerResult[] }>(`/api/screener${queryString(params)}`),
+    request<{ results: ScreenerResult[] }>('/api/screener', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+  screenerMetrics: () =>
+    request<{ metrics: ScreenerMetricDef[] }>('/api/screener/metrics'),
   screenerPresets: (params: { assetClass?: string } = {}) =>
     request<{ presets: ScreenerPreset[] }>(`/api/screener/presets${queryString(params)}`),
   createScreenerPreset: (body: {
@@ -675,6 +681,7 @@ export type {
   MacroSeriesObservation,
   ScreenerPreset,
   ScreenerResult,
+  ScreenerMetricDef,
   YieldCurvePoint,
   IdeaRow,
 };
