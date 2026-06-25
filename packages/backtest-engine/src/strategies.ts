@@ -134,3 +134,10 @@ export const strategyCatalog: readonly StrategyDef[] = [
 
 export const findStrategy = (type: StrategyType): StrategyDef | undefined =>
   strategyCatalog.find((s) => s.type === type);
+
+/**
+ * Map an arbitrary numeric series (e.g. a Pine plot) to backtest signals by
+ * sign: positive → long (1), negative → short (-1), zero / null → flat (0).
+ */
+export const signalsFromSeries = (data: ReadonlyArray<number | null>): number[] =>
+  data.map((v) => (v == null || !Number.isFinite(v) ? 0 : v > 0 ? 1 : v < 0 ? -1 : 0));

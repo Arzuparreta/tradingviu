@@ -5,8 +5,12 @@ import {
   BacktestSettingsSchema,
   StrategyConfigSchema,
   runBacktest,
+  simulate,
+  signalsFromSeries,
   strategyCatalog,
 } from '@tv/backtest-engine';
+import { compileAndRun, PineRuntimeError } from '@tv/pine-runtime';
+import { PineParseError } from '@tv/pine-parser';
 import { eq } from 'drizzle-orm';
 import { symbols, exchanges } from '@tv/db/schema';
 import { getProvider } from '../services/data.js';
@@ -16,6 +20,17 @@ const BacktestBody = z.object({
   interval: z.enum(['1m', '5m', '15m', '1h', '4h', '1d', '1w']).default('1h'),
   limit: z.coerce.number().int().positive().max(5000).default(1000),
   strategy: StrategyConfigSchema,
+  settings: BacktestSettingsSchema.default({}),
+});
+
+const PineBacktestBody = z.object({
+  symbol: z.string(),
+  interval: z.enum(['1m', '5m', '15m', '1h', '4h', '1d', '1w']).default('1h'),
+  limit: z.coerce.number().int().positive().max(5000).default(1000),
+  source: z.string().min(1).max(20_000),
+  inputs: z.record(z.union([z.number(), z.boolean(), z.string()])).optional(),
+  /** Which plot to read as the position signal; defaults to "signal" or plot 0. */
+  signalPlot: z.string().optional(),
   settings: BacktestSettingsSchema.default({}),
 });
 
@@ -51,4 +66,55 @@ export const backtestRoutes = new Hono()
     const result = runBacktest(bars, body.strategy, body.settings);
 
     return c.json({ symbol: row, interval: body.interval, bars: bars.length, result });
+  })
+  .post('/backtest/pine', zValidator('json', PineBacktestBody), async (c) => {
+    const body = c.req.valid('json');
+
+    const db = c.get('db');
+    const [row] = await db
+      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
+      .from(symbols)
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(eq(symbols.id, body.symbol))
+      .limit(1);
+    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
+
+    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
+    const bars = await provider.fetchHistorical({
+      symbol: row.ticker,
+      interval: body.interval,
+      limit: body.limit,
+    });
+
+    try {
+      const pine = compileAndRun(body.source, bars, body.inputs ?? {});
+      if (pine.plots.length === 0) {
+        return c.json({ ok: false, error: { kind: 'signal', message: 'Script has no plots to read as a signal' } }, 400);
+      }
+      const chosen = body.signalPlot
+        ? pine.plots.find((p) => p.title === body.signalPlot)
+        : (pine.plots.find((p) => p.title.toLowerCase() === 'signal') ?? pine.plots[0]);
+      if (!chosen) {
+        return c.json({ ok: false, error: { kind: 'signal', message: 'Signal plot not found' } }, 400);
+      }
+      const signals = signalsFromSeries(chosen.data);
+      const result = simulate(bars, signals, body.settings);
+      return c.json({
+        ok: true,
+        symbol: row,
+        interval: body.interval,
+        bars: bars.length,
+        signalPlot: chosen.title,
+        plots: pine.plots.map((p) => p.title),
+        result,
+      });
+    } catch (e) {
+      if (e instanceof PineParseError) {
+        return c.json({ ok: false, error: { kind: 'parse', message: e.message, ...(e.location ?? {}) } }, 400);
+      }
+      if (e instanceof PineRuntimeError) {
+        return c.json({ ok: false, error: { kind: 'runtime', message: e.message } }, 400);
+      }
+      throw e;
+    }
   });

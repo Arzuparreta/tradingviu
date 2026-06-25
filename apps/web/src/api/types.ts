@@ -299,7 +299,7 @@ export interface BacktestStats {
   sharpe: number;
 }
 export interface BacktestResult {
-  strategy: StrategyConfig;
+  strategy?: StrategyConfig;
   settings: BacktestSettings;
   barCount: number;
   startTime: number;

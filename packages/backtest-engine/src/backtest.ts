@@ -140,20 +140,19 @@ const computeStats = (
 };
 
 /**
- * Run a deterministic backtest of a built-in strategy over `bars`.
- *
- * The strategy's signal at bar *i* is acted on at bar *i+1*'s open (no
- * look-ahead). Positions are sized as `positionPct` of current equity; entries
- * and exits pay `feeBps` commission and cross `slippageBps` of slippage. With
- * shorts disabled a bearish signal simply flattens. Pure: a function of the
- * bars, strategy, and settings only.
+ * Run a deterministic backtest over a precomputed `signals` array (one desired
+ * position in `{-1, 0, 1}` per bar). The signal at bar *i* is acted on at bar
+ * *i+1*'s open (no look-ahead). Positions are sized as `positionPct` of current
+ * equity; entries and exits pay `feeBps` commission and cross `slippageBps` of
+ * slippage. With shorts disabled a bearish signal simply flattens. Pure: a
+ * function of the bars, signals, and settings only. The result has no
+ * `strategy` attached — {@link runBacktest} adds one for built-in strategies.
  */
-export const runBacktest = (
+export const simulate = (
   bars: ReadonlyArray<Bar>,
-  strategyInput: StrategyConfig,
+  signals: readonly number[],
   settingsInput: Partial<BacktestSettings> = {},
 ): BacktestResult => {
-  const strategy = StrategyConfigSchema.parse(strategyInput);
   const settings = BacktestSettingsSchema.parse(settingsInput);
   const { initialCapital, feeBps, slippageBps, allowShort, positionPct } = settings;
   const feeRate = feeBps / 10_000;
@@ -161,7 +160,6 @@ export const runBacktest = (
 
   if (bars.length === 0) {
     return {
-      strategy,
       settings,
       barCount: 0,
       startTime: 0,
@@ -172,7 +170,6 @@ export const runBacktest = (
     };
   }
 
-  const signals = generateSignals(bars, strategy);
   const trades: BacktestTrade[] = [];
   const equityCurve: EquityPoint[] = [];
   let realizedPnl = 0;
@@ -213,7 +210,7 @@ export const runBacktest = (
   for (let i = 0; i < bars.length; i++) {
     const bar = bars[i]!;
     // Desired position is the signal known at the *previous* bar's close.
-    let desired: number = i >= 1 ? signals[i - 1]! : 0;
+    let desired: number = i >= 1 ? signals[i - 1] ?? 0 : 0;
     if (desired === -1 && !allowShort) desired = 0;
     const currentSide: number = position ? (position.side === 'long' ? 1 : -1) : 0;
 
@@ -257,7 +254,6 @@ export const runBacktest = (
   }
 
   return {
-    strategy,
     settings,
     barCount: bars.length,
     startTime: bars[0]!.time,
@@ -266,4 +262,19 @@ export const runBacktest = (
     equityCurve,
     stats: computeStats(initialCapital, trades, equityCurve, bars, barsInPosition),
   };
+};
+
+/**
+ * Run a deterministic backtest of a built-in strategy over `bars`: generate the
+ * strategy's signals, then {@link simulate}. The result carries the resolved
+ * `strategy` config.
+ */
+export const runBacktest = (
+  bars: ReadonlyArray<Bar>,
+  strategyInput: StrategyConfig,
+  settingsInput: Partial<BacktestSettings> = {},
+): BacktestResult => {
+  const strategy = StrategyConfigSchema.parse(strategyInput);
+  const signals = generateSignals(bars, strategy);
+  return { ...simulate(bars, signals, settingsInput), strategy };
 };

@@ -78,7 +78,9 @@ export interface BacktestStats {
 }
 
 export interface BacktestResult {
-  readonly strategy: StrategyConfig;
+  /** Present for built-in strategies ({@link runBacktest}); absent for raw
+   * signal simulations ({@link simulate}, e.g. a Pine signal series). */
+  readonly strategy?: StrategyConfig;
   readonly settings: BacktestSettings;
   readonly barCount: number;
   readonly startTime: number;
@@ -131,7 +133,7 @@ export const BacktestStatsSchema = z.object({
 });
 
 export const BacktestResultSchema = z.object({
-  strategy: StrategyConfigSchema,
+  strategy: StrategyConfigSchema.optional(),
   settings: BacktestSettingsSchema,
   barCount: z.number().int().nonnegative(),
   startTime: z.number().int().nonnegative(),

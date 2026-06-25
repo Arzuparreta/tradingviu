@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Bar } from '@tv/data-types';
-import { runBacktest } from './backtest.js';
-import { sma, rsi, generateSignals, strategyCatalog } from './strategies.js';
+import { runBacktest, simulate } from './backtest.js';
+import { sma, rsi, generateSignals, signalsFromSeries, strategyCatalog } from './strategies.js';
 import { BacktestResultSchema } from './types.js';
 
 let t = 1_700_000_000;
@@ -132,6 +132,27 @@ describe('runBacktest', () => {
     const cfg = { type: 'maCross', params: { fast: 1, slow: 2 } } as const;
     const r = runBacktest(bars, cfg, { allowShort: false });
     expect(r.stats.shortTrades).toBe(0);
+  });
+
+  test('simulate runs a raw signal array (no strategy attached)', () => {
+    reset();
+    // Long from bar 2's signal → entry at bar 3 open (110), force-closed at 121.
+    const bars = [
+      bar(100, 100, 100, 100),
+      bar(100, 100, 100, 100),
+      bar(105, 110, 100, 110),
+      bar(110, 121, 110, 121),
+    ];
+    const signals = [0, 0, 1, 1];
+    const r = simulate(bars, signals, { feeBps: 0, slippageBps: 0 });
+    expect(r.strategy).toBeUndefined();
+    expect(r.trades).toHaveLength(1);
+    expect(r.trades[0]!.pnl).toBeCloseTo(1000, 4);
+    expect(() => BacktestResultSchema.parse(r)).not.toThrow();
+  });
+
+  test('signalsFromSeries maps by sign, treating null/NaN as flat', () => {
+    expect(signalsFromSeries([1.5, -0.2, 0, null, Number.NaN, 7])).toEqual([1, -1, 0, 0, 0, 1]);
   });
 
   test('catalog exposes the three strategies with params', () => {

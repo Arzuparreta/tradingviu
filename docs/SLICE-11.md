@@ -63,9 +63,46 @@ Notes:
 - Computation requires no DB migration and no new env vars — it reads the same
   historical bars the chart already fetches.
 
+## 11b — Backtest Pine signal series
+
+Status: done.
+
+Delivered:
+
+- The backtest core is split into a pure **`simulate(bars, signals, settings)`**
+  (the position/fill/equity/stats loop over a precomputed `{-1, 0, 1}` signal
+  array) and **`runBacktest(bars, strategy, settings)`** (generate a built-in
+  strategy's signals, then `simulate`). The result's `strategy` is now optional —
+  present for built-ins, absent for raw signal simulations.
+- **`signalsFromSeries(series)`** maps an arbitrary numeric series to signals by
+  sign: positive → long, negative → short, zero / null / NaN → flat.
+- **`POST /api/backtest/pine`** (`{ symbol, interval, limit, source, inputs?,
+  signalPlot?, settings }`): runs the Pine script through the existing
+  `compileAndRun`, reads a **signal plot** (the plot titled `signal`
+  case-insensitively, else the first plot), maps it to positions, and simulates.
+  It returns the chosen `signalPlot`, the list of plot titles, and the
+  `BacktestResult`, and reports Pine parse/runtime errors like `/api/pine/run`.
+  This reuses the existing vectorized Pine interpreter as-is — no event-driven
+  `strategy.entry`/`exit` engine is required.
+- The **Pine editor** (`PineEditorPage`) gains a **⚗ Backtest** button and an
+  *allow-shorts* toggle next to Run, plus a result panel under the charts: the
+  signal plot used, an equity-curve sparkline, and headline stats (net profit vs
+  buy & hold, win rate, profit factor, max drawdown, Sharpe, exposure).
+- Engine tests extended: `simulate` over a raw signal array (no strategy
+  attached, exact P&L) and `signalsFromSeries` sign mapping.
+
+Notes:
+
+- **Convention:** a script is backtested by the sign of a plotted series — name
+  it `signal` (e.g. `plot(fast > slow ? 1 : -1, title="signal")`). An overlay
+  signal plot will rescale the price pane, so put the signal in a non-overlay
+  script (or accept the squashed candles) when you want a clean chart too.
+- This is signal-based, not order-based: it covers crossover/threshold
+  strategies cleanly. True `strategy.entry`/`exit` semantics (stops, targets,
+  pyramiding) would need a bar-by-bar interpreter mode — a later step.
+
 ## Remaining Slice 11 Work
 
-- Backtest arbitrary Pine strategies (feed `strategy.*` calls into the simulator).
-- Stops / targets / trailing exits and pyramiding.
+- Event-driven Pine `strategy.*` (stops / targets / trailing exits, pyramiding).
 - A dedicated backtest report page with a trade list and drawdown chart.
 - Walk-forward / parameter optimization.

@@ -9,6 +9,7 @@ import { SymbolSearch } from '../components/SymbolSearch';
 import { createTvChart, addSeries, setData, removeChart, darkTheme } from '@tv/chart-engine';
 import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
 import type { PineRunResult } from '@tv/pine-runtime';
+import type { BacktestResult } from '../api/types';
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'] as const;
 
@@ -39,6 +40,12 @@ export function PineEditorPage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [validateMsg, setValidateMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [running, setRunning] = useState(false);
+  const [btResult, setBtResult] = useState<{ result: BacktestResult; signalPlot: string } | null>(
+    null,
+  );
+  const [btError, setBtError] = useState<string | null>(null);
+  const [btRunning, setBtRunning] = useState(false);
+  const [allowShort, setAllowShort] = useState(false);
 
   const priceRef = useRef<HTMLDivElement>(null);
   const oscRef = useRef<HTMLDivElement>(null);
@@ -135,6 +142,27 @@ export function PineEditorPage() {
     }
   }, [source, symbolId, interval]);
 
+  const backtest = useCallback(async () => {
+    if (!symbolId) { setBtError('Pick a symbol first'); return; }
+    setBtRunning(true);
+    setBtError(null);
+    try {
+      const res = await api.backtestPine({
+        source,
+        symbol: symbolId,
+        interval,
+        limit: 1000,
+        settings: { allowShort },
+      });
+      if (res.ok) setBtResult({ result: res.result, signalPlot: res.signalPlot });
+      else { setBtError(`${res.error.kind}: ${res.error.message}`); setBtResult(null); }
+    } catch (e) {
+      setBtError((e as Error).message);
+    } finally {
+      setBtRunning(false);
+    }
+  }, [source, symbolId, interval, allowShort]);
+
   if (!user) {
     return <div className="page"><p>You need to <Link to="/login">log in</Link> to use the Pine editor.</p></div>;
   }
@@ -155,6 +183,12 @@ export function PineEditorPage() {
           {INTERVALS.map((i) => <option key={i} value={i}>{i}</option>)}
         </select>
         <button className="primary" onClick={run} disabled={running || !symbolId}>{running ? 'Running…' : '▶ Run'}</button>
+        <label className="layout-toggle" title="Allow short positions in the backtest">
+          <input type="checkbox" checked={allowShort} onChange={(e) => setAllowShort(e.target.checked)} /> shorts
+        </label>
+        <button onClick={backtest} disabled={btRunning || !symbolId} title="Backtest the script's signal plot (titled “signal”, else the first plot)">
+          {btRunning ? 'Backtesting…' : '⚗ Backtest'}
+        </button>
         {validateMsg && <span className={`small ${validateMsg.ok ? 'up' : 'down'}`}>{validateMsg.text}</span>}
         <span className="grow" />
         {result && <span className="muted small">{result.plots.length} plots · {result.inputs.length} inputs · {result.overlay ? 'overlay' : 'separate pane'}</span>}
@@ -176,6 +210,76 @@ export function PineEditorPage() {
           <div ref={priceRef} className="pine-chart" />
           {result && !result.overlay && <div ref={oscRef} className="pine-chart pine-chart-osc" />}
           {runError && <div className="pine-error">{runError}</div>}
+          {btError && <div className="pine-error">{btError}</div>}
+          {btResult &&
+            (() => {
+              const r = btResult.result;
+              const st = r.stats;
+              const eq = r.equityCurve;
+              const pct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
+              const minE = Math.min(st.initialCapital, ...eq.map((p) => p.equity));
+              const maxE = Math.max(st.initialCapital, ...eq.map((p) => p.equity));
+              const W = 260;
+              const H = 64;
+              const x = (i: number) => (eq.length > 1 ? (i / (eq.length - 1)) * W : 0);
+              const y = (e: number) =>
+                maxE > minE ? H - ((e - minE) / (maxE - minE)) * H : H / 2;
+              const path = eq
+                .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.equity).toFixed(1)}`)
+                .join(' ');
+              const up = st.netProfit >= 0;
+              const chip = (label: string, value: string, cls = '') => (
+                <div className="col" style={{ gap: 0, minWidth: 92 }}>
+                  <span className="muted small">{label}</span>
+                  <span className={`mono ${cls}`}>{value}</span>
+                </div>
+              );
+              return (
+                <div
+                  className="card"
+                  style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}
+                >
+                  <div className="row">
+                    <strong>Backtest</strong>
+                    <span className="grow" />
+                    <span className="muted small">
+                      signal: <span className="mono">{btResult.signalPlot}</span> · {st.totalTrades}{' '}
+                      trades
+                    </span>
+                  </div>
+                  <svg
+                    width="100%"
+                    height={H}
+                    viewBox={`0 0 ${W} ${H}`}
+                    preserveAspectRatio="none"
+                    style={{ display: 'block' }}
+                  >
+                    <line
+                      x1={0}
+                      x2={W}
+                      y1={y(st.initialCapital)}
+                      y2={y(st.initialCapital)}
+                      stroke="#787b86"
+                      strokeWidth={0.5}
+                      strokeDasharray="3 3"
+                    />
+                    <path d={path} fill="none" stroke={up ? '#26a69a' : '#ef5350'} strokeWidth={1.5} />
+                  </svg>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
+                    {chip('Net profit', pct(st.netProfitPct), up ? 'up' : 'down')}
+                    {chip('Buy & hold', pct(st.buyHoldReturnPct))}
+                    {chip('Win rate', `${(st.winRate * 100).toFixed(0)}%`)}
+                    {chip(
+                      'Profit factor',
+                      st.profitFactor == null ? '∞' : st.profitFactor.toFixed(2),
+                    )}
+                    {chip('Max DD', `-${(st.maxDrawdownPct * 100).toFixed(1)}%`, 'down')}
+                    {chip('Sharpe', st.sharpe.toFixed(2))}
+                    {chip('Exposure', `${(st.exposurePct * 100).toFixed(0)}%`)}
+                  </div>
+                </div>
+              );
+            })()}
         </div>
       </div>
     </div>

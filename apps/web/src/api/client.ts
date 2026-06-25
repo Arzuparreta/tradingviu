@@ -293,6 +293,27 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, strategy, settings }),
     }),
+  backtestPine: (body: {
+    symbol: string;
+    interval: string;
+    source: string;
+    inputs?: Record<string, number | boolean | string>;
+    signalPlot?: string;
+    settings?: Partial<BacktestSettings>;
+    limit?: number;
+  }) =>
+    request<
+      | {
+          ok: true;
+          symbol: { id: string; ticker: string; exchange: string };
+          interval: string;
+          bars: number;
+          signalPlot: string;
+          plots: string[];
+          result: BacktestResult;
+        }
+      | { ok: false; error: { kind: string; message: string } }
+    >('/api/backtest/pine', { method: 'POST', body: JSON.stringify(body) }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>
     request<{ id: string }>('/api/watchlists', { method: 'POST', body: JSON.stringify({ name }) }),
