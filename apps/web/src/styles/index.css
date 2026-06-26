@@ -403,37 +403,6 @@ label {
   min-width: 0;
   min-height: 0;
 }
-.chart-panel-chart,
-.chart-panel-chart * {
-  cursor: none;
-}
-.real-cursor-marker {
-  display: none;
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  transform: translate(-2px, -2px);
-  pointer-events: none;
-  z-index: 5;
-}
-.real-cursor-marker::before,
-.real-cursor-marker::after {
-  content: '';
-  position: absolute;
-  background: rgba(34, 211, 238, 0.36);
-}
-.real-cursor-marker::before {
-  left: 1px;
-  top: 2px;
-  width: 3px;
-  height: 1px;
-}
-.real-cursor-marker::after {
-  left: 2px;
-  top: 1px;
-  width: 1px;
-  height: 3px;
-}
 .drawing-overlay {
   position: absolute;
   inset: 0;

@@ -26,18 +26,7 @@ import type { IChartApi, ISeriesApi, MouseEventParams, SeriesType, Time } from '
 interface ChartRef {
   chart: IChartApi;
   series: ISeriesApi<SeriesType>;
-  realCursorMarker: HTMLDivElement;
 }
-
-const hideRealCursorMarkers = (entries: readonly (readonly [string, ChartRef])[]): void => {
-  for (const [, entry] of entries) entry.realCursorMarker.style.display = 'none';
-};
-
-const showRealCursorMarker = (entry: ChartRef, point: { x: number; y: number }): void => {
-  entry.realCursorMarker.style.display = 'block';
-  entry.realCursorMarker.style.left = `${point.x}px`;
-  entry.realCursorMarker.style.top = `${point.y}px`;
-};
 
 export function LayoutPage() {
   const { user } = useAuth();
@@ -51,7 +40,6 @@ export function LayoutPage() {
   const initialized = useRef(false);
   const charts = useRef<Map<string, ChartRef>>(new Map());
   const [chartsVersion, setChartsVersion] = useState(0);
-  const programmaticCrosshairPanels = useRef<Set<string>>(new Set());
 
   // --- Multi-chart Bar Replay (synced by cursor *time*, not bar index) ---
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -98,8 +86,8 @@ export function LayoutPage() {
     }
   }, [layoutsQ.data]);
 
-  const onReady = useCallback((id: string, chart: IChartApi, series: ISeriesApi<SeriesType>, realCursorMarker: HTMLDivElement) => {
-    charts.current.set(id, { chart, series, realCursorMarker });
+  const onReady = useCallback((id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => {
+    charts.current.set(id, { chart, series });
     setChartsVersion((v) => v + 1);
   }, []);
   const onDestroy = useCallback((id: string) => {
@@ -164,31 +152,16 @@ export function LayoutPage() {
     if (!config.sync.crosshair) return;
     const entries = [...charts.current.entries()];
     if (entries.length < 2) return;
-    const suppressProgrammaticEvent = (panelId: string) => {
-      programmaticCrosshairPanels.current.add(panelId);
-      window.setTimeout(() => {
-        programmaticCrosshairPanels.current.delete(panelId);
-      }, 16);
-    };
     const handlers = entries.map(([id, src]) => {
       const handler = (param: MouseEventParams<Time>) => {
-        if (programmaticCrosshairPanels.current.has(id)) return;
-        hideRealCursorMarkers(entries);
-        if (param.time === undefined || param.point === undefined) {
-          for (const [otherId, dst] of entries) {
-            if (otherId === id) continue;
-            suppressProgrammaticEvent(otherId);
-            dst.chart.clearCrosshairPosition();
-          }
-          return;
-        }
-        showRealCursorMarker(src, param.point);
-        const price = src.series.coordinateToPrice(param.point.y);
-        if (price === null) return;
         for (const [otherId, dst] of entries) {
           if (otherId === id) continue;
-          suppressProgrammaticEvent(otherId);
-          dst.chart.setCrosshairPosition(price, param.time, dst.series);
+          if (param.time === undefined || param.point === undefined) {
+            dst.chart.clearCrosshairPosition();
+            continue;
+          }
+          const price = src.series.coordinateToPrice(param.point.y);
+          if (price !== null) dst.chart.setCrosshairPosition(price, param.time, dst.series);
         }
       };
       src.chart.subscribeCrosshairMove(handler as never);
@@ -196,7 +169,6 @@ export function LayoutPage() {
     });
     return () => {
       for (const { chart, handler } of handlers) chart.unsubscribeCrosshairMove(handler as never);
-      hideRealCursorMarkers(entries);
     };
   }, [config.sync.crosshair, chartsVersion]);
 

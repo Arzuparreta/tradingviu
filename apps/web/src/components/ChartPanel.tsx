@@ -25,7 +25,7 @@ export interface ChartPanelProps {
   drawingStyle: DrawingStyle;
   deleteDrawingRequest: number;
   /** Register the chart + candle series with the parent (for crosshair sync). */
-  onReady?: (id: string, chart: IChartApi, series: ISeriesApi<SeriesType>, realCursorMarker: HTMLDivElement) => void;
+  onReady?: (id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => void;
   onDestroy?: (id: string) => void;
   /** When true, the panel reveals only bars up to `replayCursor` (time). */
   replayActive?: boolean;
@@ -51,7 +51,6 @@ export function ChartPanel({
   onBounds,
 }: ChartPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const realCursorMarkerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
   const volumeRef = useRef<ISeriesApi<SeriesType> | null>(null);
@@ -74,7 +73,7 @@ export function ChartPanel({
 
   // Create the chart once.
   useEffect(() => {
-    if (!containerRef.current || !realCursorMarkerRef.current) return;
+    if (!containerRef.current) return;
     const chart = createTvChart({ container: containerRef.current, theme: darkTheme, autoSize: true });
     const candle = addSeries(chart, 'candles');
     const volume = addSeries(chart, 'histogram', {
@@ -88,7 +87,7 @@ export function ChartPanel({
     volumeRef.current = volume;
     setChartApi(chart);
     setCandleApi(candle);
-    onReadyRef.current?.(panel.id, chart, candle, realCursorMarkerRef.current);
+    onReadyRef.current?.(panel.id, chart, candle);
     return () => {
       onDestroyRef.current?.(panel.id);
       removeChart(chart);
@@ -198,7 +197,6 @@ export function ChartPanel({
       </div>
       <div className="chart-panel-chart">
         <div ref={containerRef} className="chart-panel-canvas" />
-        <div ref={realCursorMarkerRef} className="real-cursor-marker" />
         <DrawingOverlay
           chart={chartApi}
           series={candleApi}
