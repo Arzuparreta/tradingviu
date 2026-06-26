@@ -54,3 +54,25 @@ All wired into `App.tsx` nav and `apps/web/src/api/client.ts` / `types.ts`.
 ## Tests
 
 `apps/server/src/services/slice4.test.ts` — price-cross evaluation, holdings/realized-P&L rebuild, market fill with fee + slippage.
+
+## 4f — Portfolio analytics (later addition)
+
+Status: done.
+
+- `packages/portfolio-analytics`: a pure, deterministic engine over priced
+  positions (`{ symbolId, ticker, quantity, avgCost, price, assetClass?,
+  sector? }`). It computes total market value / cost basis / unrealized P&L
+  (abs + %), per-position weight and signed P&L contribution, allocation by
+  asset class and sector, concentration (HHI, top / top-3 weight, effective
+  number of holdings = 1/HHI), and the best/worst position by return.
+- `GET /api/portfolios/:id/analytics` rebuilds the holdings, fetches a current
+  price per holding (latest daily close via the provider, falling back to avg
+  cost on error), enriches with `assetClass`/`sector`, and runs the engine.
+- `PortfoliosPage` gains an **Analytics** card: headline totals + concentration,
+  an allocation-by-asset-class bar chart, best/worst, and a positions table
+  (weight, value, return, P&L).
+- `packages/portfolio-analytics/src/index.test.ts` — hand-computed totals,
+  weights, P&L contribution, allocations, HHI/effective holdings, best/worst,
+  the empty case, and determinism.
+- No DB migration: prices come from the existing provider path; metadata from
+  the `symbols` table.

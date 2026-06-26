@@ -13,6 +13,30 @@ import {
 import { exchanges, holdings, portfolios, symbols, transactions } from '@tv/db/schema';
 import { ulid } from 'ulid';
 import { computeHoldings, toDecimalText, validatePortfolioTransaction } from '../services/portfolio-engine.js';
+import { computePortfolioAnalytics, type AnalyticsPosition } from '@tv/portfolio-analytics';
+import { getProvider } from '../services/data.js';
+
+const ccxtMap: Record<string, string> = {
+  BINANCE: 'binance',
+  COINBASE: 'coinbase',
+  KRAKEN: 'kraken',
+  BYBIT: 'bybit',
+};
+
+/** Latest close as a current-price proxy; falls back to `fallback` on failure. */
+const lastPrice = async (exchange: string, ticker: string, fallback: number): Promise<number> => {
+  try {
+    const bars = await getProvider(ccxtMap[exchange] ?? 'binance').fetchHistorical({
+      symbol: ticker,
+      interval: '1d',
+      limit: 1,
+    });
+    const close = bars.at(-1)?.close;
+    return typeof close === 'number' && Number.isFinite(close) && close > 0 ? close : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const assertPortfolio = async (
   db: ReturnType<typeof import('@tv/db').createDb>,
@@ -112,6 +136,46 @@ export const portfolioRoutes = new Hono()
       .orderBy(asc(transactions.occurredAt));
     const metrics = computeHoldings(txRows).metrics;
     return c.json({ portfolio, holdings: holdingRows, transactions: txRows, metrics });
+  })
+  .get('/portfolios/:id/analytics', async (c) => {
+    const db = c.get('db');
+    const tenant = tryGetTenant() as TenantContext;
+    const id = c.req.param('id');
+    await assertPortfolio(db, tenant, id);
+
+    const rows = await db
+      .select({
+        symbolId: holdings.symbolId,
+        quantity: holdings.quantity,
+        avgCost: holdings.avgCost,
+        ticker: symbols.ticker,
+        exchange: exchanges.code,
+        assetClass: symbols.assetClass,
+        sector: symbols.sector,
+      })
+      .from(holdings)
+      .innerJoin(symbols, eq(symbols.id, holdings.symbolId))
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(and(eq(holdings.tenantId, tenant.tenantId), eq(holdings.portfolioId, id)));
+
+    const positions: AnalyticsPosition[] = await Promise.all(
+      rows.map(async (r): Promise<AnalyticsPosition> => {
+        const avgCost = Number(r.avgCost);
+        const quantity = Number(r.quantity);
+        const price = await lastPrice(r.exchange, r.ticker, avgCost);
+        return {
+          symbolId: r.symbolId,
+          ticker: r.ticker,
+          quantity,
+          avgCost,
+          price,
+          assetClass: r.assetClass,
+          sector: r.sector,
+        };
+      }),
+    );
+
+    return c.json({ analytics: computePortfolioAnalytics(positions) });
   })
   .patch('/portfolios/:id', zValidator('json', UpdatePortfolioSchema), async (c) => {
     const db = c.get('db');

@@ -468,6 +468,38 @@ export interface PortfolioMetrics {
   openPositions: number;
 }
 
+export interface PositionAnalytics {
+  symbolId: string;
+  ticker: string;
+  quantity: number;
+  avgCost: number;
+  price: number;
+  marketValue: number;
+  costBasis: number;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+  weight: number;
+  pnlContribution: number;
+}
+export interface AllocationSlice {
+  key: string;
+  marketValue: number;
+  weight: number;
+}
+export interface PortfolioAnalytics {
+  marketValue: number;
+  costBasis: number;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+  positionsCount: number;
+  positions: PositionAnalytics[];
+  byAssetClass: AllocationSlice[];
+  bySector: AllocationSlice[];
+  concentration: { hhi: number; topWeight: number; top3Weight: number; effectiveHoldings: number };
+  best: PositionAnalytics | null;
+  worst: PositionAnalytics | null;
+}
+
 export interface PaperAccount {
   id: string;
   name: string;

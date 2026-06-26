@@ -16,7 +16,7 @@
 | 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`), **superseded by 2.5** |
 | 2.5   | Real-time market data: BarStore (1 upstream per key, fanout), TimescaleDB hypertable, paginated history, status events, in-progress bars, timezone-correct chart | ✅ done (this slice)     |
 | 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)      |
-| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine          | ✅ done (`4fd3fd3`)      |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine, portfolio analytics | ✅ done (`4fd3fd3` + 4f) |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                  |
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6l done) |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
@@ -104,6 +104,7 @@ tradingviu/
 │   ├── news/                    # provider contract + mock/NewsAPI adapters (ingest worker in services/)
 │   ├── calendar/                # earnings/economic/dividend provider contract + mock/FMP adapters
 │   ├── portfolio/               # [TODO] P&L, holdings, transactions
+│   ├── portfolio-analytics/     # allocation, concentration (HHI), P&L attribution over priced holdings (slice 4f)
 │   ├── layout-sync/             # multi-chart layout schema + grid presets + helpers
 │   ├── ui-kit/                  # [TODO] shared React components
 │   ├── cli/                     # tvctl operator CLI (tenants, users, plans)
@@ -196,6 +197,13 @@ tradingviu/
 - Paper accounts + market/limit paper orders with instant/pending fills, fees, slippage, buying-power check
 - Web app pages: Alerts, Portfolios, Paper
 - No DB migration was required: the foundation schema already contained the tenant-scoped tables.
+- **4f (done, later) — Portfolio analytics:** `packages/portfolio-analytics` (pure
+  engine — market value / cost basis / unrealized P&L, per-position weight + P&L
+  contribution, allocation by asset class & sector, concentration via HHI +
+  effective holdings, best/worst by return); `GET /api/portfolios/:id/analytics`
+  (prices each holding from the provider); and an **Analytics** card on
+  `PortfoliosPage` (totals, allocation bars, concentration, positions table).
+  See `docs/SLICE-4.md`.
 
 ### Slice 5 (done) — Brokers + DOM + Options
 

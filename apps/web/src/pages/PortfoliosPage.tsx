@@ -19,6 +19,11 @@ export function PortfoliosPage() {
     queryFn: () => api.portfolio(selectedId!),
     enabled: !!selectedId,
   });
+  const analyticsQ = useQuery({
+    queryKey: ['portfolio-analytics', selectedId],
+    queryFn: () => api.portfolioAnalytics(selectedId!),
+    enabled: !!selectedId,
+  });
 
   useEffect(() => {
     if (!selectedId && portfoliosQ.data?.portfolios[0]) setSelectedId(portfoliosQ.data.portfolios[0].id);
@@ -131,6 +136,117 @@ export function PortfoliosPage() {
                   {detailQ.data.holdings.length === 0 && <p className="muted">No open holdings.</p>}
                 </div>
               </section>
+
+              {analyticsQ.data && analyticsQ.data.analytics.positionsCount > 0 &&
+                (() => {
+                  const a = analyticsQ.data.analytics;
+                  const money = (v: number) =>
+                    new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(v);
+                  const pct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
+                  return (
+                    <section className="card">
+                      <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Analytics</h2>
+                      <div className="row" style={{ flexWrap: 'wrap', gap: 18, marginBottom: 12 }}>
+                        <div className="col" style={{ gap: 0 }}>
+                          <span className="muted small">Market value</span>
+                          <span className="mono">{money(a.marketValue)}</span>
+                        </div>
+                        <div className="col" style={{ gap: 0 }}>
+                          <span className="muted small">Unrealized P&L</span>
+                          <span className={a.unrealizedPnl >= 0 ? 'up mono' : 'down mono'}>
+                            {money(a.unrealizedPnl)} ({pct(a.unrealizedPnlPct)})
+                          </span>
+                        </div>
+                        <div className="col" style={{ gap: 0 }}>
+                          <span className="muted small">Effective holdings</span>
+                          <span className="mono">
+                            {a.concentration.effectiveHoldings.toFixed(1)} / {a.positionsCount}
+                          </span>
+                        </div>
+                        <div className="col" style={{ gap: 0 }}>
+                          <span className="muted small">Top / Top 3</span>
+                          <span className="mono">
+                            {(a.concentration.topWeight * 100).toFixed(0)}% /{' '}
+                            {(a.concentration.top3Weight * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                        {a.best && (
+                          <div className="col" style={{ gap: 0 }}>
+                            <span className="muted small">Best / Worst</span>
+                            <span className="mono">
+                              <span className="up">{a.best.ticker} {pct(a.best.unrealizedPnlPct)}</span>
+                              {a.worst && a.worst.symbolId !== a.best.symbolId && (
+                                <>
+                                  {' · '}
+                                  <span className="down">
+                                    {a.worst.ticker} {pct(a.worst.unrealizedPnlPct)}
+                                  </span>
+                                </>
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="muted small" style={{ marginBottom: 6 }}>Allocation by asset class</div>
+                      <div className="col" style={{ gap: 4, marginBottom: 12 }}>
+                        {a.byAssetClass.map((s) => (
+                          <div key={s.key} className="row small" style={{ gap: 8, alignItems: 'center' }}>
+                            <span style={{ width: 70, textTransform: 'capitalize' }}>{s.key}</span>
+                            <div style={{ flex: 1, background: 'var(--bg-3)', borderRadius: 3, height: 10 }}>
+                              <div
+                                style={{
+                                  width: `${(s.weight * 100).toFixed(1)}%`,
+                                  background: '#4c8bf5',
+                                  height: '100%',
+                                  borderRadius: 3,
+                                }}
+                              />
+                            </div>
+                            <span className="mono" style={{ width: 48, textAlign: 'right' }}>
+                              {(s.weight * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <table className="discovery-table" style={{ minWidth: 0, fontSize: 12 }}>
+                        <thead>
+                          <tr>
+                            <th>Symbol</th>
+                            <th style={{ textAlign: 'right' }}>Weight</th>
+                            <th style={{ textAlign: 'right' }}>Value</th>
+                            <th style={{ textAlign: 'right' }}>Return</th>
+                            <th style={{ textAlign: 'right' }}>P&L</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {a.positions.map((p) => (
+                            <tr key={p.symbolId}>
+                              <td className="mono">{p.ticker}</td>
+                              <td className="mono" style={{ textAlign: 'right' }}>
+                                {(p.weight * 100).toFixed(1)}%
+                              </td>
+                              <td className="mono" style={{ textAlign: 'right' }}>{money(p.marketValue)}</td>
+                              <td
+                                className={`mono ${p.unrealizedPnl >= 0 ? 'up' : 'down'}`}
+                                style={{ textAlign: 'right' }}
+                              >
+                                {pct(p.unrealizedPnlPct)}
+                              </td>
+                              <td
+                                className={`mono ${p.unrealizedPnl >= 0 ? 'up' : 'down'}`}
+                                style={{ textAlign: 'right' }}
+                              >
+                                {money(p.unrealizedPnl)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  );
+                })()}
 
               <section className="card">
                 <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Transactions</h2>

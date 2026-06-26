@@ -33,6 +33,7 @@ import type {
   PortfolioRow,
   PortfolioHolding,
   PortfolioMetrics,
+  PortfolioAnalytics,
   PortfolioTransaction,
   PaperAccount,
   PaperOrder,
@@ -418,6 +419,8 @@ export const api = {
       transactions: PortfolioTransaction[];
       metrics: PortfolioMetrics;
     }>(`/api/portfolios/${id}`),
+  portfolioAnalytics: (id: string) =>
+    request<{ analytics: PortfolioAnalytics }>(`/api/portfolios/${id}/analytics`),
   deletePortfolio: (id: string) =>
     request<{ ok: true }>(`/api/portfolios/${id}`, { method: 'DELETE' }),
   addPortfolioTransaction: (
