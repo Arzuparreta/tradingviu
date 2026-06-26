@@ -2,9 +2,13 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildAlertWebhookPayload,
   renderAlertTitle,
+  renderAlertEmail,
+  buildRfc822,
+  deliverEmail,
   deliverWebhook,
   isPublicWebhookUrl,
   type AlertNotificationInput,
+  type EmailTransport,
   type FetchLike,
 } from './index.js';
 
@@ -39,6 +43,41 @@ describe('renderAlertTitle', () => {
     expect(renderAlertTitle(input())).toBe(
       'BTC breakout: BINANCE:BTCUSDT @ 65000 — price above 64000',
     );
+  });
+});
+
+describe('renderAlertEmail', () => {
+  test('subject is the title and body carries the details', () => {
+    const e = renderAlertEmail(input());
+    expect(e.subject).toBe(renderAlertTitle(input()));
+    expect(e.text).toContain('BINANCE:BTCUSDT');
+    expect(e.text).toContain('price above 64000');
+    expect(e.text).toContain('2026-06-26T12:00:00.000Z');
+  });
+});
+
+describe('buildRfc822', () => {
+  test('emits CRLF headers + blank line + body', () => {
+    const raw = buildRfc822('alerts@tv.local', { to: 'u@x.com', subject: 'Hi', text: 'line1\nline2' });
+    expect(raw).toContain('From: alerts@tv.local\r\n');
+    expect(raw).toContain('To: u@x.com\r\n');
+    expect(raw).toContain('Subject: Hi\r\n');
+    expect(raw).toContain('\r\n\r\nline1\r\nline2');
+  });
+  test('dot-stuffs lines beginning with a period', () => {
+    const raw = buildRfc822('a@b', { to: 'c@d', subject: 's', text: '.hidden\nok\n.again' });
+    expect(raw).toContain('\r\n..hidden\r\nok\r\n..again');
+  });
+});
+
+describe('deliverEmail', () => {
+  test('returns the transport result and never throws', async () => {
+    const ok: EmailTransport = async () => true;
+    const bad: EmailTransport = async () => {
+      throw new Error('smtp down');
+    };
+    expect(await deliverEmail({ to: 'a@b', subject: 's', text: 't' }, ok)).toBe(true);
+    expect(await deliverEmail({ to: 'a@b', subject: 's', text: 't' }, bad)).toBe(false);
   });
 });
 

@@ -45,6 +45,60 @@ export const buildAlertWebhookPayload = (input: AlertNotificationInput): AlertWe
 export const renderAlertTitle = (input: AlertNotificationInput): string =>
   `${input.alertName}: ${input.symbol} @ ${input.price} — ${input.reason}`;
 
+/** A plain-text email to send. */
+export interface EmailMessage {
+  readonly to: string;
+  readonly subject: string;
+  readonly text: string;
+}
+
+/** Render a fired alert into an email subject + body. Pure. */
+export const renderAlertEmail = (input: AlertNotificationInput): { subject: string; text: string } => ({
+  subject: renderAlertTitle(input),
+  text:
+    `Your alert "${input.alertName}" fired.\n\n` +
+    `Symbol: ${input.symbol}\n` +
+    `Price:  ${input.price}\n` +
+    `Value:  ${input.value}\n` +
+    `Reason: ${input.reason}\n` +
+    `Time:   ${input.firedAt.toISOString()}\n`,
+});
+
+/**
+ * Build an RFC-822 message (headers + body) for SMTP: normalizes line endings
+ * to CRLF and dot-stuffs lines that begin with `.` (SMTP transparency). Pure.
+ */
+export const buildRfc822 = (from: string, msg: EmailMessage): string => {
+  const body = msg.text
+    .replace(/\r?\n/g, '\r\n')
+    .split('\r\n')
+    .map((line) => (line.startsWith('.') ? `.${line}` : line))
+    .join('\r\n');
+  const headers = [
+    `From: ${from}`,
+    `To: ${msg.to}`,
+    `Subject: ${msg.subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=utf-8',
+  ].join('\r\n');
+  return `${headers}\r\n\r\n${body}`;
+};
+
+/** Sends an email; resolves to whether it succeeded. */
+export type EmailTransport = (msg: EmailMessage) => Promise<boolean>;
+
+/** Deliver an email via the given transport. Never throws (false on failure). */
+export const deliverEmail = async (
+  msg: EmailMessage,
+  transport: EmailTransport,
+): Promise<boolean> => {
+  try {
+    return await transport(msg);
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Best-effort SSRF guard for a user-supplied webhook URL: requires http(s) and
  * rejects loopback / link-local / private-range / metadata hosts. This is a

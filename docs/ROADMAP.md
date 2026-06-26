@@ -192,7 +192,7 @@ tradingviu/
 ### Slice 4 (done) — Alerts + Portfolios + Paper trading
 
 - Alert engine: price, indicator, multi-condition evaluator
-- Channels: in-app + outbound webhook delivered (see 4g); email recorded for a future SMTP worker
+- Channels: all three deliver — in-app, outbound webhook (4g), and email via SMTP/Mailpit (4h)
 - Alerts CRUD + manual evaluation endpoint + alert history
 - Portfolios CRUD with transactions, holdings rebuild, dividends, fees, realized P&L
 - Paper accounts + market/limit paper orders with instant/pending fills, fees, slippage, buying-power check
@@ -210,7 +210,13 @@ tradingviu/
   payload builder + SSRF guard `isPublicWebhookUrl` + injectable-fetch
   `deliverWebhook`), migration `0008` (`alerts.webhook_url`), evaluate-time
   dispatch writing `delivered.webhook`, and a Webhook URL field on `AlertsPage`.
-  Email (SMTP) deferred. See `docs/SLICE-4.md`.
+  See `docs/SLICE-4.md`.
+- **4h (done, later) — Alert email delivery:** the `email` channel now delivers.
+  `packages/notifications` adds `renderAlertEmail` + `buildRfc822` (pure,
+  dot-stuffed, CRLF) + `deliverEmail`; `apps/server/src/services/email.ts` is a
+  dependency-free native `node:net` SMTP client targeting **Mailpit**
+  (`SMTP_HOST`/`SMTP_PORT`); evaluate-time dispatch records `delivered.email`; and
+  `AlertsPage` gains an "Email me" checkbox. See `docs/SLICE-4.md`.
 
 ### Slice 5 (done) — Brokers + DOM + Options
 

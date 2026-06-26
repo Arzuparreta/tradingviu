@@ -20,6 +20,7 @@ export function AlertsPage() {
   const [value, setValue] = useState('100');
   const [manualPrice, setManualPrice] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [emailMe, setEmailMe] = useState(false);
 
   const alertsQ = useQuery({ queryKey: ['alerts'], queryFn: () => api.alerts() });
   const symbolsQ = useQuery({ queryKey: ['symbols', 'alerts'], queryFn: () => api.allSymbols(200) });
@@ -32,13 +33,18 @@ export function AlertsPage() {
         symbolId,
         name: name || `Price ${operator} ${value}`,
         condition: { type: 'price', operator, value: Number(value) },
-        channels: webhookUrl.trim() ? ['in_app', 'webhook'] : ['in_app'],
+        channels: [
+          'in_app',
+          ...(emailMe ? ['email'] : []),
+          ...(webhookUrl.trim() ? ['webhook'] : []),
+        ],
         ...(webhookUrl.trim() ? { webhookUrl: webhookUrl.trim() } : {}),
         active: true,
       }),
     onSuccess: () => {
       setName('');
       setWebhookUrl('');
+      setEmailMe(false);
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
@@ -100,6 +106,10 @@ export function AlertsPage() {
               />
               <span className="muted small">POSTed when the alert fires.</span>
             </div>
+            <label className="row small" style={{ gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={emailMe} onChange={(e) => setEmailMe(e.target.checked)} />
+              Email me when it fires
+            </label>
             <button className="primary" disabled={!symbolId || Number(value) <= 0 || create.isPending} onClick={() => create.mutate()}>
               Create alert
             </button>
@@ -127,6 +137,7 @@ export function AlertsPage() {
                     {alert.lastFiredAt && <div className="small up">Last fired {new Date(alert.lastFiredAt).toLocaleString()}</div>}
                   </div>
                   <span className="grow" />
+                  {alert.channels.includes('email') && <span className="muted small mono">✉ email</span>}
                   {alert.webhookUrl && <span className="muted small mono" title={alert.webhookUrl}>🔗 webhook</span>}
                   <span className={alert.active ? 'up small' : 'muted small'}>{alert.active ? 'active' : 'paused'}</span>
                   <button onClick={() => toggle.mutate({ id: alert.id, active: !alert.active })}>

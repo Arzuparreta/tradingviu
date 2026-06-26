@@ -110,3 +110,31 @@ Notes:
   obvious cases.
 - Email delivery (SMTP → Mailpit) is the natural follow-up; the notifications
   package is structured to host it.
+
+## 4h — Alert email delivery (later addition)
+
+Status: done.
+
+- Adds the `email` channel: a fired alert emails the alert owner (recipient =
+  the JWT `email` claim).
+- `packages/notifications` grows pure helpers — `renderAlertEmail` (subject +
+  text body) and `buildRfc822` (CRLF normalization + dot-stuffing of lines that
+  begin with `.`) — plus an injectable `EmailTransport` and `deliverEmail` that
+  never throws. All unit-tested with a fake transport (no network).
+- `apps/server/src/services/email.ts`: a tiny **native SMTP client over
+  `node:net`** (no new dependency) — EHLO → MAIL/RCPT → DATA → QUIT — enough to
+  relay through an unauthenticated dev relay like **Mailpit** (already in
+  `infra/docker-compose.yml`). `getEmailTransport()` returns the transport when
+  `SMTP_HOST` is set, else null (email simply isn't delivered).
+- `POST /api/alerts/:id/evaluate` now delivers email when the alert has the
+  `email` channel, recording the result in `delivered.email`. `AlertsPage` gains
+  an "Email me when it fires" checkbox and a ✉ indicator; new `SMTP_HOST` /
+  `SMTP_PORT` env (defaulting to Mailpit's `localhost:1025`).
+
+Notes:
+
+- The SMTP client targets a trusted local/self-host relay: no AUTH and no
+  STARTTLS. An authenticated/TLS relay would need those added (or swap in a
+  library transport behind the same `EmailTransport` interface).
+- With 4g (webhook) + 4h (email), all three alert channels — in-app, webhook,
+  email — now deliver.

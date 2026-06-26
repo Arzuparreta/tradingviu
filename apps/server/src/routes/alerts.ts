@@ -16,7 +16,8 @@ import { alertHistory, alerts, exchanges, symbols } from '@tv/db/schema';
 import { ulid } from 'ulid';
 import { getProvider } from '../services/data.js';
 import { evaluateAlertCondition } from '../services/alert-engine.js';
-import { buildAlertWebhookPayload, deliverWebhook } from '@tv/notifications';
+import { buildAlertWebhookPayload, deliverWebhook, renderAlertEmail, deliverEmail } from '@tv/notifications';
+import { getEmailTransport } from '../services/email.js';
 
 const ccxtMap: Record<string, string> = {
   BINANCE: 'binance',
@@ -172,21 +173,32 @@ export const alertRoutes = new Hono()
       for (const channel of row.channels) {
         delivered[channel] = channel === 'in_app';
       }
+      const notification = {
+        alertId: row.id,
+        alertName: row.name,
+        symbol: `${row.exchange}:${row.ticker}`,
+        price,
+        fired: result.fired,
+        value: result.value,
+        reason: result.reason,
+        firedAt: new Date(),
+      };
       // Outbound webhook delivery (native fetch; failures recorded as pending).
       if (row.channels.includes('webhook') && row.webhookUrl) {
-        const payload = buildAlertWebhookPayload({
-          alertId: row.id,
-          alertName: row.name,
-          symbol: `${row.exchange}:${row.ticker}`,
-          price,
-          fired: result.fired,
-          value: result.value,
-          reason: result.reason,
-          firedAt: new Date(),
-        });
-        delivered['webhook'] = await deliverWebhook(row.webhookUrl, payload, (url, init) =>
-          fetch(url, init),
+        delivered['webhook'] = await deliverWebhook(
+          row.webhookUrl,
+          buildAlertWebhookPayload(notification),
+          (url, init) => fetch(url, init),
         );
+      }
+      // Email delivery via SMTP (Mailpit) to the alert owner; off when unconfigured.
+      if (row.channels.includes('email')) {
+        const transport = getEmailTransport();
+        const claims = c.get('claims') as { email: string };
+        if (transport && claims.email) {
+          const { subject, text } = renderAlertEmail(notification);
+          delivered['email'] = await deliverEmail({ to: claims.email, subject, text }, transport);
+        }
       }
       await db.insert(alertHistory).values({
         alertId: row.id,

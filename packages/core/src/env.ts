@@ -48,6 +48,9 @@ export const EnvSchema = z.object({
   FMP_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
   POSTMARK_TOKEN: z.string().optional(),
+  /** SMTP host for outbound alert emails (e.g. Mailpit). Email is off if unset. */
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().max(65535).default(1025),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   CRED_ENC_KEY: z
