@@ -51,6 +51,9 @@ export const EnvSchema = z.object({
   /** SMTP host for outbound alert emails (e.g. Mailpit). Email is off if unset. */
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().max(65535).default(1025),
+  /** Public API: max requests per token per window, and the window length. */
+  API_RATE_LIMIT: z.coerce.number().int().positive().max(100000).default(120),
+  API_RATE_WINDOW_SEC: z.coerce.number().int().positive().max(86400).default(60),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   CRED_ENC_KEY: z

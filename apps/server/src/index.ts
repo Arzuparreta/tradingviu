@@ -38,6 +38,7 @@ import { spaceRoutes } from './routes/spaces.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
 import { apiKeyContext } from './middleware/api-key.js';
+import { rateLimit } from './services/rate-limit.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
@@ -115,6 +116,10 @@ app.route('/api', accessTokenRoutes);
 // token (resolved by apiKeyContext, outside the JWT-based /api/* middleware).
 app.get('/openapi.json', (c) => c.json(openApiDocument));
 app.use('/v1/*', apiKeyContext({ db, redis }));
+app.use(
+  '/v1/*',
+  rateLimit(redis, { limit: env.API_RATE_LIMIT, windowSec: env.API_RATE_WINDOW_SEC }),
+);
 app.route('/v1', publicV1Routes);
 
 const port = env.API_PORT;

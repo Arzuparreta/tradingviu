@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import type { Database } from '@tv/db';
 import { withTenantRls, withSuperAdminRls, clearRls } from '@tv/db';
@@ -24,7 +24,7 @@ export const apiKeyContext = (deps: { db: Database; redis: RedisClient }): Middl
     const prefix = parseApiKeyPrefix(presented);
     if (!prefix) throw new AuthError('Malformed API key');
 
-    const { ctx } = await deps.db.transaction(async (txDb) => {
+    const { ctx, scopes } = await deps.db.transaction(async (txDb) => {
       await withSuperAdminRls(txDb as never, 'system');
       const [token] = await txDb
         .select()
@@ -58,11 +58,13 @@ export const apiKeyContext = (deps: { db: Database; redis: RedisClient }): Middl
         planCode: tenant.planCode,
         isSuperAdmin: false,
       };
-      return { ctx: resolved };
+      return { ctx: resolved, scopes: token.scopes };
     });
 
     c.set('db', deps.db);
     c.set('redis', deps.redis);
+    c.set('apiTokenPrefix', prefix);
+    c.set('apiScopes', scopes);
 
     await runWithTenant(ctx, async () => {
       await deps.db.transaction(async (txDb) => {
@@ -72,5 +74,16 @@ export const apiKeyContext = (deps: { db: Database; redis: RedisClient }): Middl
         await clearRls(txDb as never);
       });
     });
+  };
+};
+
+/** Require the authenticated token to carry `scope` (403 otherwise). */
+export const requireScope = (scope: string): MiddlewareHandler => {
+  return async (c: Context, next) => {
+    const scopes = (c.get('apiScopes') as string[] | undefined) ?? [];
+    if (!scopes.includes(scope)) {
+      return c.json({ error: 'insufficient_scope', requiredScope: scope }, 403);
+    }
+    await next();
   };
 };

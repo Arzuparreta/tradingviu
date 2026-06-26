@@ -44,9 +44,33 @@ Notes:
   current surface is read-only. Per-scope enforcement, rate limiting, write
   endpoints, and a public WebSocket are the next steps.
 
+## 10b — Rate limiting + scope enforcement
+
+Status: done.
+
+Delivered:
+
+- **Scope enforcement:** `apiKeyContext` now exposes the token's `prefix` and
+  `scopes` on the context, and a `requireScope(scope)` middleware returns
+  `403 insufficient_scope` when the token lacks it. The `/v1` surface requires
+  the `read` scope (tokens default to `['read']`).
+- **Per-token rate limiting:** `apps/server/src/services/rate-limit.ts` — a pure
+  fixed-window core (`rateWindowKey`, `evaluateRateLimit`) plus a `rateLimit`
+  middleware that counts requests in Redis (`INCR` + `EXPIRE`), sets
+  `X-RateLimit-Limit/Remaining/Reset` headers, and returns `429` with
+  `Retry-After` once the limit is exceeded. It **fails open** — if Redis is
+  unavailable the request is allowed, so a limiter outage never takes the API
+  down. Configured by `API_RATE_LIMIT` (default 120) / `API_RATE_WINDOW_SEC`
+  (default 60).
+- Mounted on `/v1/*` (after `apiKeyContext`, so the limiter keys by token
+  prefix); the OpenAPI description documents the scope requirement, the
+  `X-RateLimit-*` headers, and the `429`.
+- The pure window math is unit-tested (`services/rate-limit.test.ts`): window key
+  stability/rotation, allow-up-to-limit-then-block, remaining + reset reporting.
+
 ## Remaining Slice 10 Work
 
-- Per-scope enforcement + rate limiting on `/v1`.
-- More `/v1` endpoints (indicators, news, screener) and write operations.
+- More `/v1` endpoints (indicators, news, screener) and write operations
+  (guarded by a `write` scope).
 - Public WebSocket streaming API.
 - Plugin SDK and Pine v6 compatibility.

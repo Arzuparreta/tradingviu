@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { and, asc, eq, ilike, or } from 'drizzle-orm';
 import { symbols, exchanges } from '@tv/db/schema';
 import { getProvider } from '../services/data.js';
+import { requireScope } from '../middleware/api-key.js';
 
 const SymbolsQuery = z.object({
   q: z.string().trim().min(1).max(80).optional(),
@@ -24,6 +25,7 @@ const ccxtMap: Record<string, string> = {
 
 /** Public, API-key-authenticated read surface. Mounted under `/v1`. */
 export const publicV1Routes = new Hono()
+  .use('*', requireScope('read'))
   .get('/symbols', zValidator('query', SymbolsQuery), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
@@ -76,7 +78,9 @@ export const openApiDocument = {
     version: '1.0.0',
     description:
       'Read access to market data. Authenticate with a personal access token: ' +
-      '`Authorization: Bearer tvk_…` (or the `X-API-Key` header).',
+      '`Authorization: Bearer tvk_…` (or the `X-API-Key` header). Tokens need the ' +
+      '`read` scope. Requests are rate limited per token (see the `X-RateLimit-*` ' +
+      'response headers; a `429` is returned when the limit is exceeded).',
   },
   servers: [{ url: '/v1' }],
   security: [{ apiKey: [] }, { bearerAuth: [] }],
