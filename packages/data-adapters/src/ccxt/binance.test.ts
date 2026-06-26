@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { Exchange as CcxtExchange } from 'ccxt';
 import type { BarQuery, Symbol } from '@tv/data-types';
 import type { BarEvent } from '../provider.js';
-import { CcxtProvider } from './binance.js';
+import { CcxtProvider, toBinanceSymbol } from './binance.js';
 
 const HOUR_MS = 3_600_000;
 
@@ -13,7 +13,7 @@ interface OhlcvCall {
   limit: number;
 }
 
-function makeProvider(ohlcv: number[][]): { provider: CcxtProvider; calls: OhlcvCall[] } {
+function makeProvider(ohlcv: number[][], id = 'coinbase'): { provider: CcxtProvider; calls: OhlcvCall[] } {
   const calls: OhlcvCall[] = [];
   const exchange = {
     fetchOHLCV: async (symbol: string, tf: string, since?: number, limit?: number) => {
@@ -21,7 +21,7 @@ function makeProvider(ohlcv: number[][]): { provider: CcxtProvider; calls: Ohlcv
       return ohlcv;
     },
   } as unknown as CcxtExchange;
-  return { provider: new CcxtProvider('binance', exchange), calls };
+  return { provider: new CcxtProvider(id, exchange), calls };
 }
 
 const candle = (ts: number): number[] => [ts, 1, 2, 0.5, 1.5, 10];
@@ -38,6 +38,31 @@ const symbol: Symbol = {
 };
 
 describe('CcxtProvider.fetchHistorical range', () => {
+  test('normalizes Binance symbols for native REST klines', async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(
+        JSON.stringify([[1_700_000_000_000, '1', '2', '0.5', '1.5', '10', 0, '0', 42, '0', '0', '0']]),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as typeof fetch;
+    try {
+      const provider = new CcxtProvider('binance', {} as unknown as CcxtExchange);
+      const bars = await provider.fetchHistorical({ symbol: 'BTC/USDT', interval: '1m', limit: 5 });
+      expect(calls[0]).toContain('symbol=BTCUSDT');
+      expect(bars[0]).toMatchObject({ time: 1_700_000_000, open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, trades: 42 });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('normalizes slashless and slash Binance symbols the same way', () => {
+    expect(toBinanceSymbol('BTC/USDT')).toBe('BTCUSDT');
+    expect(toBinanceSymbol('btcusdt')).toBe('BTCUSDT');
+  });
+
   test('derives `since` from `to - interval*limit` when only `to` is given and drops bars past `to`', async () => {
     const to = 1_700_000_000_000;
     const { provider, calls } = makeProvider([

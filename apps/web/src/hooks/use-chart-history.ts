@@ -29,6 +29,8 @@ export interface UseChartHistoryResult {
   upsertBar: (bar: Bar) => void;
   /** Append a closed bar (no in-place merge). */
   appendBar: (bar: Bar) => void;
+  /** Fetch and merge bars newer than `after` before inserting a live point with a gap. */
+  loadNewer: (after: number) => Promise<void>;
   /** Reset everything (symbol/interval change). */
   reset: () => void;
 }
@@ -149,6 +151,24 @@ export const useChartHistory = (opts: UseChartHistoryOpts): UseChartHistoryResul
     [symbolId, interval, queryClient],
   );
 
+  const loadNewer = useCallback(
+    async (after: number) => {
+      if (!symbolId) return;
+      const res = await fetch(
+        `/api/chart/history?symbol=${encodeURIComponent(symbolId)}&interval=${interval}&after=${after}&limit=${pageSize}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem('tv_token') ?? ''}` } },
+      );
+      if (!res.ok) return;
+      const json = (await res.json()) as { bars: Bar[] };
+      if (!json.bars || json.bars.length === 0) return;
+      queryClient.setQueryData<{ bars: Bar[]; interval: string } | undefined>(
+        ['chart-history', symbolId, interval],
+        (old) => (old ? { ...old, bars: dedupeSort([...old.bars, ...json.bars]) } : old),
+      );
+    },
+    [symbolId, interval, pageSize, queryClient],
+  );
+
   const reset = useCallback(() => {
     setExtraBars([]);
     setEarliestLoadedTime(null);
@@ -165,6 +185,7 @@ export const useChartHistory = (opts: UseChartHistoryOpts): UseChartHistoryResul
     loadMore,
     upsertBar,
     appendBar,
+    loadNewer,
     reset,
   };
 };

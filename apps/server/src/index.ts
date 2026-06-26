@@ -43,6 +43,7 @@ import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
 import { initBarStore, getBarStore, shutdownBarStore } from './services/data.js';
+import { shutdownMarketStore } from './services/market-store.js';
 
 const env = loadEnv();
 
@@ -153,6 +154,7 @@ const server = _server;
 const shutdown = async (): Promise<void> => {
   console.log('[shutdown] draining bar store…');
   await shutdownBarStore();
+  shutdownMarketStore();
   console.log('[shutdown] done');
   process.exit(0);
 };

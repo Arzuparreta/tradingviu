@@ -64,6 +64,14 @@ export interface DomBook {
   generatedAt: string;
 }
 
+export interface Quote {
+  time: number;
+  bid: number;
+  ask: number;
+  bidSize?: number;
+  askSize?: number;
+}
+
 export interface IndicatorDef {
   id: string;
   name: string;

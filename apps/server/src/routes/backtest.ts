@@ -15,9 +15,7 @@ import {
 } from '@tv/backtest-engine';
 import { compileAndRun, PineRuntimeError } from '@tv/pine-runtime';
 import { PineParseError } from '@tv/pine-parser';
-import { eq } from 'drizzle-orm';
-import { symbols, exchanges } from '@tv/db/schema';
-import { getProvider } from '../services/data.js';
+import { getFreshBars } from '../services/market-data.js';
 
 const BacktestBody = z.object({
   symbol: z.string(),
@@ -63,57 +61,25 @@ const WalkForwardBody = z.object({
   maxCombos: z.coerce.number().int().positive().max(2000).default(200),
 });
 
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
-
 export const backtestRoutes = new Hono()
   .get('/backtest/strategies', (c) => c.json({ strategies: strategyCatalog }))
   .post('/backtest', zValidator('json', BacktestBody), async (c) => {
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const providerId = ccxtMap[row.exchange] ?? 'binance';
-    const provider = getProvider(providerId);
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const resultBars = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = resultBars.bars;
 
     const result = runBacktest(bars, body.strategy, body.settings);
 
-    return c.json({ symbol: row, interval: body.interval, bars: bars.length, result });
+    return c.json({ symbol: resultBars.symbol, interval: body.interval, bars: bars.length, result });
   })
   .post('/backtest/optimize', zValidator('json', OptimizeBody), async (c) => {
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const resultBars = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = resultBars.bars;
 
     const optimization = optimize(bars, body.type, body.paramGrid, body.settings, {
       objective: body.objective,
@@ -121,26 +87,14 @@ export const backtestRoutes = new Hono()
       topN: body.topN,
     });
 
-    return c.json({ symbol: row, interval: body.interval, bars: bars.length, optimization });
+    return c.json({ symbol: resultBars.symbol, interval: body.interval, bars: bars.length, optimization });
   })
   .post('/backtest/walkforward', zValidator('json', WalkForwardBody), async (c) => {
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const resultBars = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = resultBars.bars;
 
     const result = walkForward(bars, body.type, body.paramGrid, body.settings, {
       objective: body.objective,
@@ -149,26 +103,14 @@ export const backtestRoutes = new Hono()
       maxCombos: body.maxCombos,
     });
 
-    return c.json({ symbol: row, interval: body.interval, bars: bars.length, walkForward: result });
+    return c.json({ symbol: resultBars.symbol, interval: body.interval, bars: bars.length, walkForward: result });
   })
   .post('/backtest/pine', zValidator('json', PineBacktestBody), async (c) => {
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const resultBars = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = resultBars.bars;
 
     try {
       const pine = compileAndRun(body.source, bars, body.inputs ?? {});
@@ -185,7 +127,7 @@ export const backtestRoutes = new Hono()
       const result = simulate(bars, signals, body.settings);
       return c.json({
         ok: true,
-        symbol: row,
+        symbol: resultBars.symbol,
         interval: body.interval,
         bars: bars.length,
         signalPlot: chosen.title,

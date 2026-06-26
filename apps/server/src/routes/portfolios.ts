@@ -14,24 +14,16 @@ import { exchanges, holdings, portfolios, symbols, transactions } from '@tv/db/s
 import { ulid } from 'ulid';
 import { computeHoldings, toDecimalText, validatePortfolioTransaction } from '../services/portfolio-engine.js';
 import { computePortfolioAnalytics, type AnalyticsPosition } from '@tv/portfolio-analytics';
-import { getProvider } from '../services/data.js';
-
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
+import { getFreshBars } from '../services/market-data.js';
 
 /** Latest close as a current-price proxy; falls back to `fallback` on failure. */
-const lastPrice = async (exchange: string, ticker: string, fallback: number): Promise<number> => {
+const lastPrice = async (
+  db: ReturnType<typeof import('@tv/db').createDb>,
+  symbolId: string,
+  fallback: number,
+): Promise<number> => {
   try {
-    const bars = await getProvider(ccxtMap[exchange] ?? 'binance').fetchHistorical({
-      symbol: ticker,
-      interval: '1d',
-      limit: 1,
-    });
-    const close = bars.at(-1)?.close;
+    const close = (await getFreshBars(db, symbolId, '1m', { limit: 1 })).bars.at(-1)?.close;
     return typeof close === 'number' && Number.isFinite(close) && close > 0 ? close : fallback;
   } catch {
     return fallback;
@@ -149,7 +141,6 @@ export const portfolioRoutes = new Hono()
         quantity: holdings.quantity,
         avgCost: holdings.avgCost,
         ticker: symbols.ticker,
-        exchange: exchanges.code,
         assetClass: symbols.assetClass,
         sector: symbols.sector,
       })
@@ -162,7 +153,7 @@ export const portfolioRoutes = new Hono()
       rows.map(async (r): Promise<AnalyticsPosition> => {
         const avgCost = Number(r.avgCost);
         const quantity = Number(r.quantity);
-        const price = await lastPrice(r.exchange, r.ticker, avgCost);
+        const price = await lastPrice(db, r.symbolId, avgCost);
         return {
           symbolId: r.symbolId,
           ticker: r.ticker,

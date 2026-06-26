@@ -1,18 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { eq } from 'drizzle-orm';
-import { symbols, exchanges } from '@tv/db/schema';
 import { validate, compileAndRun, PineRuntimeError } from '@tv/pine-runtime';
 import { PineParseError } from '@tv/pine-parser';
-import { getProvider } from '../services/data.js';
-
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
+import { getFreshBars } from '../services/market-data.js';
 
 const ValidateBody = z.object({
   source: z.string().min(1).max(20000),
@@ -35,20 +26,8 @@ export const pineRoutes = new Hono()
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const result = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = result.bars;
 
     try {
       const result = compileAndRun(body.source, bars, body.inputs ?? {});

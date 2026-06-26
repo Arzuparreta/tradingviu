@@ -100,8 +100,8 @@ buildAndAnalyze('iron_condor', {
 ### What it delivers
 
 - Zod contracts in `packages/core/src/dom-schemas.ts`.
-- Pure deterministic DOM builder in `apps/server/src/services/depth.ts`.
-- `GET /api/chart/dom` for a recent-bar-derived bid/ask ladder with spread, tick size, cumulative depth, and imbalance.
+- `apps/server/src/services/market-store.ts` keeps live Binance quote/book state from `bookTicker` and `depth20@100ms`, with REST depth snapshots for first paint.
+- `GET /api/chart/dom` returns a live Binance bid/ask ladder when the symbol is on Binance, including spread, tick size, cumulative depth, and imbalance.
 - `ChartPage` right-side trading panel:
   - DOM ladder with bid/ask depth bars.
   - Click ask rows to stage buy limits; click bid rows to stage sell limits.
@@ -109,7 +109,7 @@ buildAndAnalyze('iron_condor', {
   - Destination selector for paper accounts or broker connections.
   - Submits through existing `/api/paper/accounts/:id/orders` and `/api/brokers/connections/:id/orders`.
 
-The DOM is intentionally deterministic from recent bars, not persisted fake L2 data. It gives the product a complete trading workflow now and can be replaced by a real L2 provider later without changing the chart ticket contract.
+The original deterministic DOM builder has been superseded for Binance symbols by real exchange depth. The chart ticket contract is unchanged, so other providers can add real L2 adapters behind the same API.
 
 ### Tests
 

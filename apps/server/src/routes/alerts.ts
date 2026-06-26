@@ -14,17 +14,10 @@ import {
 } from '@tv/core';
 import { alertHistory, alerts, exchanges, symbols } from '@tv/db/schema';
 import { ulid } from 'ulid';
-import { getProvider } from '../services/data.js';
 import { evaluateAlertCondition } from '../services/alert-engine.js';
 import { buildAlertWebhookPayload, deliverWebhook, renderAlertEmail, deliverEmail } from '@tv/notifications';
 import { getEmailTransport } from '../services/email.js';
-
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
+import { getFreshBars } from '../services/market-data.js';
 
 const collectIndicatorIntervals = (condition: AlertCondition): Interval[] => {
   if (condition.type === 'indicator') return [condition.interval];
@@ -157,10 +150,9 @@ export const alertRoutes = new Hono()
     if (!row.active) throw new ValidationError('Cannot evaluate inactive alert');
 
     const condition = AlertConditionSchema.parse(row.condition);
-    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
     const intervals = collectIndicatorIntervals(condition);
     const interval: Interval = intervals[0] ?? '1h';
-    const bars = await provider.fetchHistorical({ symbol: row.ticker, interval, limit: 300 });
+    const bars = (await getFreshBars(db, row.symbolId, interval, { limit: 300 })).bars;
     const lastBar = bars.at(-1);
     if (!lastBar && body.price === undefined) throw new ValidationError('No market price available');
     const price = body.price ?? lastBar!.close;

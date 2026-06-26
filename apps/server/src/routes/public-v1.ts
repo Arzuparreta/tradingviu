@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, eq, ilike, or } from 'drizzle-orm';
 import { symbols, exchanges } from '@tv/db/schema';
-import { getProvider } from '../services/data.js';
 import { requireScope } from '../middleware/api-key.js';
+import { getFreshBars } from '../services/market-data.js';
 
 const SymbolsQuery = z.object({
   q: z.string().trim().min(1).max(80).optional(),
@@ -15,13 +15,6 @@ const HistoryQuery = z.object({
   interval: z.enum(['1m', '5m', '15m', '1h', '4h', '1d', '1w']).default('1h'),
   limit: z.coerce.number().int().positive().max(2000).default(300),
 });
-
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
 
 /** Public, API-key-authenticated read surface. Mounted under `/v1`. */
 export const publicV1Routes = new Hono()
@@ -53,21 +46,8 @@ export const publicV1Routes = new Hono()
   .get('/symbols/:id/history', zValidator('query', HistoryQuery), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, c.req.param('id')))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: q.interval,
-      limit: q.limit,
-    });
-    return c.json({ symbol: row, interval: q.interval, bars });
+    const result = await getFreshBars(db, c.req.param('id'), q.interval, { limit: q.limit });
+    return c.json({ symbol: result.symbol, interval: q.interval, bars: result.bars });
   });
 
 /** OpenAPI 3.1 description of the public `/v1` surface. Served unauthenticated. */

@@ -29,6 +29,7 @@ import type {
 import type { DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPeriod } from '../api/types';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
+import { useMarketStream } from '../hooks/use-market-stream';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -259,7 +260,7 @@ export function ChartPage() {
     queryKey: ['dom', symbolId],
     queryFn: () => api.dom(symbolId!, 16),
     enabled: !!symbolId,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
   });
 
   const paperAccountsQ = useQuery({
@@ -283,7 +284,14 @@ export function ChartPage() {
     })),
   });
 
-  const lastPrice = domQ.data?.book.mid ?? historyQ.bars.at(-1)?.close;
+  const market = useMarketStream({
+    symbolId: streamEnabled ? symbolId : null,
+    exchange: streamExchange,
+    ticker: streamTicker,
+  });
+  const liveBook = market.book ?? domQ.data?.book;
+  const lastPrice =
+    market.quote ? (market.quote.bid + market.quote.ask) / 2 : liveBook?.mid ?? historyQ.bars.at(-1)?.close;
 
   // Bars actually drawn on the chart. In replay we reveal only bars up to the
   // cursor; otherwise we render the full loaded history (same array identity, so
@@ -835,28 +843,6 @@ export function ChartPage() {
     }
   }, [indicatorQueries, historyQ.bars, replayCutoff]);
 
-  const stream = useBarStream({
-    symbolId: streamEnabled ? symbolId : null,
-    exchange: streamExchange,
-    ticker: streamTicker,
-    interval,
-    onBar: (bar) => {
-      if (!candleRef.current || !volumeRef.current) return;
-      // Push directly to the chart via series.update(). The React state
-      // (historyQ.bars) is only updated on loadMore so we don't reset the
-      // visible range on every tick.
-      update(candleRef.current, {
-        time: bar.time as UTCTimestamp,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-      });
-      update(volumeRef.current, { time: bar.time as UTCTimestamp, value: bar.volume });
-    },
-  });
-  const streamStatus = stream.status;
-
   // Paginated history: when the user scrolls into the empty zone on the left,
   // pull more bars. We trigger `loadMore` when the visible-range's left edge
   // is within ~5 bars of the loaded buffer's leftmost time. We read the
@@ -871,6 +857,22 @@ export function ChartPage() {
     };
     return map[interval] ?? 60;
   })();
+  const stream = useBarStream({
+    symbolId: streamEnabled ? symbolId : null,
+    exchange: streamExchange,
+    ticker: streamTicker,
+    interval,
+    onBar: (bar) => {
+      const hq = historyQRef.current;
+      const latest = hq.bars.at(-1);
+      if (latest && bar.time > latest.time + Math.floor(intervalSec * 1.5)) {
+        void hq.loadNewer(latest.time).finally(() => hq.upsertBar(bar));
+        return;
+      }
+      hq.upsertBar(bar);
+    },
+  });
+  const streamStatus = stream.status;
   const triggerZone = 5 * intervalSec;
   useEffect(() => {
     const chart = chartRef.current;
@@ -974,11 +976,11 @@ export function ChartPage() {
 
   const formatPrice = useCallback(
     (price: number) => {
-      const tickSize = domQ.data?.book.tickSize ?? 0.01;
-      const decimals = Math.min(8, Math.max(2, Math.ceil(Math.log10(1 / tickSize))));
-      return price.toFixed(decimals);
-    },
-    [domQ.data?.book.tickSize],
+    const tickSize = liveBook?.tickSize ?? 0.01;
+    const decimals = Math.min(8, Math.max(2, Math.ceil(Math.log10(1 / tickSize))));
+    return price.toFixed(decimals);
+  },
+    [liveBook?.tickSize],
   );
 
   const selectDomLevel = useCallback(
@@ -1074,7 +1076,7 @@ export function ChartPage() {
   }
 
   const overlayIndicators = indicatorsQ.data?.indicators.filter((i) => i.overlay) ?? [];
-  const book = domQ.data?.book;
+  const book = liveBook;
   const maxDepth = Math.max(book?.bids.at(-1)?.cumulative ?? 0, book?.asks.at(-1)?.cumulative ?? 0);
   const selectedPaper = paperAccountsQ.data?.accounts.find(
     (account) => account.id === paperAccountId,
@@ -1116,6 +1118,9 @@ export function ChartPage() {
                 {symbolInfo
                   ? `${symbolInfo.exchange}:${symbolInfo.ticker}`
                   : symbolId}
+              </div>
+              <div className="muted small">
+                {market.status === 'live' ? 'live depth' : market.status === 'idle' ? 'snapshot' : market.status}
               </div>
             </div>
             <span className="grow" />

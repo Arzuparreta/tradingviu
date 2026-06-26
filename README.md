@@ -4,7 +4,7 @@ Self-hosted, open-source trading platform. TradingView, but yours.
 
 Multi-tenant, runs on your VPS. Charts, indicators, Pine Script subset, alerts, screening, paper trading, broker integrations, social, portfolios, news, calendars — all the things, in one platform.
 
-**Status:** active development. Slices 1–4 done (foundation, indicators, Pine Script + multi-chart + search, alerts + portfolios + paper trading); slice 5 in progress (options engine done). See `docs/ROADMAP.md`.
+**Status:** active development. Slices 1–5 are done, slice 6/7/10/11 are in progress, and slice 9 advanced TA is done except true footprint tape. See `docs/ROADMAP.md`.
 
 ## Quick start (self-hosted)
 
@@ -70,7 +70,7 @@ open http://localhost:5147
 - **Cache/pubsub:** Redis
 - **Auth:** Better Auth (multi-tenant with org plugin)
 - **Charts:** `tradingview/lightweight-charts` (Apache 2.0)
-- **Data:** CCXT for crypto, pluggable adapters
+- **Data:** native Binance market data (REST klines + WS bars/quote/depth) with CCXT fallbacks and pluggable adapters
 - **Frontend:** Vite + React 18
 - **Desktop:** Tauri 2
 - **Mobile:** React Native

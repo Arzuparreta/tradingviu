@@ -4,6 +4,11 @@ import { IntervalSchema } from './time.js';
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ping'), t: z.number().optional() }),
   z.object({ type: z.literal('subscribe'), symbol: z.string(), interval: IntervalSchema }),
+  z.object({
+    type: z.literal('subscribe_market'),
+    symbol: z.string(),
+    channels: z.array(z.enum(['quote', 'book'])).min(1).default(['quote', 'book']),
+  }),
   z.object({ type: z.literal('unsubscribe'), symbol: z.string() }),
   z.object({ type: z.literal('auth'), token: z.string() }),
 ]);
@@ -29,6 +34,13 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     message: z.string().optional(),
   }),
   z.object({ type: z.literal('quote'), symbol: z.string(), quote: z.unknown() }),
+  z.object({ type: z.literal('book'), symbol: z.string(), book: z.unknown() }),
+  z.object({
+    type: z.literal('market_status'),
+    symbol: z.string(),
+    status: z.enum(['connecting', 'live', 'reconnecting', 'down', 'idle']),
+    message: z.string().optional(),
+  }),
   z.object({ type: z.literal('trade'), symbol: z.string(), trade: z.unknown() }),
   z.object({ type: z.literal('alert'), alertId: z.string(), payload: z.unknown() }),
   z.object({ type: z.literal('error'), error: z.string() }),

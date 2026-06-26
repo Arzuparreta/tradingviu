@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { computeIchimoku } from '@tv/ichimoku';
-import { eq } from 'drizzle-orm';
-import { symbols, exchanges } from '@tv/db/schema';
-import { getProvider } from '../services/data.js';
+import { getFreshBars } from '../services/market-data.js';
 
 const IchimokuBody = z.object({
   symbol: z.string(),
@@ -16,13 +14,6 @@ const IchimokuBody = z.object({
   displacement: z.coerce.number().int().min(0).max(200).default(26),
 });
 
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
-
 export const ichimokuRoutes = new Hono().post(
   '/ichimoku',
   zValidator('json', IchimokuBody),
@@ -30,21 +21,8 @@ export const ichimokuRoutes = new Hono().post(
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const providerId = ccxtMap[row.exchange] ?? 'binance';
-    const provider = getProvider(providerId);
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const result = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = result.bars;
 
     const ichimoku = computeIchimoku(bars, {
       tenkan: body.tenkan,
@@ -54,7 +32,7 @@ export const ichimokuRoutes = new Hono().post(
     });
 
     return c.json({
-      symbol: row,
+      symbol: result.symbol,
       interval: body.interval,
       bars: bars.length,
       ichimoku,

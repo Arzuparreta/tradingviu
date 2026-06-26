@@ -4,6 +4,7 @@ import { type BarEventHandler, type DataProvider, ProviderError } from '../provi
 import { intervalToMs, type Interval } from '@tv/core';
 
 const SUPPORTED_INTERVALS: Record<string, string> = {
+  '1s': '1s',
   '1m': '1m',
   '5m': '5m',
   '15m': '15m',
@@ -19,6 +20,74 @@ const SUPPORTED_INTERVALS: Record<string, string> = {
 const CCXT_INTERVALS = new Set(Object.keys(SUPPORTED_INTERVALS));
 
 const toCcxtTimestamp = (value: number): number => (value < 10_000_000_000 ? value * 1000 : value);
+const toSeconds = (value: number): number => Math.floor(toCcxtTimestamp(value) / 1000);
+
+export const toBinanceSymbol = (symbol: string): string =>
+  symbol.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+const isBinanceKline = (value: unknown): value is [
+  number,
+  string,
+  string,
+  string,
+  string,
+  string,
+  number,
+  string,
+  number,
+  string,
+  string,
+  string,
+] =>
+  Array.isArray(value) &&
+  typeof value[0] === 'number' &&
+  typeof value[1] === 'string' &&
+  typeof value[2] === 'string' &&
+  typeof value[3] === 'string' &&
+  typeof value[4] === 'string' &&
+  typeof value[5] === 'string';
+
+const fetchBinanceHistorical = async (q: BarQuery): Promise<Bar[]> => {
+  if (!CCXT_INTERVALS.has(q.interval)) {
+    throw new ProviderError('binance', `interval ${q.interval} not supported`);
+  }
+  const params = new URLSearchParams({
+    symbol: toBinanceSymbol(q.symbol),
+    interval: SUPPORTED_INTERVALS[q.interval]!,
+    limit: String(Math.min(q.limit, 1000)),
+  });
+  if (q.from !== undefined) params.set('startTime', String(toCcxtTimestamp(q.from)));
+  if (q.to !== undefined) params.set('endTime', String(toCcxtTimestamp(q.to)));
+  const res = await fetch(`https://api.binance.com/api/v3/klines?${params.toString()}`);
+  if (!res.ok) {
+    throw new ProviderError('binance', `klines HTTP ${res.status} for ${q.symbol}`);
+  }
+  const raw = (await res.json()) as unknown;
+  if (!Array.isArray(raw)) {
+    throw new ProviderError('binance', `klines returned invalid payload for ${q.symbol}`);
+  }
+  return raw
+    .filter(isBinanceKline)
+    .map((candle) => ({
+      time: Math.floor(candle[0] / 1000),
+      open: Number(candle[1]),
+      high: Number(candle[2]),
+      low: Number(candle[3]),
+      close: Number(candle[4]),
+      volume: Number(candle[5]),
+      trades: candle[8],
+    }))
+    .filter(
+      (bar) =>
+        Number.isFinite(bar.open) &&
+        Number.isFinite(bar.high) &&
+        Number.isFinite(bar.low) &&
+        Number.isFinite(bar.close) &&
+        Number.isFinite(bar.volume) &&
+        (q.from === undefined || bar.time >= toSeconds(q.from)) &&
+        (q.to === undefined || bar.time <= toSeconds(q.to)),
+    );
+};
 
 export class CcxtProvider implements DataProvider {
   readonly id: string;
@@ -67,6 +136,11 @@ export class CcxtProvider implements DataProvider {
   }
 
   async fetchHistorical(q: BarQuery): Promise<Bar[]> {
+    if (this.id === 'binance') {
+      return fetchBinanceHistorical(q).catch((e) => {
+        throw e instanceof ProviderError ? e : new ProviderError(this.id, `fetch klines failed for ${q.symbol}`, e);
+      });
+    }
     if (!CCXT_INTERVALS.has(q.interval)) {
       throw new ProviderError(this.id, `interval ${q.interval} not supported`);
     }
@@ -91,7 +165,7 @@ export class CcxtProvider implements DataProvider {
           candle[4] !== undefined,
         )
         .map(([ts, o, h, l, c, v]) => ({
-          time: Math.floor(ts / (isSeconds ? 1 : 1000)),
+          time: isSeconds && ts < 10_000_000_000 ? Math.floor(ts) : Math.floor(ts / 1000),
           open: o,
           high: h,
           low: l,
@@ -100,8 +174,8 @@ export class CcxtProvider implements DataProvider {
         }))
         .filter(
           (bar) =>
-            (q.from === undefined || bar.time >= Math.floor(toCcxtTimestamp(q.from) / 1000)) &&
-            (q.to === undefined || bar.time <= Math.floor(toCcxtTimestamp(q.to) / 1000)),
+            (q.from === undefined || bar.time >= toSeconds(q.from)) &&
+            (q.to === undefined || bar.time <= toSeconds(q.to)),
         );
     } catch (e) {
       throw new ProviderError(this.id, `fetchOHLCV failed for ${q.symbol}`, e);

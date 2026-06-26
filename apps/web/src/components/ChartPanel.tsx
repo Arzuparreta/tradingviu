@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api, getToken } from '../api/client';
-import { createTvChart, addSeries, setData, update, removeChart, darkTheme } from '@tv/chart-engine';
+import { createTvChart, addSeries, setData, removeChart, darkTheme } from '@tv/chart-engine';
 import { INTERVALS, type Interval, type Panel } from '@tv/layout-sync';
 import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
 import { SymbolSearch } from './SymbolSearch';
+import { useChartHistory } from '../hooks/use-chart-history';
+import { useBarStream } from '../hooks/use-bar-stream';
 
 /** The loaded time span of a panel's bars, reported up for multi-chart replay. */
 export interface PanelBounds {
@@ -55,11 +55,10 @@ export function ChartPanel({
   onDestroyRef.current = onDestroy;
   onBoundsRef.current = onBounds;
 
-  const historyQ = useQuery({
-    queryKey: ['panel-history', panel.symbolId, panel.interval],
-    queryFn: () => api.history(panel.symbolId!, panel.interval, 500),
-    enabled: !!panel.symbolId,
-    refetchInterval: live ? 30_000 : false,
+  const historyQ = useChartHistory({
+    symbolId: panel.symbolId ?? null,
+    interval: panel.interval,
+    pageSize: 500,
   });
 
   // Create the chart once.
@@ -89,10 +88,10 @@ export function ChartPanel({
   // Bars actually drawn: the full history, or clipped to the shared replay
   // cursor time so every panel reveals the same point in time together.
   const renderBars = useMemo(() => {
-    const bars = historyQ.data?.bars ?? [];
+    const bars = historyQ.bars;
     if (replayActive && replayCursor != null) return bars.filter((b) => b.time <= replayCursor);
     return bars;
-  }, [historyQ.data, replayActive, replayCursor]);
+  }, [historyQ.bars, replayActive, replayCursor]);
 
   // Re-fit the view when the symbol/interval changes (not on every replay step).
   const firstFitRef = useRef(true);
@@ -124,7 +123,7 @@ export function ChartPanel({
 
   // Report this panel's loaded time bounds for the parent's global replay domain.
   useEffect(() => {
-    const bars = historyQ.data?.bars;
+    const bars = historyQ.bars;
     if (!bars || bars.length === 0) {
       onBoundsRef.current?.(panel.id, null);
       return;
@@ -137,38 +136,19 @@ export function ChartPanel({
       if (d > 0 && d < step) step = d;
     }
     onBoundsRef.current?.(panel.id, { min, max, step: Number.isFinite(step) ? step : 60 });
-  }, [historyQ.data, panel.id]);
+  }, [historyQ.bars, panel.id]);
 
-  // Live bars over WebSocket.
-  useEffect(() => {
-    if (!live || !panel.symbolId || !historyQ.data) return;
-    const token = getToken();
-    if (!token) return;
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const sym = `${historyQ.data.symbol.exchange}:${historyQ.data.symbol.ticker}`;
-    const ws = new WebSocket(`${proto}://${window.location.host}/ws?token=${token}`);
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'subscribe', symbol: sym, interval: panel.interval }));
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'bar' && candleRef.current && volumeRef.current) {
-          update(candleRef.current, {
-            time: msg.bar.time as UTCTimestamp,
-            open: msg.bar.open,
-            high: msg.bar.high,
-            low: msg.bar.low,
-            close: msg.bar.close,
-          });
-          update(volumeRef.current, { time: msg.bar.time as UTCTimestamp, value: msg.bar.volume });
-        }
-      } catch {
-        /* ignore malformed frames */
-      }
-    };
-    return () => ws.close();
-  }, [live, panel.symbolId, panel.interval, historyQ.data?.symbol.exchange, historyQ.data?.symbol.ticker]);
+  const historyQRef = useRef(historyQ);
+  historyQRef.current = historyQ;
+  useBarStream({
+    symbolId: live && !replayActive && panel.symbolId && historyQ.symbol ? panel.symbolId : null,
+    exchange: historyQ.symbol?.exchange ?? '',
+    ticker: historyQ.symbol?.ticker ?? '',
+    interval: panel.interval,
+    onBar: (bar) => historyQRef.current.upsertBar(bar),
+  });
 
-  const sym = historyQ.data?.symbol;
+  const sym = historyQ.symbol;
   const showPicker = picking || !panel.symbolId;
 
   return (

@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { computeTpoProfile } from '@tv/tpo-profile';
-import { eq } from 'drizzle-orm';
-import { symbols, exchanges } from '@tv/db/schema';
-import { getProvider } from '../services/data.js';
+import { getFreshBars } from '../services/market-data.js';
 
 const TpoProfileBody = z.object({
   symbol: z.string(),
@@ -15,13 +13,6 @@ const TpoProfileBody = z.object({
   barsPerPeriod: z.coerce.number().int().min(1).max(120).default(1),
 });
 
-const ccxtMap: Record<string, string> = {
-  BINANCE: 'binance',
-  COINBASE: 'coinbase',
-  KRAKEN: 'kraken',
-  BYBIT: 'bybit',
-};
-
 export const tpoProfileRoutes = new Hono().post(
   '/tpo-profile',
   zValidator('json', TpoProfileBody),
@@ -29,21 +20,8 @@ export const tpoProfileRoutes = new Hono().post(
     const body = c.req.valid('json');
 
     const db = c.get('db');
-    const [row] = await db
-      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
-      .from(symbols)
-      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(eq(symbols.id, body.symbol))
-      .limit(1);
-    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
-
-    const providerId = ccxtMap[row.exchange] ?? 'binance';
-    const provider = getProvider(providerId);
-    const bars = await provider.fetchHistorical({
-      symbol: row.ticker,
-      interval: body.interval,
-      limit: body.limit,
-    });
+    const result = await getFreshBars(db, body.symbol, body.interval, { limit: body.limit });
+    const bars = result.bars;
 
     const profile = computeTpoProfile(bars, {
       bins: body.bins,
@@ -52,7 +30,7 @@ export const tpoProfileRoutes = new Hono().post(
     });
 
     return c.json({
-      symbol: row,
+      symbol: result.symbol,
       interval: body.interval,
       bars: bars.length,
       profile,

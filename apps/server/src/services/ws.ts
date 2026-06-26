@@ -1,6 +1,8 @@
 import type { ServerWebSocket } from 'bun';
 import { ClientMessageSchema, type ServerMessage } from '@tv/core';
 import { getBarStore } from './data.js';
+import { normalizeProviderTicker } from './market-data.js';
+import { getMarketStore, type MarketChannel } from './market-store.js';
 
 type WsData = { userId?: string; tenantId?: string };
 type Ws = ServerWebSocket<WsData>;
@@ -15,6 +17,7 @@ interface Subscription {
 interface Connection {
   ws: Ws;
   subscriptions: Map<string, Subscription>;
+  marketSubscriptions: Map<string, () => void>;
 }
 
 const connections = new Map<Ws, Connection>();
@@ -62,7 +65,11 @@ const handleSubscribe = (ws: Ws, msg: { symbol: string; interval: string }): voi
   }
   const barStore = getBarStore();
   const unsubscribe = barStore.subscribe(
-    { provider: parsed.provider, ticker: parsed.ticker, interval: msg.interval as never },
+    {
+      provider: parsed.provider,
+      ticker: normalizeProviderTicker(parsed.provider, parsed.ticker),
+      interval: msg.interval as never,
+    },
     (event) => {
       if (event.kind === 'status') {
         broadcast(ks, {
@@ -92,6 +99,50 @@ const handleSubscribe = (ws: Ws, msg: { symbol: string; interval: string }): voi
   send(ws, { type: 'subscribed', symbol: msg.symbol });
 };
 
+const handleMarketSubscribe = (
+  ws: Ws,
+  msg: { symbol: string; channels: readonly string[] },
+): void => {
+  const conn = connections.get(ws);
+  if (!conn) return;
+  const parsed = parseSymbol(msg.symbol);
+  if (!parsed) {
+    send(ws, { type: 'error', error: 'invalid_symbol' });
+    return;
+  }
+  const ks = `${parsed.provider}:${parsed.ticker}:market`;
+  conn.marketSubscriptions.get(ks)?.();
+  const channels = msg.channels.filter((channel): channel is MarketChannel =>
+    channel === 'quote' || channel === 'book',
+  );
+  if (channels.length === 0) {
+    send(ws, { type: 'error', error: 'invalid_market_channels' });
+    return;
+  }
+  const unsubscribe = getMarketStore().subscribe(
+    { provider: parsed.provider, ticker: normalizeProviderTicker(parsed.provider, parsed.ticker) },
+    channels,
+    (event) => {
+      if (event.kind === 'status') {
+        send(ws, {
+          type: 'market_status',
+          symbol: msg.symbol,
+          status: event.status,
+          ...(event.message !== undefined ? { message: event.message } : {}),
+        });
+        return;
+      }
+      if (event.kind === 'quote') {
+        send(ws, { type: 'quote', symbol: msg.symbol, quote: event.quote });
+        return;
+      }
+      send(ws, { type: 'book', symbol: msg.symbol, book: event.book });
+    },
+  );
+  conn.marketSubscriptions.set(ks, unsubscribe);
+  send(ws, { type: 'subscribed', symbol: msg.symbol });
+};
+
 const handleUnsubscribe = (ws: Ws, msg: { symbol: string }): void => {
   const conn = connections.get(ws);
   if (!conn) return;
@@ -107,12 +158,18 @@ const handleUnsubscribe = (ws: Ws, msg: { symbol: string }): void => {
       conn.subscriptions.delete(ks);
     }
   }
+  for (const [ks, unsub] of conn.marketSubscriptions) {
+    if (ks.startsWith(`${parsed.provider}:${parsed.ticker}:`)) {
+      unsub();
+      conn.marketSubscriptions.delete(ks);
+    }
+  }
   send(ws, { type: 'unsubscribed', symbol: msg.symbol });
 };
 
 export const wsHandlers = {
   open(ws: Ws): void {
-    const conn: Connection = { ws, subscriptions: new Map() };
+    const conn: Connection = { ws, subscriptions: new Map(), marketSubscriptions: new Map() };
     connections.set(ws, conn);
     send(ws, { type: 'hello', serverTime: Date.now() });
   },
@@ -138,6 +195,10 @@ export const wsHandlers = {
       handleSubscribe(ws, msg);
       return;
     }
+    if (msg.type === 'subscribe_market') {
+      handleMarketSubscribe(ws, msg);
+      return;
+    }
     if (msg.type === 'unsubscribe') {
       handleUnsubscribe(ws, msg);
       return;
@@ -149,7 +210,11 @@ export const wsHandlers = {
     for (const sub of conn.subscriptions.values()) {
       sub.unsubscribe();
     }
+    for (const unsub of conn.marketSubscriptions.values()) {
+      unsub();
+    }
     conn.subscriptions.clear();
+    conn.marketSubscriptions.clear();
     connections.delete(ws);
   },
 };

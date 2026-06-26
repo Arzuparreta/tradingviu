@@ -13,7 +13,7 @@ Domain services (workers, isolated)
    ↓
 State (PostgreSQL+TSDB · Redis · S3 · Meili · NATS)
    ↓
-External (CCXT, Alpaca, Polygon, Stripe, Postmark, FRED)
+External (Binance REST/WS, CCXT fallbacks, Alpaca, Polygon, Stripe, Postmark, FRED)
 ```
 
 ## Multi-tenancy
@@ -32,7 +32,7 @@ External (CCXT, Alpaca, Polygon, Stripe, Postmark, FRED)
 
 ## Data sources
 
-- `packages/data-adapters/ccxt` for crypto (Binance, Coinbase, Kraken, Bybit) with WebSocket subscriptions.
+- Native Binance REST/WS for klines, quote, and depth; CCXT remains the fallback adapter path for other crypto exchanges.
 - Plug-in adapters for stocks, forex, etc.
 
 ## Plan/quotas
@@ -47,23 +47,24 @@ See `packages/core/src/ws-protocol.ts`. Discriminated union schema with Zod for 
 
 ## Status
 
-This is slice 1 of Phase 0. What's running:
+This file started as the slice 1 architecture note. Current runtime status:
 
 - Multi-tenant DB with RLS
 - Signup/login with auto-provisioning
 - Plan/billing stub (Stripe scaffolded, free plan default)
 - Symbol catalog (seeded with crypto)
-- Chart history endpoint pulling from CCXT
+- Chart history endpoint backed by BarStore/TimescaleDB and freshness-aware provider fallback
+- Live Binance bars, quote, and depth over WebSocket
 - Web UI: login, signup, dashboard, chart
 - tvctl operator CLI
 - Docker Compose for self-hosting
 
-Coming in slice 2:
+Already delivered after slice 1:
 
 - Watchlists + portfolio + alerts CRUD
-- Indicator library (TA-Lib WASM)
+- Indicator library
 - Drawing tools persistence
 - Symbol search via Meilisearch
 - Provider health monitoring
-- Real-time WebSocket bar updates
+- Real-time WebSocket bar updates and market quote/depth fanout
 - Stripe checkout flow end-to-end

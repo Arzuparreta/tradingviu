@@ -2,6 +2,8 @@
 
 This is the first vertical slice. Everything below is end-to-end working on a fresh VPS.
 
+> Historical note: current chart data no longer uses the slice 1/2 polling path. Slice 2.5 adds BarStore persistence, native Binance klines, and live quote/depth.
+
 ## What works
 
 - Multi-tenant DB with PostgreSQL RLS (every request scopes `app.tenant_id`)
@@ -61,4 +63,4 @@ docker compose -f infra/docker-compose.yml exec api bun run packages/db/src/seed
 2. Sign up (first signup is super admin)
 3. Click "Open chart"
 4. Pick a symbol, e.g. `BINANCE:BTCUSDT`
-5. You should see candles rendering with live-ish data from Binance
+5. You should see candles rendering with live data from Binance

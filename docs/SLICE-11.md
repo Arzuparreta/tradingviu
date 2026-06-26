@@ -37,8 +37,8 @@ Delivered:
   `BacktestResult`, plus a `strategyCatalog` (label, description, tunable param
   defs) for the API + UI.
 - `POST /api/backtest` (`{ symbol, interval, limit, strategy, settings }`) in
-  `apps/server/src/routes/backtest.ts`, fetching bars through the same CCXT
-  provider path as the other analysis routes, plus
+  `apps/server/src/routes/backtest.ts`, fetching bars through the shared
+  freshness-aware market-data path used by the other analysis routes, plus
   `GET /api/backtest/strategies` for the catalog.
 - A **Backtest** toggle on `ChartPage`: pick a strategy, tune its params and the
   account settings (capital, fee, slippage, position size, allow-shorts), Run,

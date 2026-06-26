@@ -2,6 +2,8 @@
 
 Commit: `39a6465`
 
+> Historical note: the live-bar polling design below was superseded by slice 2.5. Current Binance charts use native REST/WS bars plus live quote/depth fanout.
+
 ## What it delivered
 
 ### TA library (`packages/ta-lib`)

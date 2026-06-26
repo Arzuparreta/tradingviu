@@ -78,7 +78,7 @@ Delivered:
   breakout order.
 - `GET /api/chart-patterns` (catalog) and `POST /api/chart-patterns/scan`
   (`{ symbol, interval, limit, ids? }`) in `apps/server/src/routes/chart-patterns.ts`.
-  Scan fetches bars through the same CCXT provider path as `/api/patterns/scan`,
+  Scan fetches bars through the shared freshness-aware market-data path,
   runs `scanChartPatterns`, and returns matches.
 - A **Chart Patterns** toggle on `ChartPage` that draws each detected pattern as a
   dashed polyline through its structural points (colored by direction) on the candle
@@ -125,8 +125,8 @@ Delivered:
 - `computeVolumeProfile(bars, { bins?, valueAreaPct? })` returning a fully
   Zod-described `VolumeProfile`, plus `buyFraction` / `overlap` helpers.
 - `POST /api/volume-profile` (`{ symbol, interval, limit, bins?, valueAreaPct? }`)
-  in `apps/server/src/routes/volume-profile.ts`. It fetches bars through the same
-  CCXT provider path as `/api/chart-patterns/scan`, runs `computeVolumeProfile`,
+  in `apps/server/src/routes/volume-profile.ts`. It fetches bars through the shared
+  freshness-aware market-data path, runs `computeVolumeProfile`,
   and returns the profile.
 - A **Volume Profile** toggle on `ChartPage` that overlays the POC (solid amber),
   VAH and VAL (dashed grey) as horizontal price lines on the candle series, plus a
@@ -173,7 +173,7 @@ Delivered:
   fully Zod-described `TpoProfile`, plus a `periodLabel` helper.
 - `POST /api/tpo-profile` (`{ symbol, interval, limit, bins?, valueAreaPct?,
   barsPerPeriod? }`) in `apps/server/src/routes/tpo-profile.ts`. It fetches bars
-  through the same CCXT provider path as `/api/volume-profile`, runs
+  through the shared freshness-aware market-data path, runs
   `computeTpoProfile`, and returns the profile.
 - A **TPO** toggle on `ChartPage` that overlays the POC (solid cyan), VAH/VAL
   (dashed grey), and the Initial Balance high/low (dotted indigo) as horizontal
@@ -260,7 +260,7 @@ Delivered:
   it sits beneath the candles. Exposes `setData` / `remove`.
 - `POST /api/ichimoku` (`{ symbol, interval, limit, tenkan?, kijun?, senkou?,
   displacement? }`) in `apps/server/src/routes/ichimoku.ts`, fetching bars
-  through the same CCXT provider path as `/api/volume-profile`.
+  through the shared freshness-aware market-data path.
 - An **Ichimoku** toggle on `ChartPage` that draws the five lines (Tenkan blue,
   Kijun orange, Senkou A green, Senkou B red, Chikou purple) plus the kumo. The
   span line series carry the forward-displaced times so the time scale can place
@@ -338,8 +338,8 @@ Delivered:
 - `computePivotPoints(bars, { method?, period? })` returning a Zod-described
   `PivotPoints`.
 - `POST /api/pivot-points` (`{ symbol, interval, limit, method, period }`) in
-  `apps/server/src/routes/pivot-points.ts`, fetching bars through the same CCXT
-  provider path as the other overlays.
+  `apps/server/src/routes/pivot-points.ts`, fetching bars through the shared
+  freshness-aware market-data path used by the other overlays.
 - A **Pivots** toggle on `ChartPage` with method + period selectors that draws
   the latest period's levels as horizontal price lines (PP amber/solid,
   resistances red, supports green, dashed) plus a side panel listing the levels

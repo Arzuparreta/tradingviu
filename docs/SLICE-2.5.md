@@ -1,6 +1,17 @@
 # Slice 2.5 — Real-time Market Data Infrastructure
 
-> **Why this slice exists.** Slice 2 (`39a6465`) shipped live bars via per-client CCXT polling, gated by `if (time > lastTime)` which silently dropped in-progress bar updates. Result: 1m charts don't animate, every client opens its own poll loop, no historical pagination, no persistence. This slice replaces the data layer with a single upstream-per-symbol server-side `BarStore`, a TimescaleDB hypertable for persistence, paginated history, and an in-progress-bar aware WS protocol. Slice 2's broken live bars are deprecated; everything that depended on them (slice 3 Pine, slice 4 alerts, slice 5 DOM, slice 9 patterns) keeps working with zero changes — the public WS message shape (`type: 'bar'`) is unchanged.
+> **Why this slice exists.** Slice 2 (`39a6465`) shipped live bars via per-client CCXT polling, gated by `if (time > lastTime)` which silently dropped in-progress bar updates. Result: 1m charts don't animate, every client opens its own poll loop, no historical pagination, no persistence. This slice replaces the data layer with a single upstream-per-symbol server-side `BarStore`, a TimescaleDB hypertable for persistence, paginated history, and an in-progress-bar aware WS protocol. Slice 2's broken live bars are deprecated.
+
+## Later hardening: Binance real-time end-to-end
+
+After live testing against Binance, the chart path was hardened further:
+
+- Binance historical data uses native REST klines. CCXT remains the fallback for non-Binance providers.
+- Binance bar rows use canonical exchange tickers such as `BTCUSDT`. Migration `0010_normalize_binance_bar_symbols.sql` merges legacy slash-form rows.
+- `market-data.ts` centralizes freshness-aware historical bars so chart history, indicators, patterns, profiles, Pine, backtests, alerts, and portfolio analytics read the same fresh series.
+- `market-store.ts` adds real Binance `bookTicker` and `depth20@100ms` streams, plus REST depth snapshots for `/api/chart/dom`.
+- The WS protocol adds `subscribe_market`, `market_status`, `quote`, and `book` for live price and DOM updates.
+- The chart UI uses the history cache as its candle source of truth; live bars upsert that cache and `loadNewer` gap-fills before far-ahead bars are inserted.
 
 ## Goals
 
@@ -71,7 +82,7 @@ New global table. **No `tenant_id`**. **RLS: read public, write super_admin** (l
 -- 0007_market_bars.sql
 CREATE TABLE bars (
   provider   text NOT NULL,             -- 'binance' | 'coinbase' | ...
-  ticker     text NOT NULL,             -- 'BTC/USDT' (CCXT symbol form)
+  ticker     text NOT NULL,             -- 'BTCUSDT' for Binance; provider-native canonical form
   interval   text NOT NULL,             -- '1m' | '5m' | ... (Interval)
   time       bigint NOT NULL,           -- unix seconds (UTC)
   open       double precision NOT NULL,
@@ -112,7 +123,7 @@ Unique constraint on `(provider, ticker, interval, time)` makes writes idempoten
 
 export interface BarStreamKey {
   provider: string;   // 'binance' | 'coinbase' | ...
-  ticker: string;     // 'BTC/USDT' (CCXT form)
+  ticker: string;     // 'BTCUSDT' for Binance; provider-native canonical form
   interval: Interval;
 }
 
@@ -336,7 +347,7 @@ Connects to `/ws?token=…`, sends `subscribe`, listens for `bar` (with `phase`)
 `tools/backfill-bars/src/index.ts` — `pnpm backfill:bars`
 
 ```bash
-pnpm backfill:bars --provider binance --ticker BTC/USDT --interval 1m --limit 1000
+pnpm backfill:bars --provider binance --ticker BTCUSDT --interval 1m --limit 1000
 pnpm backfill:bars --provider binance --all --intervals 1m,5m,1h,1d --limit 1000
 ```
 
@@ -392,14 +403,14 @@ tools/backfill-bars/
 | `ccxt-stream.test.ts` | unit | polling detects close on time change, in-progress emit on same time |
 | `persist-queue.test.ts` | unit | batched writes, idempotency, retry on transient error |
 | `chart-history.test.ts` (e2e) | api | 2 paginated calls stitch a contiguous range |
-| `ws-fanout.test.ts` (e2e) | api | 3 WS clients on BTCUSDT 1m → 1 CCXT poll, identical bar stream |
+| `ws-fanout.test.ts` (e2e) | api | 3 WS clients on BTCUSDT 1m → 1 upstream stream, identical bar stream |
 | `backfill-bars.test.ts` (integration) | cli | re-running with same args is a no-op |
 
 ## Migration plan
 
 1. Add migration `0007_market_bars.sql` with the table + hypertable + RLS. The Drizzle meta `_journal.json` is updated with the new entry. The corresponding `0007_snapshot.json` is **not** hand-written — after `pnpm db:migrate` runs the SQL, run `pnpm db:generate` once to refresh Drizzle's internal snapshot for future diffs. (The migration SQL is self-contained; the snapshot file is only used by `drizzle-kit` to compute the next diff.)
 2. Deploy server with the new BarStore. Old CCXT polling code stays as fallback if `BAR_STORE_ENABLED=false` env var is set (kill-switch for prod rollouts).
-3. Run `pnpm backfill:bars --provider binance --ticker BTC/USDT,ETH/USDT,SOL/USDT --intervals 1m,5m,1h --limit 1000` to seed the most-watched pairs.
+3. Run `pnpm backfill:bars --provider binance --ticker BTCUSDT,ETHUSDT,SOLUSDT --intervals 1m,5m,1h --limit 1000` to seed the most-watched pairs.
 4. Switch the default to `BAR_STORE_ENABLED=true`.
 5. Remove the old per-client `provider.subscribe` from `ws.ts` (it's no longer called).
 6. Bump the `CHART_PROTOCOL_VERSION` constant in `ws-protocol.ts` to `2`.
