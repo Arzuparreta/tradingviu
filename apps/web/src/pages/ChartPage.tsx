@@ -30,6 +30,8 @@ import type { DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPerio
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import { useMarketStream } from '../hooks/use-market-stream';
+import { useDrawings } from '../hooks/use-drawings';
+import { LwcDrawingOverlay } from '../components/LwcDrawingOverlay';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -94,6 +96,7 @@ export function ChartPage() {
   const [pivotMethod, setPivotMethod] = useState<PivotMethod>('standard');
   const [pivotPeriod, setPivotPeriod] = useState<PivotPeriod>('D');
   const [showIchimoku, setShowIchimoku] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
   const [showBacktest, setShowBacktest] = useState(false);
   const [strategyType, setStrategyType] = useState<StrategyType>('maCross');
   const [strategyParams, setStrategyParams] = useState<Record<string, number>>({
@@ -186,6 +189,12 @@ export function ChartPage() {
     queryFn: () => api.pivotPoints(symbolId!, interval, pivotMethod, pivotPeriod, 500),
     enabled: !!symbolId && showPivots,
     staleTime: 30_000,
+  });
+
+  const drawingsState = useDrawings({
+    symbolId: symbolId ?? null,
+    interval,
+    enabled: !!user && !!symbolId,
   });
 
   const strategiesQ = useQuery({
@@ -1102,6 +1111,17 @@ export function ChartPage() {
           background: '#0e0e0e',
         }}
       >
+        {chartReady && chartRef.current && candleRef.current && (
+          <LwcDrawingOverlay
+            chart={chartRef.current}
+            candleSeries={candleRef.current}
+            drawings={drawingsState.drawings}
+            visibleBars={visibleBars}
+            active={showDrawing}
+            onDrawingsChange={drawingsState.setDrawings}
+            onActiveChange={setShowDrawing}
+          />
+        )}
       </div>
       <aside
         className="col"
@@ -2029,6 +2049,13 @@ export function ChartPage() {
         {showIchimoku && ichimokuQ.isFetching && (
           <span className="muted small">computing…</span>
         )}
+        <button
+          className={showDrawing ? 'primary' : ''}
+          onClick={() => setShowDrawing((s) => !s)}
+          style={{ fontSize: 12 }}
+        >
+          ✎ Draw
+        </button>
         <button
           className={showBacktest ? 'primary' : ''}
           onClick={() => setShowBacktest((s) => !s)}
