@@ -40,7 +40,7 @@ const distToSegment = (p: Vec2, a: Vec2, b: Vec2): number => {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len2 = dx * dx + dy * dy;
-  if (len2 === 0) return dist(p, a);
+  if (len2 === 0 || !Number.isFinite(len2)) return dist(p, a);
   let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
   t = Math.max(0, Math.min(1, t));
   return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
@@ -210,7 +210,7 @@ const pixelToPoint = (
 const makeDrawing = (
   name: DrawingTool,
   points: Drawing['points'][number][],
-  extras?: { styles?: Drawing['styles']; extendData?: Drawing['extendData'] },
+  extras?: { styles?: Drawing['styles']; extendData?: Drawing['extendData']; mode?: Drawing['mode'] },
 ): Drawing => {
   const now = Date.now();
   return {
@@ -219,7 +219,7 @@ const makeDrawing = (
     name,
     points,
     styles: extras?.styles ?? null,
-    mode: 'normal',
+    mode: extras?.mode ?? 'normal',
     lock: false,
     visible: true,
     zLevel: 0,
@@ -241,16 +241,20 @@ const dupDrawing = (drawing: Drawing): Drawing => {
     ...drawing,
     id,
     lock: false,
-    points: drawing.points.map((p) => ({
-      ...p,
-      ...(typeof p.dataIndex === 'number' ? { dataIndex: p.dataIndex + 2 } : {}),
-      ...(typeof p.timestamp === 'number' && typeof p.dataIndex !== 'number'
-        ? { timestamp: p.timestamp + 60_000 }
-        : {}),
-      ...(typeof p.value === 'number'
-        ? { value: p.value + Math.max(Math.abs(p.value) * 0.002, 0.01) }
-        : {}),
-    })),
+    points: drawing.points.map((p) => {
+      const base: Record<string, unknown> = { ...p };
+      if (typeof p.dataIndex === 'number') {
+        base.dataIndex = p.dataIndex + 2;
+        // Prefer dataIndex offset; discard timestamp to avoid mixed-coordinate confusion.
+        delete base.timestamp;
+      } else if (typeof p.timestamp === 'number') {
+        base.timestamp = p.timestamp + 60_000;
+      }
+      if (typeof p.value === 'number') {
+        base.value = p.value + Math.max(Math.abs(p.value) * 0.002, 0.01);
+      }
+      return base as Drawing['points'][number];
+    }),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -274,10 +278,9 @@ const TOOL_ICONS: Record<DrawingTool, LucideIcon> = {
   priceLine: BadgeCent,
 };
 
-const TOOL_SHORTCUTS: Record<DrawingTool, string> = {
+const TOOL_SHORTCUTS: Partial<Record<DrawingTool, string>> = {
   cursor: 'Esc',
   segment: 'T',
-  line: 'T',
   rayLine: 'R',
   straightLine: 'E',
   horizontalStraightLine: 'H',
@@ -285,7 +288,6 @@ const TOOL_SHORTCUTS: Record<DrawingTool, string> = {
   rect: 'B',
   text: 'N',
   fibonacciLine: 'F',
-  parallelStraightLine: 'P',
   priceChannelLine: 'C',
   priceLine: 'P',
 };
@@ -470,7 +472,7 @@ export function LwcDrawingOverlay({
       map.set(d.id, drawingToScreen(d, chart, candleSeries, visibleBars));
     }
     return map;
-  }, [drawings, chart, candleSeries, visibleBars, dims]);
+  }, [drawings, chart, candleSeries, visibleBars]);
 
   // ── Hit testing ───────────────────────────────────────────────────────
 
@@ -572,20 +574,20 @@ export function LwcDrawingOverlay({
         if (tool === 'horizontalStraightLine' || tool === 'priceLine') pt = { value: start.value };
         else if (tool === 'verticalStraightLine') pt = { timestamp: start.timestamp };
         else pt = { ...start };
-        const d = makeDrawing(tool, [pt], { styles: DEFAULT_DRAW_STYLES });
+        const d = makeDrawing(tool, [pt], { styles: DEFAULT_DRAW_STYLES, mode: magnet });
         commit([...drawingsRef.current, d]);
       } else {
         const dx = (current.timestamp ?? 0) - (start.timestamp ?? 0);
         const dy = (current.value ?? 0) - (start.value ?? 0);
         if (Math.abs(dx) > 2 || Math.abs(dy) > 1) {
-          const d = makeDrawing(tool, [start, current], { styles: DEFAULT_DRAW_STYLES });
+          const d = makeDrawing(tool, [start, current], { styles: DEFAULT_DRAW_STYLES, mode: magnet });
           commit([...drawingsRef.current, d]);
           setSelectedId(d.id);
         }
       }
     }
     setDragging(null);
-  }, [dragging, tool, chart, candleSeries, commit]);
+  }, [dragging, tool, chart, candleSeries, commit, magnet]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────
 
@@ -866,7 +868,7 @@ export function LwcDrawingOverlay({
               className={tool === value ? 'primary icon' : 'ghost icon'}
               type="button"
               onClick={() => setTool(value)}
-              title={`${label} (${TOOL_SHORTCUTS[value]})`}
+              title={`${label}${TOOL_SHORTCUTS[value] ? ` (${TOOL_SHORTCUTS[value]})` : ''}`}
               aria-label={label}
             >
               <Icon size={15} />

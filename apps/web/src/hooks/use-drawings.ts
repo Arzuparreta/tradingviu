@@ -71,7 +71,11 @@ export function useDrawings({ symbolId, interval, scopeId, enabled = true }: Use
       // New scope: persist anything still pending for the previous one first.
       flush();
       seededScope.current = scopeKey;
-      setLocal(query.data.drawings);
+      // Don't overwrite local state if the user has already started drawing
+      // before the server response arrived.
+      if (!pending.current) {
+        setLocal(query.data.drawings);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, scopeKey, query.data]);

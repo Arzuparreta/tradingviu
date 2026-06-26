@@ -79,6 +79,7 @@ export type DrawingStyle = typeof DEFAULT_DRAWING_STYLE;
 export const KLINE_TOOL_LABELS: readonly (readonly [DrawingTool, string])[] = [
   ['cursor', 'Cursor'],
   ['segment', 'Trend line'],
+  ['line', 'Line'],
   ['rayLine', 'Ray'],
   ['straightLine', 'Extended'],
   ['horizontalStraightLine', 'Horizontal'],
