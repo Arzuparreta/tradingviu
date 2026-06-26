@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { DrawingsSchema, type Drawing } from '@tv/drawing-tools';
 
 /** Chart intervals supported by the platform (mirrors apps/web ChartPage + chart route). */
 export const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'] as const;
@@ -22,20 +21,23 @@ export const GridSchema = z.enum(GRID_KEYS as [GridKey, ...GridKey[]]);
 
 export const panelCountFor = (grid: GridKey): number => GRID_PRESETS[grid].count;
 
+let panelSeq = 0;
+const newPanelId = (): string => `p${Date.now().toString(36)}${(panelSeq++).toString(36)}`;
+const newDrawingScopeId = (): string => `draw_${Date.now().toString(36)}${(panelSeq++).toString(36)}`;
+
 /** A single chart panel within a layout. */
 export const PanelSchema = z.object({
   /** Stable panel id (so React keys + sync targeting survive re-tiling). */
   id: z.string().min(1).max(40),
+  /** Stable drawing storage scope for this chart instance. */
+  drawingScopeId: z.string().min(1).max(80).default(() => newDrawingScopeId()),
   /** Symbol id (from the symbols table). Null = empty panel awaiting a pick. */
   symbolId: z.string().min(1).max(40).nullable(),
   interval: IntervalSchema,
   /** Indicator ids active on this panel (overlay only, for now). */
   indicators: z.array(z.string().min(1).max(60)).max(20).default([]),
-  /** Drawings owned by this panel. Same asset in another panel gets its own list. */
-  drawings: DrawingsSchema.default([]),
 });
 export type Panel = z.infer<typeof PanelSchema>;
-export type LayoutDrawing = Drawing;
 
 /** Cross-panel sync toggles. When on, an interaction in one panel propagates to the others. */
 export const SyncSchema = z.object({
@@ -73,20 +75,21 @@ export const LayoutConfigSchema = z
     if (ids.size !== cfg.panels.length) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'panel ids must be unique', path: ['panels'] });
     }
+    const drawingScopes = new Set(cfg.panels.map((p) => p.drawingScopeId));
+    if (drawingScopes.size !== cfg.panels.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'panel drawing scopes must be unique', path: ['panels'] });
+    }
   });
 
 export type LayoutConfig = z.infer<typeof LayoutConfigSchema>;
 
-let panelSeq = 0;
-const newPanelId = (): string => `p${Date.now().toString(36)}${(panelSeq++).toString(36)}`;
-
 /** Build an empty panel with sensible defaults. */
 export const makePanel = (symbolId: string | null = null, interval: Interval = '1h'): Panel => ({
   id: newPanelId(),
+  drawingScopeId: newDrawingScopeId(),
   symbolId,
   interval,
   indicators: [],
-  drawings: [],
 });
 
 /** A fresh layout config for a given grid, optionally seeding the first panel's symbol. */
@@ -123,7 +126,10 @@ export const normalizeLayoutConfig = (cfg: LayoutConfig): LayoutConfig => ({
   ...cfg,
   sync: { ...cfg.sync, interval: false },
   panels: cfg.panels.map((panel) => ({
-    ...panel,
-    drawings: panel.drawings ?? [],
+    id: panel.id,
+    drawingScopeId: panel.drawingScopeId,
+    symbolId: panel.symbolId,
+    interval: panel.interval,
+    indicators: panel.indicators ?? [],
   })),
 });

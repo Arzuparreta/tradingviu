@@ -4,8 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import { ChartPanel, type PanelBounds } from '../components/ChartPanel';
-import { DrawingToolbar } from '../components/DrawingToolbar';
-import { DEFAULT_DRAWING_STYLE, type DrawingStyle, type DrawingTool } from '@tv/drawing-tools';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -22,12 +20,6 @@ import {
   type LayoutConfig,
   type Panel,
 } from '@tv/layout-sync';
-import type { IChartApi, ISeriesApi, MouseEventParams, SeriesType, Time } from 'lightweight-charts';
-
-interface ChartRef {
-  chart: IChartApi;
-  series: ISeriesApi<SeriesType>;
-}
 
 export function LayoutPage() {
   const { user } = useAuth();
@@ -35,12 +27,7 @@ export function LayoutPage() {
   const [config, setConfig] = useState<LayoutConfig>(() => defaultLayoutConfig('1'));
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [currentName, setCurrentName] = useState<string>('Untitled');
-  const [drawingTool, setDrawingTool] = useState<DrawingTool>('cursor');
-  const [drawingStyle, setDrawingStyle] = useState<DrawingStyle>(DEFAULT_DRAWING_STYLE);
-  const [deleteDrawingRequest, setDeleteDrawingRequest] = useState(0);
   const initialized = useRef(false);
-  const charts = useRef<Map<string, ChartRef>>(new Map());
-  const [chartsVersion, setChartsVersion] = useState(0);
 
   // --- Multi-chart Bar Replay (synced by cursor *time*, not bar index) ---
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -86,17 +73,6 @@ export function LayoutPage() {
       setCurrentName(pick.name);
     }
   }, [layoutsQ.data]);
-
-  const onReady = useCallback((id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => {
-    charts.current.set(id, { chart, series });
-    setChartsVersion((v) => v + 1);
-  }, []);
-  const onDestroy = useCallback((id: string) => {
-    charts.current.delete(id);
-    bounds.current.delete(id);
-    setChartsVersion((v) => v + 1);
-    setBoundsVersion((v) => v + 1);
-  }, []);
 
   // Advance the shared cursor while playing; cadence is the speed multiplier.
   // (`setInterval` is fine here — not shadowed in this component.)
@@ -147,31 +123,6 @@ export function LayoutPage() {
     }
     setReplayPlaying((p) => !p);
   };
-
-  // Crosshair sync: when the pointer moves over one chart, mirror the crosshair on the others.
-  useEffect(() => {
-    if (!config.sync.crosshair) return;
-    const entries = [...charts.current.entries()];
-    if (entries.length < 2) return;
-    const handlers = entries.map(([id, src]) => {
-      const handler = (param: MouseEventParams<Time>) => {
-        for (const [otherId, dst] of entries) {
-          if (otherId === id) continue;
-          if (param.time === undefined || param.point === undefined) {
-            dst.chart.clearCrosshairPosition();
-            continue;
-          }
-          const price = src.series.coordinateToPrice(param.point.y);
-          if (price !== null) dst.chart.setCrosshairPosition(price, param.time, dst.series);
-        }
-      };
-      src.chart.subscribeCrosshairMove(handler as never);
-      return { chart: src.chart, handler };
-    });
-    return () => {
-      for (const { chart, handler } of handlers) chart.unsubscribeCrosshairMove(handler as never);
-    };
-  }, [config.sync.crosshair, chartsVersion]);
 
   const setGrid = (grid: GridKey) => setConfig((cfg) => reflowToGrid(cfg, grid));
 
@@ -275,16 +226,6 @@ export function LayoutPage() {
 
         <span className="layout-divider" />
 
-        <DrawingToolbar
-          tool={drawingTool}
-          onToolChange={setDrawingTool}
-          style={drawingStyle}
-          onStyleChange={setDrawingStyle}
-          onDelete={() => setDeleteDrawingRequest((n) => n + 1)}
-        />
-
-        <span className="layout-divider" />
-
         <div className="row" style={{ gap: 4 }}>
           <button
             className={replayActive ? 'primary' : 'ghost'}
@@ -335,13 +276,8 @@ export function LayoutPage() {
             panel={p}
             active={config.activePanel === i}
             live={config.activePanel === i && !replayActive}
-            drawingTool={drawingTool}
-            drawingStyle={drawingStyle}
-            deleteDrawingRequest={deleteDrawingRequest}
             onActivate={() => setConfig((cfg) => ({ ...cfg, activePanel: i }))}
             onChange={(patch) => updatePanel(i, patch)}
-            onReady={onReady}
-            onDestroy={onDestroy}
             replayActive={replayActive}
             replayCursor={replayActive ? replayCursor : null}
             onBounds={onBounds}

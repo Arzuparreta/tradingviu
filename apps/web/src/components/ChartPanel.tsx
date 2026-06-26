@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createTvChart, addSeries, setData, removeChart, darkTheme } from '@tv/chart-engine';
 import { INTERVALS, type Interval, type Panel } from '@tv/layout-sync';
-import type { Drawing, DrawingStyle, DrawingTool } from '@tv/drawing-tools';
-import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
 import { SymbolSearch } from './SymbolSearch';
-import { DrawingOverlay } from './DrawingOverlay';
+import { KLineChartSurface } from './KLineChartSurface';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream } from '../hooks/use-bar-stream';
+import { useDrawings } from '../hooks/use-drawings';
 
-/** The loaded time span of a panel's bars, reported up for multi-chart replay. */
 export interface PanelBounds {
   min: number;
   max: number;
@@ -21,17 +18,8 @@ export interface ChartPanelProps {
   live: boolean;
   onActivate: () => void;
   onChange: (patch: Partial<Panel>) => void;
-  drawingTool: DrawingTool;
-  drawingStyle: DrawingStyle;
-  deleteDrawingRequest: number;
-  /** Register the chart + candle series with the parent (for crosshair sync). */
-  onReady?: (id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => void;
-  onDestroy?: (id: string) => void;
-  /** When true, the panel reveals only bars up to `replayCursor` (time). */
   replayActive?: boolean;
-  /** Shared replay cursor time (UTC seconds), or null when not replaying. */
   replayCursor?: number | null;
-  /** Report this panel's loaded time bounds (or null) for the global domain. */
   onBounds?: (id: string, bounds: PanelBounds | null) => void;
 }
 
@@ -41,28 +29,12 @@ export function ChartPanel({
   live,
   onActivate,
   onChange,
-  drawingTool,
-  drawingStyle,
-  deleteDrawingRequest,
-  onReady,
-  onDestroy,
   replayActive = false,
   replayCursor = null,
   onBounds,
 }: ChartPanelProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
-  const volumeRef = useRef<ISeriesApi<SeriesType> | null>(null);
-  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
-  const [candleApi, setCandleApi] = useState<ISeriesApi<SeriesType> | null>(null);
   const [picking, setPicking] = useState(false);
-
-  const onReadyRef = useRef(onReady);
-  const onDestroyRef = useRef(onDestroy);
   const onBoundsRef = useRef(onBounds);
-  onReadyRef.current = onReady;
-  onDestroyRef.current = onDestroy;
   onBoundsRef.current = onBounds;
 
   const historyQ = useChartHistory({
@@ -70,87 +42,17 @@ export function ChartPanel({
     interval: panel.interval,
     pageSize: 500,
   });
+  const drawingsState = useDrawings({
+    symbolId: panel.symbolId ?? null,
+    interval: panel.interval,
+    scopeId: panel.drawingScopeId,
+    enabled: true,
+  });
 
-  // Create the chart once.
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const chart = createTvChart({ container: containerRef.current, theme: darkTheme, autoSize: true });
-    const candle = addSeries(chart, 'candles');
-    const volume = addSeries(chart, 'histogram', {
-      priceScaleId: '',
-      priceFormat: { type: 'volume' },
-      color: 'rgba(38, 166, 154, 0.35)',
-    });
-    volume.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    chartRef.current = chart;
-    candleRef.current = candle;
-    volumeRef.current = volume;
-    setChartApi(chart);
-    setCandleApi(candle);
-    onReadyRef.current?.(panel.id, chart, candle);
-    return () => {
-      onDestroyRef.current?.(panel.id);
-      removeChart(chart);
-      chartRef.current = null;
-      candleRef.current = null;
-      volumeRef.current = null;
-      setChartApi(null);
-      setCandleApi(null);
-    };
-  }, [panel.id]);
-
-  // Bars actually drawn: the full history, or clipped to the shared replay
-  // cursor time so every panel reveals the same point in time together.
   const renderBars = useMemo(() => {
-    const bars = historyQ.bars;
-    if (replayActive && replayCursor != null) return bars.filter((b) => b.time <= replayCursor);
-    return bars;
+    if (replayActive && replayCursor != null) return historyQ.bars.filter((b) => b.time <= replayCursor);
+    return historyQ.bars;
   }, [historyQ.bars, replayActive, replayCursor]);
-
-  // Re-fit the view when the symbol/interval changes (not on every replay step).
-  const firstFitRef = useRef(true);
-  useEffect(() => {
-    firstFitRef.current = true;
-  }, [panel.symbolId, panel.interval]);
-
-  // Render bars into the series.
-  useEffect(() => {
-    if (!candleRef.current || !volumeRef.current) return;
-    setData(
-      candleRef.current,
-      renderBars.map((b) => ({
-        time: b.time as UTCTimestamp,
-        open: b.open,
-        high: b.high,
-        low: b.low,
-        close: b.close,
-      })),
-    );
-    setData(volumeRef.current, renderBars.map((b) => ({ time: b.time as UTCTimestamp, value: b.volume })));
-    if (firstFitRef.current && renderBars.length > 0) {
-      chartRef.current?.timeScale().fitContent();
-      firstFitRef.current = false;
-    } else if (replayActive) {
-      chartRef.current?.timeScale().scrollToRealTime();
-    }
-  }, [renderBars, replayActive]);
-
-  // Report this panel's loaded time bounds for the parent's global replay domain.
-  useEffect(() => {
-    const bars = historyQ.bars;
-    if (!bars || bars.length === 0) {
-      onBoundsRef.current?.(panel.id, null);
-      return;
-    }
-    const min = bars[0]!.time;
-    const max = bars[bars.length - 1]!.time;
-    let step = Infinity;
-    for (let i = 1; i < bars.length; i++) {
-      const d = bars[i]!.time - bars[i - 1]!.time;
-      if (d > 0 && d < step) step = d;
-    }
-    onBoundsRef.current?.(panel.id, { min, max, step: Number.isFinite(step) ? step : 60 });
-  }, [historyQ.bars, panel.id]);
 
   const historyQRef = useRef(historyQ);
   historyQRef.current = historyQ;
@@ -162,6 +64,23 @@ export function ChartPanel({
     onBar: (bar) => historyQRef.current.upsertBar(bar),
   });
 
+  useEffect(() => {
+    if (historyQ.bars.length === 0) {
+      onBoundsRef.current?.(panel.id, null);
+      return;
+    }
+    let step = Infinity;
+    for (let i = 1; i < historyQ.bars.length; i++) {
+      const d = historyQ.bars[i]!.time - historyQ.bars[i - 1]!.time;
+      if (d > 0 && d < step) step = d;
+    }
+    onBoundsRef.current?.(panel.id, {
+      min: historyQ.bars[0]!.time,
+      max: historyQ.bars[historyQ.bars.length - 1]!.time,
+      step: Number.isFinite(step) ? step : 60,
+    });
+  }, [historyQ.bars, panel.id]);
+
   const sym = historyQ.symbol;
   const showPicker = picking || !panel.symbolId;
 
@@ -172,7 +91,7 @@ export function ChartPanel({
           <div onMouseDown={(e) => e.stopPropagation()} style={{ flex: 1 }}>
             <SymbolSearch
               autoFocus
-              placeholder="Pick symbol…"
+              placeholder="Pick symbol..."
               onSelect={(s) => {
                 onChange({ symbolId: s.id });
                 setPicking(false);
@@ -196,19 +115,18 @@ export function ChartPanel({
         </select>
       </div>
       <div className="chart-panel-chart">
-        <div ref={containerRef} className="chart-panel-canvas" />
-        <DrawingOverlay
-          chart={chartApi}
-          series={candleApi}
-          drawings={panel.drawings}
-          tool={drawingTool}
-          style={drawingStyle}
+        <KLineChartSurface
+          bars={renderBars}
+          drawings={drawingsState.drawings}
           active={active}
-          deleteRequest={deleteDrawingRequest}
-          onChange={(drawings: Drawing[]) => onChange({ drawings })}
+          live={live}
+          loading={!!panel.symbolId && historyQ.isLoading}
+          onDrawingsChange={drawingsState.setDrawings}
+          onLoadMore={historyQ.loadMore}
+          onBounds={(bounds) => onBoundsRef.current?.(panel.id, bounds)}
+          replayCursor={replayActive ? replayCursor : null}
         />
       </div>
-      {panel.symbolId && historyQ.isLoading && <div className="chart-panel-loading muted small">loading…</div>}
     </div>
   );
 }

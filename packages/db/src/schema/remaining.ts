@@ -57,6 +57,7 @@ export const drawings = pgTable(
       .notNull()
       .references(() => symbols.id, { onDelete: 'cascade' }),
     interval: text('interval').notNull(),
+    scopeId: text('scope_id').notNull(),
     kind: text('kind').notNull(),
     geometry: jsonb('geometry').$type<unknown>().notNull(),
     style: jsonb('style').$type<Record<string, unknown>>(),
@@ -65,6 +66,7 @@ export const drawings = pgTable(
   },
   (t) => ({
     tenantSymbolIdx: index('drawings_tenant_symbol_idx').on(t.tenantId, t.symbolId),
+    tenantScopeIdx: index('drawings_tenant_scope_idx').on(t.tenantId, t.userId, t.scopeId),
   }),
 );
 

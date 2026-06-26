@@ -78,6 +78,13 @@
       "when": 1782460000000,
       "tag": "0010_normalize_binance_bar_symbols",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782506052560,
+      "tag": "0011_real_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

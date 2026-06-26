@@ -330,26 +330,76 @@ label {
 .layout-toggle input {
   width: auto;
 }
-.drawing-toolbar {
+.kline-surface {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
+  background: #0e0e0e;
+}
+.kline-surface:focus {
+  outline: none;
+}
+.kline-host {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
+}
+.kline-toolbar {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  z-index: 5;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+.kline-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.kline-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(42, 46, 57, 0.85);
+  border-radius: 6px;
+  background: rgba(14, 14, 14, 0.78);
+  backdrop-filter: blur(6px);
   flex: 0 0 auto;
 }
-.drawing-toolbar button {
-  min-width: 32px;
-  padding: 4px 8px;
-}
-.drawing-toolbar input[type='color'] {
-  width: 30px;
+.kline-toolbar button {
+  min-width: 30px;
   height: 28px;
-  padding: 2px;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: rgba(14, 14, 14, 0.82);
 }
-.drawing-toolbar select {
-  min-width: 58px;
+.kline-toolbar button.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+.kline-toolbar button.icon svg {
+  display: block;
+  flex-shrink: 0;
+}
+.kline-toolbar select {
+  min-width: 72px;
   width: auto;
-  padding: 4px 6px;
-  font-size: 12px;
+  height: 28px;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: rgba(14, 14, 14, 0.86);
 }
 
 .layout-grid {
@@ -392,25 +442,10 @@ label {
   flex: 1;
   text-align: left;
 }
-.chart-panel-canvas {
-  position: absolute;
-  inset: 0;
-  min-width: 0;
-  min-height: 0;
-}
 .chart-panel-chart {
   position: relative;
   min-width: 0;
   min-height: 0;
-}
-.drawing-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 4;
-  overflow: hidden;
-  touch-action: none;
 }
 .chart-panel-loading {
   position: absolute;

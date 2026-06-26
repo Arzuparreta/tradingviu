@@ -1,17 +1,14 @@
-import { DrawingSchema, type Drawing } from '@tv/drawing-tools';
-
-/**
- * Maps between the client-facing `Drawing` shape and the `drawings` table.
- *
- * The table keeps `kind` and `style` in dedicated columns (so they stay
- * queryable) and the rest of the drawing — its geometry and client-side
- * timestamps — in the `geometry` jsonb column. The row `id` is the
- * client-generated drawing id, so a saved set round-trips with stable ids.
- */
+import { DrawingSchema, legacyDrawingToKLine, type Drawing } from '@tv/drawing-tools';
 
 interface DrawingGeometry {
+  engine: 'klinecharts';
+  groupId?: string;
   points: Drawing['points'];
-  text?: string;
+  mode: Drawing['mode'];
+  lock: boolean;
+  visible: boolean;
+  zLevel: number;
+  extendData?: unknown;
   createdAt: number;
   updatedAt: number;
 }
@@ -20,7 +17,7 @@ export interface DrawingColumns {
   id: string;
   kind: string;
   geometry: DrawingGeometry;
-  style: Record<string, unknown>;
+  style: Record<string, unknown> | null;
 }
 
 export interface DrawingRowLike {
@@ -30,36 +27,57 @@ export interface DrawingRowLike {
   style: unknown;
 }
 
-/** Split a `Drawing` into the table's columns. */
 export const drawingToColumns = (d: Drawing): DrawingColumns => {
   const geometry: DrawingGeometry = {
+    engine: 'klinecharts',
     points: d.points,
+    mode: d.mode,
+    lock: d.lock,
+    visible: d.visible,
+    zLevel: d.zLevel,
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
   };
-  if (d.text !== undefined) geometry.text = d.text;
+  if (d.groupId !== undefined) geometry.groupId = d.groupId;
+  if (d.extendData !== undefined) geometry.extendData = d.extendData;
   return {
     id: d.id,
-    kind: d.kind,
+    kind: d.name,
     geometry,
-    style: d.style as unknown as Record<string, unknown>,
+    style: d.styles === null || d.styles === undefined ? null : (d.styles as Record<string, unknown>),
   };
 };
 
-/** Rebuild a `Drawing` from a row, or `null` if the stored payload is invalid. */
 export const rowToDrawing = (row: DrawingRowLike): Drawing | null => {
   const geo = row.geometry;
   if (geo === null || typeof geo !== 'object') return null;
-  const g = geo as Partial<DrawingGeometry>;
+  const g = geo as Partial<DrawingGeometry> & Record<string, unknown>;
+  if (g.engine !== 'klinecharts') {
+    return legacyDrawingToKLine({
+      id: row.id,
+      kind: row.kind,
+      points: g.points,
+      text: g.text,
+      style: row.style,
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+    });
+  }
   const candidate: Record<string, unknown> = {
+    engine: 'klinecharts',
     id: row.id,
-    kind: row.kind,
+    name: row.kind,
+    groupId: g.groupId,
     points: g.points,
-    style: row.style,
-    createdAt: g.createdAt ?? 0,
-    updatedAt: g.updatedAt ?? 0,
+    styles: row.style,
+    mode: g.mode,
+    lock: g.lock,
+    visible: g.visible,
+    zLevel: g.zLevel,
+    extendData: g.extendData,
+    createdAt: g.createdAt,
+    updatedAt: g.updatedAt,
   };
-  if (g.text !== undefined) candidate.text = g.text;
   const parsed = DrawingSchema.safeParse(candidate);
   return parsed.success ? parsed.data : null;
 };

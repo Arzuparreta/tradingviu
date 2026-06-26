@@ -3,6 +3,7 @@ import { tenants, users, tenantMembers, plans } from '@tv/db/schema';
 import type { Database } from '@tv/db';
 import { newUserId, newTenantId, type UserId, type TenantId } from '@tv/core';
 import { hashPassword } from './password.js';
+import { normalizeEmail } from './email.js';
 import { ulid } from 'ulid';
 import { ConflictError, ValidationError } from '@tv/core';
 
@@ -43,7 +44,7 @@ export const signup = async (db: Database, input: SignupInput): Promise<SignupRe
   // NOTE: caller MUST pass a connection that can bypass RLS (the admin role).
   // Signup inserts cross-tenant data (user + tenant + membership) before any
   // tenant context exists, so RLS would otherwise block the inserts.
-  const email = input.email.toLowerCase().trim();
+  const email = normalizeEmail(input.email);
   const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (existing.length > 0) {
     throw new ConflictError('Email already registered', { email });

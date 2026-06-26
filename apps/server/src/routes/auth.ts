@@ -5,7 +5,7 @@ import { setCookie, deleteCookie } from 'hono/cookie';
 import { and, eq } from 'drizzle-orm';
 import { createDb } from '@tv/db';
 import { users, tenantMembers, tenants } from '@tv/db/schema';
-import { signup, issueAccessToken, verifyPassword } from '@tv/auth';
+import { signup, issueAccessToken, verifyPassword, normalizeEmail } from '@tv/auth';
 import { loadEnv, AuthError, ValidationError } from '@tv/core';
 import { withSuperAdminRls, clearRls } from '@tv/db';
 import { resolveAuthAdminDatabaseUrl } from '../services/auth-admin-db.js';
@@ -17,8 +17,10 @@ const env = loadEnv();
 const adminUrl = resolveAuthAdminDatabaseUrl(env);
 const db = createDb({ url: adminUrl });
 
+const EmailSchema = z.string().transform(normalizeEmail).pipe(z.string().email());
+
 const SignupBody = z.object({
-  email: z.string().email(),
+  email: EmailSchema,
   password: z.string().min(10).max(200),
   displayName: z.string().min(1).max(80).optional(),
   tenantName: z.string().min(1).max(80).optional(),
@@ -29,7 +31,7 @@ const SignupBody = z.object({
 });
 
 const LoginBody = z.object({
-  email: z.string().email(),
+  email: EmailSchema,
   password: z.string().min(1),
   tenantSlug: z.string().optional(),
 });
@@ -110,7 +112,7 @@ export const authRoutes = new Hono()
         const [u] = await txDb
           .select()
           .from(users)
-          .where(eq(users.email, body.email.toLowerCase()))
+          .where(eq(users.email, body.email))
           .limit(1);
         if (!u) throw new AuthError('Invalid credentials');
         const ok = await verifyPassword(u.passwordHash, body.password);

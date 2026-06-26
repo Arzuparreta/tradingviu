@@ -7,10 +7,13 @@ import { DrawingsSchema } from '@tv/drawing-tools';
 import { tryGetTenant, type TenantContext } from '@tv/core';
 import { drawingToColumns, rowToDrawing } from '../services/drawings.js';
 
-/** A chart's drawings are scoped per (user, symbol, interval). */
+const legacyDrawingScope = (symbol: string, interval: string): string => `symbol:${symbol}:${interval}`;
+
+/** A chart's drawings are scoped per (user, drawing scope, symbol, interval). */
 const ScopeQuery = z.object({
   symbol: z.string().min(1).max(80),
   interval: z.string().min(1).max(16),
+  scope: z.string().min(1).max(80).optional(),
 });
 
 const SaveBody = z.object({ drawings: DrawingsSchema });
@@ -19,7 +22,8 @@ export const drawingRoutes = new Hono()
   .get('/drawings', zValidator('query', ScopeQuery), async (c) => {
     const db = c.get('db');
     const tenant = tryGetTenant() as TenantContext;
-    const { symbol, interval } = c.req.valid('query');
+    const { symbol, interval, scope } = c.req.valid('query');
+    const scopeId = scope ?? legacyDrawingScope(symbol, interval);
     const rows = await db
       .select()
       .from(drawingsTable)
@@ -29,6 +33,7 @@ export const drawingRoutes = new Hono()
           eq(drawingsTable.userId, tenant.userId),
           eq(drawingsTable.symbolId, symbol),
           eq(drawingsTable.interval, interval),
+          eq(drawingsTable.scopeId, scopeId),
         ),
       );
     const drawings = rows
@@ -42,7 +47,8 @@ export const drawingRoutes = new Hono()
   .put('/drawings', zValidator('query', ScopeQuery), zValidator('json', SaveBody), async (c) => {
     const db = c.get('db');
     const tenant = tryGetTenant() as TenantContext;
-    const { symbol, interval } = c.req.valid('query');
+    const { symbol, interval, scope } = c.req.valid('query');
+    const scopeId = scope ?? legacyDrawingScope(symbol, interval);
     const { drawings } = c.req.valid('json');
     const now = new Date();
 
@@ -54,6 +60,7 @@ export const drawingRoutes = new Hono()
           eq(drawingsTable.userId, tenant.userId),
           eq(drawingsTable.symbolId, symbol),
           eq(drawingsTable.interval, interval),
+          eq(drawingsTable.scopeId, scopeId),
         ),
       );
 
@@ -67,6 +74,7 @@ export const drawingRoutes = new Hono()
             userId: tenant.userId,
             symbolId: symbol,
             interval,
+            scopeId,
             kind: cols.kind,
             geometry: cols.geometry,
             style: cols.style,

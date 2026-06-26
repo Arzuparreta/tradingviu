@@ -413,13 +413,13 @@ export const api = {
   updateLayout: (id: string, body: { name?: string; config?: LayoutConfig; isDefault?: boolean }) =>
     request<{ ok: true }>(`/api/layouts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteLayout: (id: string) => request<{ ok: true }>(`/api/layouts/${id}`, { method: 'DELETE' }),
-  drawings: (symbol: string, interval: string) =>
+  drawings: (symbol: string, interval: string, scope?: string) =>
     request<{ drawings: Drawing[] }>(
-      `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+      `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
     ),
-  saveDrawings: (symbol: string, interval: string, drawings: Drawing[]) =>
+  saveDrawings: (symbol: string, interval: string, drawings: Drawing[], scope?: string) =>
     request<{ ok: true }>(
-      `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+      `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
       { method: 'PUT', body: JSON.stringify({ drawings }) },
     ),
   pineValidate: (source: string) =>

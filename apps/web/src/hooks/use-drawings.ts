@@ -8,6 +8,7 @@ const SAVE_DEBOUNCE_MS = 700;
 interface UseDrawingsArgs {
   symbolId: string | null;
   interval: string;
+  scopeId?: string;
   /** Gate the query (e.g. only when logged in). */
   enabled?: boolean;
 }
@@ -25,13 +26,14 @@ interface UseDrawings {
  * on every pointer move while dragging, so coalescing the writes keeps the
  * network quiet and only the final geometry lands.
  */
-export function useDrawings({ symbolId, interval, enabled = true }: UseDrawingsArgs): UseDrawings {
+export function useDrawings({ symbolId, interval, scopeId, enabled = true }: UseDrawingsArgs): UseDrawings {
   const queryClient = useQueryClient();
   const active = enabled && !!symbolId;
+  const storageScope = scopeId ?? (symbolId ? `symbol:${symbolId}:${interval}` : '');
 
   const query = useQuery({
-    queryKey: ['drawings', symbolId, interval],
-    queryFn: () => api.drawings(symbolId!, interval),
+    queryKey: ['drawings', symbolId, interval, storageScope],
+    queryFn: () => api.drawings(symbolId!, interval, storageScope || undefined),
     enabled: active,
     staleTime: 60_000,
   });
@@ -39,12 +41,12 @@ export function useDrawings({ symbolId, interval, enabled = true }: UseDrawingsA
   const [drawings, setLocal] = useState<Drawing[]>([]);
 
   // Reseed local state whenever the chart's (symbol, interval) scope changes.
-  const scopeKey = `${symbolId ?? ''}|${interval}`;
+  const scopeKey = `${symbolId ?? ''}|${interval}|${storageScope}`;
   const seededScope = useRef<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The newest unsaved write, tagged with the scope it belongs to so a
   // scope switch can't misfile it onto the wrong symbol.
-  const pending = useRef<{ symbol: string; interval: string; drawings: Drawing[] } | null>(null);
+  const pending = useRef<{ symbol: string; interval: string; scope: string; drawings: Drawing[] } | null>(null);
 
   const flush = () => {
     if (saveTimer.current) {
@@ -54,8 +56,8 @@ export function useDrawings({ symbolId, interval, enabled = true }: UseDrawingsA
     const p = pending.current;
     pending.current = null;
     if (!p) return;
-    queryClient.setQueryData(['drawings', p.symbol, p.interval], { drawings: p.drawings });
-    void api.saveDrawings(p.symbol, p.interval, p.drawings).catch(() => undefined);
+    queryClient.setQueryData(['drawings', p.symbol, p.interval, p.scope], { drawings: p.drawings });
+    void api.saveDrawings(p.symbol, p.interval, p.drawings, p.scope).catch(() => undefined);
   };
 
   useEffect(() => {
@@ -79,8 +81,8 @@ export function useDrawings({ symbolId, interval, enabled = true }: UseDrawingsA
 
   const setDrawings = (next: Drawing[]) => {
     setLocal(next);
-    if (!symbolId) return;
-    pending.current = { symbol: symbolId, interval, drawings: next };
+    if (!symbolId || !storageScope) return;
+    pending.current = { symbol: symbolId, interval, scope: storageScope, drawings: next };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
   };

@@ -26,6 +26,8 @@ describe('defaultLayoutConfig', () => {
     expect(cfg.panels).toHaveLength(4);
     expect(cfg.panels[0]?.symbolId).toBe('sym_btc');
     expect(cfg.panels[1]?.symbolId).toBeNull();
+    expect(cfg.panels[0]?.drawingScopeId).toMatch(/^draw_/);
+    expect(new Set(cfg.panels.map((p) => p.drawingScopeId)).size).toBe(4);
     expect(() => parseLayoutConfig(cfg)).not.toThrow();
   });
 });
@@ -36,6 +38,8 @@ describe('reflowToGrid', () => {
     const grown = reflowToGrid(cfg, '4');
     expect(grown.panels).toHaveLength(4);
     expect(grown.panels[0]?.symbolId).toBe('sym_a');
+    expect(grown.panels[0]?.drawingScopeId).toBe(cfg.panels[0]?.drawingScopeId);
+    expect(new Set(grown.panels.map((p) => p.drawingScopeId)).size).toBe(4);
     expect(() => parseLayoutConfig(grown)).not.toThrow();
   });
 
@@ -65,6 +69,18 @@ describe('parseLayoutConfig validation', () => {
     expect(() => parseLayoutConfig(bad)).toThrow();
   });
 
+  it('rejects duplicate drawing scopes', () => {
+    const cfg = defaultLayoutConfig('2', 'sym_a');
+    const bad = {
+      ...cfg,
+      panels: [
+        cfg.panels[0]!,
+        { ...cfg.panels[1]!, drawingScopeId: cfg.panels[0]!.drawingScopeId },
+      ],
+    };
+    expect(() => parseLayoutConfig(bad)).toThrow();
+  });
+
   it('applies sync defaults when omitted', () => {
     const cfg = defaultLayoutConfig('2');
     const parsed = LayoutConfigSchema.parse({ grid: cfg.grid, panels: cfg.panels });
@@ -78,7 +94,7 @@ describe('parseLayoutConfig validation', () => {
     expect(parsed.sync.interval).toBe(false);
   });
 
-  it('keeps drawings scoped per panel', () => {
+  it('strips legacy panel drawings from normalized layouts', () => {
     const cfg = defaultLayoutConfig('2', 'sym_a');
     const parsed = parseLayoutConfig({
       ...cfg,
@@ -87,7 +103,22 @@ describe('parseLayoutConfig validation', () => {
         { ...cfg.panels[1]!, symbolId: 'sym_a', interval: '1h', drawings: [] },
       ],
     });
-    expect(parsed.panels[0]?.drawings).toHaveLength(1);
-    expect(parsed.panels[1]?.drawings).toHaveLength(0);
+    expect('drawings' in parsed.panels[0]!).toBe(false);
+    expect('drawings' in parsed.panels[1]!).toBe(false);
+  });
+
+  it('adds drawing scopes to legacy panels', () => {
+    const cfg = defaultLayoutConfig('2', 'sym_a');
+    const parsed = parseLayoutConfig({
+      ...cfg,
+      panels: cfg.panels.map((panel) => ({
+        id: panel.id,
+        symbolId: panel.symbolId,
+        interval: panel.interval,
+        indicators: panel.indicators,
+      })),
+    });
+    expect(parsed.panels.every((panel) => panel.drawingScopeId.startsWith('draw_'))).toBe(true);
+    expect(new Set(parsed.panels.map((panel) => panel.drawingScopeId)).size).toBe(2);
   });
 });
