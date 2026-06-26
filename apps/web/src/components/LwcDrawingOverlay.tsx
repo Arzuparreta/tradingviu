@@ -463,6 +463,11 @@ export function LwcDrawingOverlay({
     if (el) el.style.cursor = active ? 'crosshair' : 'none';
   }, [active]);
 
+  // Reset tool to cursor when drawing mode deactivates
+  useEffect(() => {
+    if (!active) setTool('cursor');
+  }, [active]);
+
   // ── Compute screen positions ──────────────────────────────────────────
 
   const screenDrawings = useMemo(() => {
@@ -847,6 +852,7 @@ export function LwcDrawingOverlay({
   const toolbar = (
     <div
       className="lwc-drawing-toolbar"
+      style={{ opacity: active ? 1 : 0.45, transition: 'opacity 150ms' }}
       onMouseDown={(e) => e.stopPropagation()}
       onMouseMove={(e) => e.stopPropagation()}
       onMouseUp={(e) => e.stopPropagation()}
@@ -867,7 +873,12 @@ export function LwcDrawingOverlay({
               key={value}
               className={tool === value ? 'primary icon' : 'ghost icon'}
               type="button"
-              onClick={() => setTool(value)}
+              onClick={() => {
+                if (!activeRef.current && toolCreatesDrawing(value)) {
+                  onActiveChange?.(true);
+                }
+                setTool(value);
+              }}
               title={`${label}${TOOL_SHORTCUTS[value] ? ` (${TOOL_SHORTCUTS[value]})` : ''}`}
               aria-label={label}
             >
