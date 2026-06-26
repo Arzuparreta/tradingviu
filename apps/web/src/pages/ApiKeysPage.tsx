@@ -67,10 +67,24 @@ export function ApiKeysPage() {
 
         <section style={{ flex: 1, minWidth: 0 }}>
           <div className="card" style={{ marginBottom: 12 }}>
-            <div className="small muted">Use it</div>
-            <code className="mono small" style={{ display: 'block', marginTop: 4, wordBreak: 'break-all' }}>
-              curl -H "Authorization: Bearer tvk_…" {window.location.origin}/v1/symbols
-            </code>
+            <div className="small muted">Example requests</div>
+            <div className="col" style={{ gap: 8, marginTop: 8 }}>
+              <code className="mono small" style={{ wordBreak: 'break-all', background: 'var(--bg-3)', padding: '4px 8px', borderRadius: 4, display: 'block' }}>
+                curl -H "Authorization: Bearer tvk_…" {window.location.origin}/v1/symbols?q=btc
+              </code>
+              <code className="mono small" style={{ wordBreak: 'break-all', background: 'var(--bg-3)', padding: '4px 8px', borderRadius: 4, display: 'block' }}>
+                curl -H "Authorization: Bearer tvk_…" {window.location.origin}/v1/indicators
+              </code>
+              <code className="mono small" style={{ wordBreak: 'break-all', background: 'var(--bg-3)', padding: '4px 8px', borderRadius: 4, display: 'block' }}>
+                curl -H "Authorization: Bearer tvk_…" -d @body.json {window.location.origin}/v1/indicators/compute
+              </code>
+              <code className="mono small" style={{ wordBreak: 'break-all', background: 'var(--bg-3)', padding: '4px 8px', borderRadius: 4, display: 'block' }}>
+                curl -H "Authorization: Bearer tvk_…" -d @body.json {window.location.origin}/v1/screener
+              </code>
+              <code className="mono small" style={{ wordBreak: 'break-all', background: 'var(--bg-3)', padding: '4px 8px', borderRadius: 4, display: 'block' }}>
+                curl -H "Authorization: Bearer tvk_…" {window.location.origin}/v1/news?source=newsapi&amp;limit=10
+              </code>
+            </div>
           </div>
           {tokensQ.isLoading && <p className="muted">Loading...</p>}
           <div className="col">
