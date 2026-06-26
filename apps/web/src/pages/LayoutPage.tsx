@@ -51,7 +51,7 @@ export function LayoutPage() {
   const initialized = useRef(false);
   const charts = useRef<Map<string, ChartRef>>(new Map());
   const [chartsVersion, setChartsVersion] = useState(0);
-  const syncingCrosshair = useRef(false);
+  const programmaticCrosshairPanels = useRef<Set<string>>(new Set());
 
   // --- Multi-chart Bar Replay (synced by cursor *time*, not bar index) ---
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -164,27 +164,31 @@ export function LayoutPage() {
     if (!config.sync.crosshair) return;
     const entries = [...charts.current.entries()];
     if (entries.length < 2) return;
+    const suppressProgrammaticEvent = (panelId: string) => {
+      programmaticCrosshairPanels.current.add(panelId);
+      window.setTimeout(() => {
+        programmaticCrosshairPanels.current.delete(panelId);
+      }, 16);
+    };
     const handlers = entries.map(([id, src]) => {
       const handler = (param: MouseEventParams<Time>) => {
-        if (syncingCrosshair.current || !param.sourceEvent) return;
+        if (programmaticCrosshairPanels.current.has(id)) return;
+        hideRealCursorMarkers(entries);
+        if (param.time === undefined || param.point === undefined) {
+          for (const [otherId, dst] of entries) {
+            if (otherId === id) continue;
+            suppressProgrammaticEvent(otherId);
+            dst.chart.clearCrosshairPosition();
+          }
+          return;
+        }
+        showRealCursorMarker(src, param.point);
+        const price = src.series.coordinateToPrice(param.point.y);
+        if (price === null) return;
         for (const [otherId, dst] of entries) {
           if (otherId === id) continue;
-          if (param.time === undefined || param.point === undefined) {
-            dst.chart.clearCrosshairPosition();
-            hideRealCursorMarkers(entries);
-            continue;
-          }
-          hideRealCursorMarkers(entries);
-          showRealCursorMarker(src, param.point);
-          const price = src.series.coordinateToPrice(param.point.y);
-          if (price !== null) {
-            syncingCrosshair.current = true;
-            try {
-              dst.chart.setCrosshairPosition(price, param.time, dst.series);
-            } finally {
-              syncingCrosshair.current = false;
-            }
-          }
+          suppressProgrammaticEvent(otherId);
+          dst.chart.setCrosshairPosition(price, param.time, dst.series);
         }
       };
       src.chart.subscribeCrosshairMove(handler as never);

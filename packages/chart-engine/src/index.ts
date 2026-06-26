@@ -70,7 +70,7 @@ export const darkTheme: ChartTheme = {
   downColor: '#ef5350',
   wickUpColor: '#26a69a',
   wickDownColor: '#ef5350',
-  crosshair: { color: '#758696', width: 1, style: LineStyle.Solid },
+  crosshair: { color: '#758696', width: 1, style: LineStyle.LargeDashed },
 };
 
 export const lightTheme: ChartTheme = {
@@ -82,7 +82,7 @@ export const lightTheme: ChartTheme = {
   downColor: '#ef5350',
   wickUpColor: '#26a69a',
   wickDownColor: '#ef5350',
-  crosshair: { color: '#9598a1', width: 1, style: LineStyle.Solid },
+  crosshair: { color: '#9598a1', width: 1, style: LineStyle.LargeDashed },
 };
 
 export interface CreateChartOptions extends Partial<TimeChartOptions> {
