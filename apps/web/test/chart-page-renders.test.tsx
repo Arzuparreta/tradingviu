@@ -100,6 +100,8 @@ const fakeChart = (container: HTMLElement) => {
       fitContent: () => {},
       subscribeVisibleTimeRangeChange: () => () => {},
       unsubscribeVisibleTimeRangeChange: () => {},
+      subscribeVisibleLogicalRangeChange: () => () => {},
+      unsubscribeVisibleLogicalRangeChange: () => {},
     }),
     addSeries: () => fakeSeries(),
     removeSeries: () => {},

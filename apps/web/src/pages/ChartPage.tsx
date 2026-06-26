@@ -30,6 +30,10 @@ import type { DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPerio
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import { useMarketStream } from '../hooks/use-market-stream';
+import { useDrawings } from '../hooks/use-drawings';
+import { DrawingOverlay } from '../components/DrawingOverlay';
+import { DrawingToolbar } from '../components/DrawingToolbar';
+import { DEFAULT_DRAWING_STYLE, type DrawingStyle, type DrawingTool } from '@tv/drawing-tools';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -119,6 +123,21 @@ export function ChartPage() {
   const [orderType, setOrderType] = useState<'market' | 'limit'>('limit');
   const [quantity, setQuantity] = useState('1');
   const [limitPrice, setLimitPrice] = useState('');
+
+  // Drawing tools: a draw-mode toggle reveals the toolbar and lets the overlay
+  // capture pointer events; otherwise drawings render but the chart stays
+  // interactive. `chartReady` mirrors the chart/series refs into render so the
+  // overlay can pick them up (refs alone don't trigger a re-render).
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawingTool, setDrawingTool] = useState<DrawingTool>('trend-line');
+  const [drawingStyle, setDrawingStyle] = useState<DrawingStyle>(DEFAULT_DRAWING_STYLE);
+  const [deleteDrawingRequest, setDeleteDrawingRequest] = useState(0);
+  const [chartReady, setChartReady] = useState(false);
+  const { drawings, setDrawings } = useDrawings({
+    symbolId: symbolId ?? null,
+    interval,
+    enabled: !!user,
+  });
 
   const symbolsQ = useQuery({
     queryKey: ['symbols'],
@@ -388,7 +407,9 @@ export function ChartPage() {
     candleRef.current = candle;
     volumeRef.current = volume;
     isFirstSetDataRef.current = true;
+    setChartReady(true);
     return () => {
+      setChartReady(false);
       removeChart(chart);
       chartRef.current = null;
       candleRef.current = null;
@@ -1097,7 +1118,18 @@ export function ChartPage() {
           minHeight: 200,
           background: '#0e0e0e',
         }}
-      />
+      >
+        <DrawingOverlay
+          chart={chartReady ? chartRef.current : null}
+          series={chartReady ? candleRef.current : null}
+          drawings={drawings}
+          tool={drawingTool}
+          style={drawingStyle}
+          active={drawMode && !replayActive}
+          deleteRequest={deleteDrawingRequest}
+          onChange={setDrawings}
+        />
+      </div>
       <aside
         className="col"
         style={{
@@ -2032,6 +2064,24 @@ export function ChartPage() {
           Backtest
         </button>
         {showBacktest && backtestM.isPending && <span className="muted small">running…</span>}
+        <span className="muted small">|</span>
+        <button
+          className={drawMode ? 'primary' : ''}
+          onClick={() => setDrawMode((d) => !d)}
+          style={{ fontSize: 12 }}
+          title="Drawing tools"
+        >
+          ✎ Draw{drawings.length > 0 ? ` (${drawings.length})` : ''}
+        </button>
+        {drawMode && (
+          <DrawingToolbar
+            tool={drawingTool}
+            onToolChange={setDrawingTool}
+            style={drawingStyle}
+            onStyleChange={setDrawingStyle}
+            onDelete={() => setDeleteDrawingRequest((n) => n + 1)}
+          />
+        )}
         <span className="muted small">|</span>
         <button
           className={replayActive ? 'primary' : ''}

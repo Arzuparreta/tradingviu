@@ -75,6 +75,7 @@ import type {
   SpacesSort,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
+import type { Drawing } from '@tv/drawing-tools';
 import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
 
 type PineInputs = Record<string, number | boolean | string>;
@@ -412,6 +413,15 @@ export const api = {
   updateLayout: (id: string, body: { name?: string; config?: LayoutConfig; isDefault?: boolean }) =>
     request<{ ok: true }>(`/api/layouts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteLayout: (id: string) => request<{ ok: true }>(`/api/layouts/${id}`, { method: 'DELETE' }),
+  drawings: (symbol: string, interval: string) =>
+    request<{ drawings: Drawing[] }>(
+      `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+    ),
+  saveDrawings: (symbol: string, interval: string, drawings: Drawing[]) =>
+    request<{ ok: true }>(
+      `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`,
+      { method: 'PUT', body: JSON.stringify({ drawings }) },
+    ),
   pineValidate: (source: string) =>
     request<ValidateResult>('/api/pine/validate', {
       method: 'POST',

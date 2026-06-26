@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import { ChartPanel, type PanelBounds } from '../components/ChartPanel';
+import { DrawingToolbar } from '../components/DrawingToolbar';
 import { DEFAULT_DRAWING_STYLE, type DrawingStyle, type DrawingTool } from '@tv/drawing-tools';
 import {
   REPLAY_SPEEDS,
@@ -274,52 +275,13 @@ export function LayoutPage() {
 
         <span className="layout-divider" />
 
-        <div className="drawing-toolbar">
-          {([
-            ['cursor', 'Cursor'],
-            ['select', 'Select'],
-            ['trend-line', 'Line'],
-            ['ray', 'Ray'],
-            ['extended-line', 'Extend'],
-            ['horizontal-line', 'H'],
-            ['vertical-line', 'V'],
-            ['rectangle', 'Rect'],
-            ['text', 'Text'],
-          ] as const).map(([tool, label]) => (
-            <button
-              key={tool}
-              className={drawingTool === tool ? 'primary' : 'ghost'}
-              onClick={() => setDrawingTool(tool)}
-              title={label}
-              style={{ padding: '4px 8px' }}
-            >
-              {label}
-            </button>
-          ))}
-          <input
-            type="color"
-            value={drawingStyle.color}
-            onChange={(e) => setDrawingStyle((s) => ({ ...s, color: e.target.value }))}
-            title="Drawing color"
-          />
-          <select
-            value={drawingStyle.lineStyle}
-            onChange={(e) => setDrawingStyle((s) => ({ ...s, lineStyle: e.target.value as DrawingStyle['lineStyle'] }))}
-            title="Line style"
-          >
-            <option value="solid">solid</option>
-            <option value="dashed">dash</option>
-            <option value="dotted">dot</option>
-          </select>
-          <select
-            value={drawingStyle.width}
-            onChange={(e) => setDrawingStyle((s) => ({ ...s, width: Number(e.target.value) }))}
-            title="Line width"
-          >
-            {[1, 2, 3, 4, 5, 6].map((w) => <option key={w} value={w}>{w}px</option>)}
-          </select>
-          <button className="ghost" onClick={() => setDeleteDrawingRequest((n) => n + 1)} title="Delete selected drawing">Delete</button>
-        </div>
+        <DrawingToolbar
+          tool={drawingTool}
+          onToolChange={setDrawingTool}
+          style={drawingStyle}
+          onStyleChange={setDrawingStyle}
+          onDelete={() => setDeleteDrawingRequest((n) => n + 1)}
+        />
 
         <span className="layout-divider" />
 

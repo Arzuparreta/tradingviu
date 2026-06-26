@@ -92,7 +92,7 @@ tradingviu/
 │   ├── pivot-points/            # pivot engine: standard/fibonacci/camarilla/woodie/demark over D/W/M periods (slice 9h)
 │   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
 │   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
-│   ├── drawing-tools/           # [TODO] 110+ drawing primitives
+│   ├── drawing-tools/           # 7 primitives (line/ray/extend/H/V/rect/text) + screen-projection helpers; server-persisted per (symbol, interval)
 │   ├── indicators/              # [TODO] indicator catalog with display info
 │   ├── screener-engine/         # [TODO] SQL-based screener
 │   ├── alert-engine/            # (placeholder — alert evaluator lives in apps/server/src/services/alert-engine.ts)
@@ -368,6 +368,26 @@ tradingviu/
 - Later — event-driven Pine `strategy.*` (stops/targets/trailing) and a dedicated
   backtest report page.
 
+### Drawing tools (in progress)
+
+- **Engine + overlay (done):** `packages/drawing-tools` (pure Zod-validated
+  schema + helpers — `makeDrawing`, point-count rules, line extension/hit-test
+  math) and an SVG `DrawingOverlay` rendering 7 primitives (trend line, ray,
+  extended line, horizontal/vertical line, rectangle, text) with select, drag,
+  and delete. The overlay reprojects on pan/zoom (subscribes to the time scale's
+  visible-range), so drawings stay pinned to their (time, price) anchors. The
+  chart hides the OS cursor in favour of the drawn TradingView-style crosshair.
+- **Multi-chart (done):** the layout grid carries per-panel drawings inside the
+  saved layout config (`Panel.drawings`).
+- **Main chart + persistence (done):** a **✎ Draw** toggle + shared
+  `DrawingToolbar` on `ChartPage`, backed by the previously-dormant `drawings`
+  table via a tenant-scoped `GET`/`PUT /api/drawings?symbol=&interval=` (pure
+  row↔drawing mapping in `apps/server/src/services/drawings.ts`, replace-all
+  save). The `useDrawings` hook loads per (symbol, interval) and debounces saves
+  so dragging doesn't flood the network.
+- Later — more primitives (Fibonacci retracement/extension, parallel channel,
+  arrows, ellipse, brushes), per-drawing style editing + lock/hide, and snapping.
+
 ## Working with this codebase
 
 ### Quick local dev
@@ -431,6 +451,10 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 | `apps/web/src/hooks/use-chart-history.ts`      | **Slice 2.5** — paginated history hook with `loadMore`/`loadNewer`  |
 | `apps/web/src/hooks/use-bar-stream.ts`         | **Slice 2.5** — WS hook with status + auto-reconnect                |
 | `apps/web/src/hooks/use-market-stream.ts`      | Live quote/book/status hook for price and DOM                       |
+| `apps/server/src/routes/drawings.ts`           | Drawing CRUD (`GET`/`PUT /api/drawings`) scoped per (symbol, interval) |
+| `apps/server/src/services/drawings.ts`         | Pure row↔`Drawing` mapping for the `drawings` table                  |
+| `apps/web/src/components/DrawingOverlay.tsx`    | SVG overlay: render/select/drag drawings, reproject on pan/zoom      |
+| `apps/web/src/hooks/use-drawings.ts`           | Load drawings per (symbol, interval) + debounced replace-all save   |
 | `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                   |
 | `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                         |
 | `packages/db/src/seed.ts`                      | Plan + exchange + symbol seed                                       |

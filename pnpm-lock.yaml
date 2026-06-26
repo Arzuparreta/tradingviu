@@ -56,6 +56,9 @@ importers:
       '@tv/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@tv/drawing-tools':
+        specifier: workspace:*
+        version: link:../../packages/drawing-tools
       '@tv/ichimoku':
         specifier: workspace:*
         version: link:../../packages/ichimoku

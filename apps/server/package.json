@@ -23,6 +23,7 @@
     "@tv/data-adapters": "workspace:*",
     "@tv/data-types": "workspace:*",
     "@tv/db": "workspace:*",
+    "@tv/drawing-tools": "workspace:*",
     "@tv/ichimoku": "workspace:*",
     "@tv/layout-sync": "workspace:*",
     "@tv/notifications": "workspace:*",

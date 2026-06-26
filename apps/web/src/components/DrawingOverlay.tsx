@@ -120,6 +120,9 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
   const [draft, setDraft] = useState<{ kind: Drawing['kind']; points: DrawingPoint[] } | null>(null);
   const [drag, setDrag] = useState<{ id: string; start: DrawingPoint; original: Drawing } | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  // Bumped whenever the chart pans/zooms so projected screen coords recompute and
+  // the drawings stay pinned to their (time, price) anchors instead of drifting.
+  const [tick, setTick] = useState(0);
   // True while the Select tool hovers an existing drawing — drives the `move` cursor.
   const [hoveringDrawing, setHoveringDrawing] = useState(false);
 
@@ -135,6 +138,17 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
     ro.observe(svg);
     return () => ro.disconnect();
   }, []);
+
+  // Reproject on pan/zoom: lightweight-charts moves the time scale without
+  // resizing the container, so the ResizeObserver never fires. Subscribe to
+  // visible-range changes and bump a tick to recompute screen coordinates.
+  useEffect(() => {
+    if (!chart) return;
+    const timeScale = chart.timeScale();
+    const onRange = () => setTick((t) => t + 1);
+    timeScale.subscribeVisibleLogicalRangeChange(onRange);
+    return () => timeScale.unsubscribeVisibleLogicalRangeChange(onRange);
+  }, [chart]);
 
   // Drop the stale `move` hover state whenever we leave the Select tool.
   useEffect(() => {
@@ -154,7 +168,9 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
     return drawings
       .map((drawing) => ({ drawing, points: drawing.points.map((point) => project(chart, series, point)).filter((point): point is ScreenPoint => point !== null) }))
       .filter((item) => item.points.length > 0);
-  }, [chart, drawings, series, size]);
+    // `tick` and `size` are intentional reprojection triggers (pan/zoom/resize).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chart, drawings, series, size, tick]);
 
   const updateSize = () => {
     const svg = svgRef.current;
