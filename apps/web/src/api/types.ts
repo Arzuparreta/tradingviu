@@ -327,6 +327,35 @@ export interface OptimizeResult {
   results: OptimizeResultRow[];
 }
 
+export interface WalkForwardFold {
+  inStart: number;
+  inEnd: number;
+  outStart: number;
+  outEnd: number;
+  bestParams: Record<string, number>;
+  inSampleScore: number;
+  oosScore: number;
+  oos: BacktestStats;
+}
+export interface WalkForwardResult {
+  type: StrategyType;
+  objective: OptimizeObjective;
+  inSampleBars: number;
+  outOfSampleBars: number;
+  folds: WalkForwardFold[];
+  aggregate: {
+    foldCount: number;
+    profitableFolds: number;
+    profitableFoldPct: number;
+    oosReturnCompounded: number;
+    avgOosReturn: number;
+    avgInSampleScore: number;
+    avgOosScore: number;
+    walkForwardEfficiency: number;
+    totalOosTrades: number;
+  };
+}
+
 export type PivotMethod = 'standard' | 'fibonacci' | 'camarilla' | 'woodie' | 'demark';
 export type PivotPeriod = 'D' | 'W' | 'M';
 export interface PivotLevel {

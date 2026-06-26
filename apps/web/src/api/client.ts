@@ -18,6 +18,7 @@ import type {
   BacktestResult,
   OptimizeObjective,
   OptimizeResult,
+  WalkForwardResult,
   PivotMethod,
   PivotPeriod,
   PivotPoints,
@@ -317,6 +318,36 @@ export const api = {
     }>('/api/backtest/optimize', {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, type, paramGrid, settings, objective }),
+    }),
+  backtestWalkForward: (
+    symbol: string,
+    interval: string,
+    type: StrategyType,
+    paramGrid: Record<string, number[]>,
+    settings: Partial<BacktestSettings> = {},
+    objective: OptimizeObjective = 'netProfitPct',
+    inSampleBars = 300,
+    outOfSampleBars = 100,
+    limit = 1500,
+  ) =>
+    request<{
+      symbol: { id: string; ticker: string; exchange: string };
+      interval: string;
+      bars: number;
+      walkForward: WalkForwardResult;
+    }>('/api/backtest/walkforward', {
+      method: 'POST',
+      body: JSON.stringify({
+        symbol,
+        interval,
+        limit,
+        type,
+        paramGrid,
+        settings,
+        objective,
+        inSampleBars,
+        outOfSampleBars,
+      }),
     }),
   backtest: (
     symbol: string,

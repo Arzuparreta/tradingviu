@@ -1,6 +1,7 @@
 import type { Bar } from '@tv/data-types';
 import type {
   BacktestSettings,
+  BacktestStats,
   OptimizeObjective,
   OptimizeResult,
   OptimizeResultRow,
@@ -23,9 +24,9 @@ const cartesian = (grid: Record<string, readonly number[]>): Record<string, numb
   return combos;
 };
 
-/** Sortable score for a combo; higher is always better (drawdown is negated). */
-const score = (objective: OptimizeObjective, row: OptimizeResultRow): number => {
-  const s = row.stats;
+/** Score for a result; higher is always better (drawdown is negated). Shared
+ * by the optimizer and walk-forward so ranking is consistent. */
+export const objectiveScore = (objective: OptimizeObjective, s: BacktestStats): number => {
   switch (objective) {
     case 'netProfitPct':
       return s.netProfitPct;
@@ -39,6 +40,9 @@ const score = (objective: OptimizeObjective, row: OptimizeResultRow): number => 
       return -s.maxDrawdownPct; // smaller drawdown ranks higher
   }
 };
+
+const score = (objective: OptimizeObjective, row: OptimizeResultRow): number =>
+  objectiveScore(objective, row.stats);
 
 export interface OptimizeOptions {
   readonly objective?: OptimizeObjective;

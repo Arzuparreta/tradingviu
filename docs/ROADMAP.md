@@ -23,7 +23,7 @@
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
 | 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | ✅ done (9a–9h; footprint deferred — needs trade tape) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
-| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11c done) |
+| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11d done) |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -131,7 +131,7 @@ tradingviu/
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
 │   ├── SLICE-9.md               # what slice 9 delivers (9a–9h: patterns, chart patterns, volume profile, TPO, bar replay, Ichimoku, pivots)
-│   ├── SLICE-11.md              # what slice 11 delivers (11a–11c: backtest engine, strategies, Pine signal backtest, optimization)
+│   ├── SLICE-11.md              # what slice 11 delivers (11a–11d: backtest engine, strategies, Pine signal backtest, optimization, walk-forward)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
 ├── LICENSE                      # AGPL-3.0
@@ -335,8 +335,14 @@ tradingviu/
   cap + topN; `POST /api/backtest/optimize`; and an **Optimize parameters**
   button + objective selector + ranked top-12 table (click to apply) in the
   ChartPage backtest panel. See `docs/SLICE-11.md`.
-- Later — event-driven Pine `strategy.*` (stops/targets/trailing), a dedicated
-  report page, and walk-forward / out-of-sample optimization.
+- **11d (done) — Walk-forward analysis:** a pure `walkForward(...)` that slides a
+  rolling in-sample optimization → out-of-sample test across the bars (contiguous
+  non-overlapping OOS windows), reporting per-fold params + OOS stats and an
+  aggregate (compounded OOS return, profitable-fold %, **walk-forward
+  efficiency**); `POST /api/backtest/walkforward`; and a **Walk-forward** button +
+  fold table in the ChartPage backtest panel. See `docs/SLICE-11.md`.
+- Later — event-driven Pine `strategy.*` (stops/targets/trailing) and a dedicated
+  backtest report page.
 
 ## Working with this codebase
 

@@ -138,8 +138,44 @@ Notes:
 - This is a single in-sample grid search — walk-forward / out-of-sample
   validation is the natural next step.
 
+## 11d — Walk-forward analysis
+
+Status: done.
+
+Delivered:
+
+- **`walkForward(bars, type, paramGrid, settings, opts)`** in
+  `@tv/backtest-engine`: rolling out-of-sample validation. A fixed `inSampleBars`
+  window is optimized (via `optimize`), the winning params are tested on the next
+  `outOfSampleBars` window, and the window slides forward by the OOS size — so
+  the OOS segments are contiguous and non-overlapping. Each fold records its
+  in-sample/out-of-sample time span, the chosen params, the in-sample score, and
+  the full OOS stats. Pure and deterministic.
+- **Aggregate metrics:** fold count, profitable folds + %, **compounded OOS
+  return** (Π(1 + oosᵢ) − 1), average OOS return, average in-sample / OOS score,
+  total OOS trades, and the **walk-forward efficiency** (avg OOS score / avg
+  in-sample score) — how well the optimization generalizes out of sample. The
+  objective scoring is shared with the optimizer via an exported `objectiveScore`.
+- **`POST /api/backtest/walkforward`** (`{ symbol, interval, limit, type,
+  paramGrid, settings, objective, inSampleBars, outOfSampleBars, maxCombos }`).
+- In the **ChartPage** backtest panel: a **Walk-forward** button that runs WFA
+  with the auto-grid and default 300/100 in/out windows, showing the efficiency,
+  compounded OOS return, profitable-fold ratio, OOS trade count, and a per-fold
+  table (fold #, chosen params, OOS return).
+- Engine tests cover contiguous non-overlapping folds, per-fold params matching a
+  direct `optimize` of the in-sample window, the compounded-return + profitable
+  aggregate, the not-enough-bars (zero folds) case, schema validity, and
+  determinism.
+
+Notes:
+
+- Walk-forward efficiency is most meaningful when the average in-sample score is
+  positive; it is reported as 0 when the in-sample average is exactly 0.
+- This is the rigorous, overfitting-resistant counterpart to the single
+  in-sample grid search of 11c — the backtesting vertical (engine, built-ins,
+  Pine signals, optimization, walk-forward) is now complete.
+
 ## Remaining Slice 11 Work
 
 - Event-driven Pine `strategy.*` (stops / targets / trailing exits, pyramiding).
 - A dedicated backtest report page with a trade list and drawdown chart.
-- Walk-forward / out-of-sample optimization.

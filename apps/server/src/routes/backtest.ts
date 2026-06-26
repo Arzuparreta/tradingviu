@@ -11,6 +11,7 @@ import {
   simulate,
   signalsFromSeries,
   strategyCatalog,
+  walkForward,
 } from '@tv/backtest-engine';
 import { compileAndRun, PineRuntimeError } from '@tv/pine-runtime';
 import { PineParseError } from '@tv/pine-parser';
@@ -47,6 +48,19 @@ const OptimizeBody = z.object({
   objective: OptimizeObjectiveSchema.default('netProfitPct'),
   maxCombos: z.coerce.number().int().positive().max(2000).default(400),
   topN: z.coerce.number().int().positive().max(200).default(50),
+});
+
+const WalkForwardBody = z.object({
+  symbol: z.string(),
+  interval: z.enum(['1m', '5m', '15m', '1h', '4h', '1d', '1w']).default('1h'),
+  limit: z.coerce.number().int().positive().max(5000).default(1500),
+  type: StrategyTypeSchema,
+  paramGrid: z.record(z.string(), z.array(z.coerce.number().finite()).min(1).max(50)),
+  settings: BacktestSettingsSchema.default({}),
+  objective: OptimizeObjectiveSchema.default('netProfitPct'),
+  inSampleBars: z.coerce.number().int().min(2).max(5000).default(300),
+  outOfSampleBars: z.coerce.number().int().min(1).max(5000).default(100),
+  maxCombos: z.coerce.number().int().positive().max(2000).default(200),
 });
 
 const ccxtMap: Record<string, string> = {
@@ -108,6 +122,34 @@ export const backtestRoutes = new Hono()
     });
 
     return c.json({ symbol: row, interval: body.interval, bars: bars.length, optimization });
+  })
+  .post('/backtest/walkforward', zValidator('json', WalkForwardBody), async (c) => {
+    const body = c.req.valid('json');
+
+    const db = c.get('db');
+    const [row] = await db
+      .select({ id: symbols.id, ticker: symbols.ticker, exchange: exchanges.code })
+      .from(symbols)
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(eq(symbols.id, body.symbol))
+      .limit(1);
+    if (!row) return c.json({ error: 'symbol_not_found' }, 404);
+
+    const provider = getProvider(ccxtMap[row.exchange] ?? 'binance');
+    const bars = await provider.fetchHistorical({
+      symbol: row.ticker,
+      interval: body.interval,
+      limit: body.limit,
+    });
+
+    const result = walkForward(bars, body.type, body.paramGrid, body.settings, {
+      objective: body.objective,
+      inSampleBars: body.inSampleBars,
+      outOfSampleBars: body.outOfSampleBars,
+      maxCombos: body.maxCombos,
+    });
+
+    return c.json({ symbol: row, interval: body.interval, bars: bars.length, walkForward: result });
   })
   .post('/backtest/pine', zValidator('json', PineBacktestBody), async (c) => {
     const body = c.req.valid('json');

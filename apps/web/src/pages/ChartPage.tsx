@@ -238,6 +238,22 @@ export function ChartPage() {
       );
     },
   });
+  const walkForwardM = useMutation({
+    mutationFn: () => {
+      if (!symbolId) throw new Error('Symbol is required');
+      return api.backtestWalkForward(
+        symbolId,
+        interval,
+        strategyType,
+        buildParamGrid(),
+        btSettings,
+        optimizeObjective,
+        300,
+        100,
+        1500,
+      );
+    },
+  });
 
   const domQ = useQuery({
     queryKey: ['dom', symbolId],
@@ -1780,6 +1796,82 @@ export function ChartPage() {
                               </td>
                               <td className="mono down">
                                 -{(r.stats.maxDrawdownPct * 100).toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                );
+              })()}
+
+            <button
+              onClick={() => walkForwardM.mutate()}
+              disabled={!symbolId || walkForwardM.isPending}
+              style={{ fontSize: 12, marginTop: 4 }}
+              title="Rolling in-sample optimize → out-of-sample test (anti-overfitting)"
+            >
+              {walkForwardM.isPending ? 'Walk-forward…' : 'Walk-forward'}
+            </button>
+            {walkForwardM.isError && <div className="down small">Walk-forward failed.</div>}
+            {walkForwardM.data &&
+              (() => {
+                const wf = walkForwardM.data.walkForward;
+                const ag = wf.aggregate;
+                const keys = currentStrategy?.params.map((p) => p.key) ?? [];
+                if (ag.foldCount === 0)
+                  return <div className="muted small">Not enough history for a fold.</div>;
+                const stat = (label: string, value: string, cls = '') => (
+                  <div className="row small">
+                    <span className="muted">{label}</span>
+                    <span className="grow" />
+                    <span className={`mono ${cls}`}>{value}</span>
+                  </div>
+                );
+                return (
+                  <>
+                    <div className="col" style={{ gap: 2 }}>
+                      {stat(
+                        'Walk-forward eff.',
+                        ag.walkForwardEfficiency.toFixed(2),
+                        ag.walkForwardEfficiency >= 0.5 ? 'up' : 'down',
+                      )}
+                      {stat(
+                        'OOS return',
+                        `${ag.oosReturnCompounded >= 0 ? '+' : ''}${(ag.oosReturnCompounded * 100).toFixed(1)}%`,
+                        ag.oosReturnCompounded >= 0 ? 'up' : 'down',
+                      )}
+                      {stat(
+                        'Profitable folds',
+                        `${ag.profitableFolds}/${ag.foldCount} (${(ag.profitableFoldPct * 100).toFixed(0)}%)`,
+                      )}
+                      {stat('OOS trades', String(ag.totalOosTrades))}
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="discovery-table" style={{ minWidth: 0, fontSize: 11 }}>
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            {keys.map((k) => (
+                              <th key={k}>{k}</th>
+                            ))}
+                            <th>OOS</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {wf.folds.map((f, i) => (
+                            <tr key={i}>
+                              <td className="mono">{i + 1}</td>
+                              {keys.map((k) => (
+                                <td key={k} className="mono">
+                                  {f.bestParams[k]}
+                                </td>
+                              ))}
+                              <td
+                                className={`mono ${f.oos.netProfitPct >= 0 ? 'up' : 'down'}`}
+                              >
+                                {(f.oos.netProfitPct * 100).toFixed(1)}%
                               </td>
                             </tr>
                           ))}

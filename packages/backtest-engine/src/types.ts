@@ -179,6 +179,73 @@ export const OptimizeResultSchema = z.object({
   ),
 });
 
+/** One walk-forward fold: optimize on the in-sample window, test out-of-sample. */
+export interface WalkForwardFold {
+  readonly inStart: number;
+  readonly inEnd: number;
+  readonly outStart: number;
+  readonly outEnd: number;
+  readonly bestParams: Record<string, number>;
+  /** Objective score of the best params on the in-sample window. */
+  readonly inSampleScore: number;
+  /** Objective score of those params on the out-of-sample window. */
+  readonly oosScore: number;
+  readonly oos: BacktestStats;
+}
+
+export interface WalkForwardAggregate {
+  readonly foldCount: number;
+  readonly profitableFolds: number;
+  readonly profitableFoldPct: number;
+  /** Compounded out-of-sample return across folds: Π(1 + oosᵢ) − 1. */
+  readonly oosReturnCompounded: number;
+  readonly avgOosReturn: number;
+  readonly avgInSampleScore: number;
+  readonly avgOosScore: number;
+  /** avgOosScore / avgInSampleScore — how well the optimization generalizes. */
+  readonly walkForwardEfficiency: number;
+  readonly totalOosTrades: number;
+}
+
+export interface WalkForwardResult {
+  readonly type: StrategyType;
+  readonly objective: OptimizeObjective;
+  readonly inSampleBars: number;
+  readonly outOfSampleBars: number;
+  readonly folds: readonly WalkForwardFold[];
+  readonly aggregate: WalkForwardAggregate;
+}
+
+export const WalkForwardResultSchema = z.object({
+  type: StrategyTypeSchema,
+  objective: OptimizeObjectiveSchema,
+  inSampleBars: z.number().int().positive(),
+  outOfSampleBars: z.number().int().positive(),
+  folds: z.array(
+    z.object({
+      inStart: z.number().int().nonnegative(),
+      inEnd: z.number().int().nonnegative(),
+      outStart: z.number().int().nonnegative(),
+      outEnd: z.number().int().nonnegative(),
+      bestParams: z.record(z.string(), z.number()),
+      inSampleScore: z.number().finite(),
+      oosScore: z.number().finite(),
+      oos: BacktestStatsSchema,
+    }),
+  ),
+  aggregate: z.object({
+    foldCount: z.number().int().nonnegative(),
+    profitableFolds: z.number().int().nonnegative(),
+    profitableFoldPct: z.number().finite(),
+    oosReturnCompounded: z.number().finite(),
+    avgOosReturn: z.number().finite(),
+    avgInSampleScore: z.number().finite(),
+    avgOosScore: z.number().finite(),
+    walkForwardEfficiency: z.number().finite(),
+    totalOosTrades: z.number().int().nonnegative(),
+  }),
+});
+
 /** Catalog entry describing a strategy and its tunable parameters. */
 export interface StrategyParamDef {
   readonly key: string;
