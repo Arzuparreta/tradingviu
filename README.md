@@ -50,15 +50,17 @@ pnpm db:seed
 pnpm dev
 
 # 6. Open
-open http://localhost:5147
+open http://localhost:5187
 ```
 
-`pnpm dev` boots all packages in watch mode via Turbo.
+`pnpm dev` boots all packages in watch mode via Turbo. Local development uses
+`http://localhost:5187` for the web app and `http://localhost:3101` for the API,
+kept away from common Vite/API ports used by other local projects.
 
-> **Firewall note:** If you're accessing the dev server from another device on the same LAN, make sure ports 5147 (web) and 3001 (API) are open:
+> **Firewall note:** If you're accessing the dev server from another device on the same LAN, make sure ports 5187 (web) and 3101 (API) are open:
 > ```bash
-> sudo ufw allow 5147/tcp
-> sudo ufw allow 3001/tcp
+> sudo ufw allow 5187/tcp
+> sudo ufw allow 3101/tcp
 > ```
 
 ## Architecture

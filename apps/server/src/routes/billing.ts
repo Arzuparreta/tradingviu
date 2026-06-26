@@ -37,7 +37,7 @@ export const billingRoutes = new Hono()
       email: claims.email,
       planCode: body.planCode,
       cycle: body.cycle,
-      returnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? 'http://localhost:5147/account/billing',
+      returnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? 'http://localhost:5187/account/billing',
     });
     return c.json({ url });
   })
@@ -47,7 +47,7 @@ export const billingRoutes = new Hono()
     if (!isBillingEnabled()) return c.json({ error: 'billing_disabled' }, 503);
     const url = await createPortalSession(db, {
       tenantId: tenant.tenantId,
-      returnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? 'http://localhost:5147/account/billing',
+      returnUrl: process.env.STRIPE_PORTAL_RETURN_URL ?? 'http://localhost:5187/account/billing',
     });
     return c.json({ url });
   })

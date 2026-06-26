@@ -111,10 +111,10 @@ tradingviu/
 │   ├── cli/                     # tvctl operator CLI (tenants, users, plans)
 │   └── billing/                 # Stripe
 ├── apps/
-│   ├── web/                     # React + Vite (port 5173)
+│   ├── web/                     # React + Vite (dev port 5187)
 │   ├── desktop/                 # [TODO] Tauri 2
 │   ├── mobile/                  # [TODO] React Native
-│   └── server/                  # Hono on Bun (port 3001)
+│   └── server/                  # Hono on Bun (dev port 3101)
 ├── services/                    # background workers: news-ingest, fundamentals-ingest, macro-ingest, calendar-ingest
 ├── infra/
 │   ├── docker-compose.yml       # postgres, redis, minio, meili, mailpit, caddy, api, web
@@ -387,8 +387,8 @@ pnpm db:seed
 
 # 4. Dev
 pnpm dev
-# → web on http://localhost:5173
-# → api on http://localhost:3001
+# → web on http://localhost:5187
+# → api on http://localhost:3101
 ```
 
 ### Testing E2E
