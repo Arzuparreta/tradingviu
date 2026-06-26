@@ -136,6 +136,31 @@ describe('v1 public API', () => {
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe('unknown_indicator');
     });
+
+    test('rejects missing required fields', async () => {
+      const app = appFor(new FakeDb());
+      const res = await app.request('/v1/indicators/compute', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    test('rejects tokens without the read scope', async () => {
+      const app = appFor(new FakeDb(), []);
+      const res = await app.request('/v1/indicators/compute', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: 'sma',
+          symbol: 'sym_btc',
+        }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('insufficient_scope');
+    });
   });
 
   // ── Screener metrics ───────────────────────────────────────────────────────
@@ -159,6 +184,14 @@ describe('v1 public API', () => {
         expect(roe.format).toBe('percent');
       }
     });
+
+    test('rejects tokens without the read scope', async () => {
+      const app = appFor(new FakeDb(), []);
+      const res = await app.request('/v1/screener/metrics');
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('insufficient_scope');
+    });
   });
 
   // ── News ──────────────────────────────────────────────────────────────────
@@ -178,6 +211,14 @@ describe('v1 public API', () => {
       const app = appFor(new FakeDb());
       const res = await app.request('/v1/news?limit=999');
       expect(res.status).toBe(400);
+    });
+
+    test('rejects tokens without the read scope', async () => {
+      const app = appFor(new FakeDb(), []);
+      const res = await app.request('/v1/news');
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('insufficient_scope');
     });
   });
 
@@ -199,6 +240,18 @@ describe('v1 public API', () => {
 
       const body = (await res.json()) as { results: unknown[] };
       expect(body.results).toBeArray();
+    });
+
+    test('rejects tokens without the read scope', async () => {
+      const app = appFor(new FakeDb(), []);
+      const res = await app.request('/v1/screener', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ assetClass: 'crypto' }),
+      });
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('insufficient_scope');
     });
   });
 

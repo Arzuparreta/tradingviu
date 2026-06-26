@@ -16,7 +16,7 @@ import {
   screenerMetricCatalog,
   screenerOrderBy,
 } from '@tv/screener-engine';
-import type { NewsQuery } from '@tv/core';
+import { NewsQuerySchema, ScreenerQuerySchema } from '@tv/core';
 import { requireScope } from '../middleware/api-key.js';
 import { getFreshBars } from '../services/market-data.js';
 
@@ -40,39 +40,6 @@ const IndicatorComputeBody = z.object({
   limit: z.coerce.number().int().positive().max(2000).default(500),
 });
 
-const ScreenerQueryV1 = z.object({
-  q: z.string().trim().min(1).max(160).optional(),
-  assetClass: z.string().trim().min(1).max(40).optional(),
-  exchange: z.string().trim().min(1).max(40).optional(),
-  country: z.string().trim().min(1).max(80).optional(),
-  sector: z.string().trim().min(1).max(120).optional(),
-  industry: z.string().trim().min(1).max(120).optional(),
-  active: z.coerce.boolean().default(true),
-  filters: z
-    .array(
-      z.object({
-        key: z.string().trim().min(1).max(60),
-        min: z.coerce.number().finite().optional(),
-        max: z.coerce.number().finite().optional(),
-      }),
-    )
-    .max(60)
-    .default([]),
-  sort: z.string().trim().min(1).max(60).default('marketCap'),
-  direction: z.enum(['asc', 'desc']).default('desc'),
-  limit: z.coerce.number().int().positive().max(500).default(100),
-});
-
-const NewsQueryV1 = z.object({
-  symbol: z.string().trim().min(1).max(32).optional(),
-  source: z.string().trim().min(1).max(80).optional(),
-  sentiment: z.string().trim().min(1).max(32).optional(),
-  q: z.string().trim().min(1).max(160).optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
-  limit: z.coerce.number().int().positive().max(100).default(50),
-});
-
 const newsSymbolFilter = (symbol: string): SQL =>
   sql`EXISTS (
     SELECT 1
@@ -84,8 +51,9 @@ const newsSymbolFilter = (symbol: string): SQL =>
 
 /** Public, API-key-authenticated surface. Mounted under `/v1`. */
 export const publicV1Routes = new Hono()
+  .use('*', requireScope('read'))
   // ---- Symbols ----
-  .get('/symbols', requireScope('read'), zValidator('query', SymbolsQuery), async (c) => {
+  .get('/symbols', zValidator('query', SymbolsQuery), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
     const filters = [eq(symbols.active, true)];
@@ -109,14 +77,14 @@ export const publicV1Routes = new Hono()
       .limit(q.limit);
     return c.json({ symbols: rows });
   })
-  .get('/symbols/:id/history', requireScope('read'), zValidator('query', HistoryQuery), async (c) => {
+  .get('/symbols/:id/history', zValidator('query', HistoryQuery), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
     const result = await getFreshBars(db, c.req.param('id'), q.interval, { limit: q.limit });
     return c.json({ symbol: result.symbol, interval: q.interval, bars: result.bars });
   })
   // ---- Indicators ----
-  .get('/indicators', requireScope('read'), (c) => {
+  .get('/indicators', (c) => {
     return c.json({
       indicators: all().map((i) => ({
         id: i.name.toLowerCase().replace(/[^a-z0-9]/g, ''),
@@ -128,7 +96,7 @@ export const publicV1Routes = new Hono()
       })),
     });
   })
-  .post('/indicators/compute', requireScope('read'), zValidator('json', IndicatorComputeBody), async (c) => {
+  .post('/indicators/compute', zValidator('json', IndicatorComputeBody), async (c) => {
     const body = c.req.valid('json');
     const def = find(body.id);
     if (!def) return c.json({ error: 'unknown_indicator' }, 404);
@@ -142,8 +110,8 @@ export const publicV1Routes = new Hono()
     });
   })
   // ---- Screener ----
-  .get('/screener/metrics', requireScope('read'), (c) => c.json({ metrics: screenerMetricCatalog }))
-  .post('/screener', requireScope('read'), zValidator('json', ScreenerQueryV1), async (c) => {
+  .get('/screener/metrics', (c) => c.json({ metrics: screenerMetricCatalog }))
+  .post('/screener', zValidator('json', ScreenerQuerySchema), async (c) => {
     const q = c.req.valid('json');
     const db = c.get('db');
 
@@ -182,7 +150,7 @@ export const publicV1Routes = new Hono()
           eq(fundamentalSnapshots.isLatest, true),
         ),
       )
-      .where(maybeWhere(buildScreenerFilters(q as unknown as Parameters<typeof buildScreenerFilters>[0])))
+      .where(maybeWhere(buildScreenerFilters(q)))
       .orderBy(screenerOrderBy(q.sort, q.direction), symbols.ticker)
       .limit(q.limit);
 
@@ -225,7 +193,7 @@ export const publicV1Routes = new Hono()
     });
   })
   // ---- News ----
-  .get('/news', requireScope('read'), zValidator('query', NewsQueryV1), async (c) => {
+  .get('/news', zValidator('query', NewsQuerySchema), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
     const filters: SQL[] = [];
