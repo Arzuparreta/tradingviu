@@ -2,6 +2,7 @@ import {
   createChart,
   createSeriesMarkers,
   CrosshairMode,
+  LineStyle,
   CandlestickSeries,
   LineSeries,
   AreaSeries,
@@ -18,7 +19,6 @@ import {
   type SeriesMarker,
   type SeriesMarkerPosition,
   type SeriesMarkerShape,
-  type LineStyle,
   type LineWidth,
   type IPriceLine,
   type MouseEventParams,
@@ -70,7 +70,7 @@ export const darkTheme: ChartTheme = {
   downColor: '#ef5350',
   wickUpColor: '#26a69a',
   wickDownColor: '#ef5350',
-  crosshair: { color: '#758696', width: 1, style: 3 },
+  crosshair: { color: '#758696', width: 1, style: LineStyle.Solid },
 };
 
 export const lightTheme: ChartTheme = {
@@ -82,7 +82,7 @@ export const lightTheme: ChartTheme = {
   downColor: '#ef5350',
   wickUpColor: '#26a69a',
   wickDownColor: '#ef5350',
-  crosshair: { color: '#9598a1', width: 1, style: 3 },
+  crosshair: { color: '#9598a1', width: 1, style: LineStyle.Solid },
 };
 
 export interface CreateChartOptions extends Partial<TimeChartOptions> {
@@ -185,6 +185,16 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
       // Free-moving crosshair (TradingView default). `Magnet` (1) snapped the
       // crosshair to candle OHLC values, which felt broken to users.
       mode: CrosshairMode.Normal,
+      vertLine: {
+        color: theme.crosshair.color,
+        width: theme.crosshair.width,
+        style: theme.crosshair.style,
+      },
+      horzLine: {
+        color: theme.crosshair.color,
+        width: theme.crosshair.width,
+        style: theme.crosshair.style,
+      },
       ...opts.crosshair,
     },
     autoSize: opts.autoSize ?? true,
