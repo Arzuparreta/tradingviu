@@ -58,7 +58,7 @@ export interface ChartTheme {
   downColor: string;
   wickUpColor: string;
   wickDownColor: string;
-  crosshair: { color: string; width: LineWidth; style: LineStyle };
+  crosshair: { color: string; width: LineWidth; style: LineStyle; labelBackground: string };
 }
 
 export const darkTheme: ChartTheme = {
@@ -70,7 +70,10 @@ export const darkTheme: ChartTheme = {
   downColor: '#ef5350',
   wickUpColor: '#26a69a',
   wickDownColor: '#ef5350',
-  crosshair: { color: '#758696', width: 1, style: 3 },
+  // TradingView-style crosshair: a clearly visible dashed gray line with filled
+  // price/time axis labels. Dashed (2) reads better than the library's sparse
+  // LargeDashed default, and the label box stands out against the dark axes.
+  crosshair: { color: '#9598a1', width: 1, style: 2, labelBackground: '#363a45' },
 };
 
 export const lightTheme: ChartTheme = {
@@ -82,7 +85,7 @@ export const lightTheme: ChartTheme = {
   downColor: '#ef5350',
   wickUpColor: '#26a69a',
   wickDownColor: '#ef5350',
-  crosshair: { color: '#9598a1', width: 1, style: 3 },
+  crosshair: { color: '#9598a1', width: 1, style: 2, labelBackground: '#9598a1' },
 };
 
 export interface CreateChartOptions extends Partial<TimeChartOptions> {
@@ -185,6 +188,25 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
       // Free-moving crosshair (TradingView default). `Magnet` (1) snapped the
       // crosshair to candle OHLC values, which felt broken to users.
       mode: CrosshairMode.Normal,
+      // Wire the theme's crosshair styling into both lines. Without this the
+      // chart falls back to the library defaults, whose price/time labels are
+      // nearly invisible on the dark axes — so once the OS cursor is hidden the
+      // crosshair looks like it disappeared. Visible labels are what make the
+      // TradingView crosshair read as "the pointer".
+      vertLine: {
+        color: theme.crosshair.color,
+        width: theme.crosshair.width,
+        style: theme.crosshair.style,
+        labelVisible: true,
+        labelBackgroundColor: theme.crosshair.labelBackground,
+      },
+      horzLine: {
+        color: theme.crosshair.color,
+        width: theme.crosshair.width,
+        style: theme.crosshair.style,
+        labelVisible: true,
+        labelBackgroundColor: theme.crosshair.labelBackground,
+      },
       ...opts.crosshair,
     },
     autoSize: opts.autoSize ?? true,
@@ -193,6 +215,17 @@ export const createTvChart = (opts: CreateChartOptions): IChartApi => {
       ...opts.localization,
     },
   });
+
+  // TradingView-style crosshair: hide the OS cursor over the chart so the only
+  // pointer the user sees is the drawn crosshair. lightweight-charts renders its
+  // root element as a child of this container and clears its own inline cursor
+  // while hovering the empty pane, so the pane inherits `none` and shows just the
+  // crosshair. Interactive areas keep a normal cursor because the library still
+  // sets its own inline cursor on them: the price axis (`ns-resize`) and time
+  // axis (`ew-resize`) on hover, pane separators (`row-resize`), and any
+  // draggable source. Forcing `none` here also means a global `wait`/`progress`
+  // cursor never bleeds onto the chart during data loading.
+  opts.container.style.cursor = 'none';
 
   if (opts.autoSize) {
     const ro = new ResizeObserver(() => {

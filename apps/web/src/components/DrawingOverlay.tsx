@@ -120,6 +120,8 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
   const [draft, setDraft] = useState<{ kind: Drawing['kind']; points: DrawingPoint[] } | null>(null);
   const [drag, setDrag] = useState<{ id: string; start: DrawingPoint; original: Drawing } | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  // True while the Select tool hovers an existing drawing — drives the `move` cursor.
+  const [hoveringDrawing, setHoveringDrawing] = useState(false);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -133,6 +135,11 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
     ro.observe(svg);
     return () => ro.disconnect();
   }, []);
+
+  // Drop the stale `move` hover state whenever we leave the Select tool.
+  useEffect(() => {
+    if (tool !== 'select') setHoveringDrawing(false);
+  }, [tool]);
 
   useEffect(() => {
     if (!active || deleteRequest <= 0) return;
@@ -204,7 +211,16 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
   };
 
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!chart || !series || !svgRef.current || !drag) return;
+    if (!chart || !series || !svgRef.current) return;
+    if (!drag) {
+      // Select tool: surface a `move` cursor while hovering a drawing, the way
+      // TradingView shows a move pointer over a draggable object.
+      if (active && tool === 'select') {
+        const screen = pointerScreenPoint(e);
+        setHoveringDrawing(screen ? hitDrawing(screen, projected, size.width, size.height) !== null : false);
+      }
+      return;
+    }
     const point = eventPoint(e, svgRef.current, chart, series);
     if (!point) return;
     const dt = point.time - drag.start.time;
@@ -230,13 +246,26 @@ export function DrawingOverlay({ chart, series, drawings, tool, style, active, d
   };
 
   const selected = selectedId ? drawings.find((drawing) => drawing.id === selectedId) : null;
+  // The `cursor` tool lets pointer events fall through to the chart canvas, which
+  // hides the OS cursor and shows the drawn crosshair. The drawing/select tools
+  // capture events, so this overlay owns the cursor: a crosshair while placing
+  // points (precise, TradingView-style) and an arrow/move pair while selecting.
   const pointerEvents = active && tool !== 'cursor' ? 'auto' : 'none';
+  const cursor = drag
+    ? 'grabbing'
+    : tool === 'select'
+      ? hoveringDrawing
+        ? 'move'
+        : 'default'
+      : toolCreatesDrawing(tool)
+        ? 'crosshair'
+        : 'none';
 
   return (
     <svg
       ref={svgRef}
       className="drawing-overlay"
-      style={{ pointerEvents }}
+      style={{ pointerEvents, cursor }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
