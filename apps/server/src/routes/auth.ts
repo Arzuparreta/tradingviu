@@ -8,12 +8,13 @@ import { users, tenantMembers, tenants } from '@tv/db/schema';
 import { signup, issueAccessToken, verifyPassword } from '@tv/auth';
 import { loadEnv, AuthError, ValidationError } from '@tv/core';
 import { withSuperAdminRls, clearRls } from '@tv/db';
+import { resolveAuthAdminDatabaseUrl } from '../services/auth-admin-db.js';
 
 const env = loadEnv();
 // Auth bootstrap uses the admin connection because signup needs to insert into
 // users/tenants before any tenant context exists. RLS on users uses tenant context,
 // which is a chicken-and-egg for new signups. Admin connection bypasses RLS.
-const adminUrl = env.DATABASE_URL_ADMIN ?? env.DATABASE_URL;
+const adminUrl = resolveAuthAdminDatabaseUrl(env);
 const db = createDb({ url: adminUrl });
 
 const SignupBody = z.object({

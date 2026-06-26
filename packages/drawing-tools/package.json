@@ -1,5 +1,5 @@
 {
-  "name": "@tv/layout-sync",
+  "name": "@tv/drawing-tools",
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -13,7 +13,6 @@
     "build": "echo skip"
   },
   "dependencies": {
-    "@tv/drawing-tools": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

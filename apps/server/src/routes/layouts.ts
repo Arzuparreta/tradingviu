@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { eq, and, desc } from 'drizzle-orm';
 import { layouts } from '@tv/db/schema';
 import { ulid } from 'ulid';
-import { LayoutConfigSchema } from '@tv/layout-sync';
+import { LayoutConfigSchema, parseLayoutConfig } from '@tv/layout-sync';
 import { NotFoundError, tryGetTenant, type TenantContext } from '@tv/core';
 
 const CreateBody = z.object({
@@ -28,7 +28,7 @@ export const layoutRoutes = new Hono()
       .from(layouts)
       .where(and(eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)))
       .orderBy(desc(layouts.isDefault), desc(layouts.updatedAt));
-    return c.json({ layouts: rows });
+    return c.json({ layouts: rows.map((row) => ({ ...row, config: parseLayoutConfig(row.config) })) });
   })
   .get('/layouts/:id', async (c) => {
     const db = c.get('db');
@@ -39,12 +39,13 @@ export const layoutRoutes = new Hono()
       .from(layouts)
       .where(and(eq(layouts.id, id), eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
     if (!row) throw new NotFoundError('Layout not found');
-    return c.json({ layout: row });
+    return c.json({ layout: { ...row, config: parseLayoutConfig(row.config) } });
   })
   .post('/layouts', zValidator('json', CreateBody), async (c) => {
     const db = c.get('db');
     const tenant = tryGetTenant() as TenantContext;
     const body = c.req.valid('json');
+    const config = parseLayoutConfig(body.config);
     const id = ulid();
     if (body.isDefault) {
       await db
@@ -57,7 +58,7 @@ export const layoutRoutes = new Hono()
       tenantId: tenant.tenantId,
       userId: tenant.userId,
       name: body.name,
-      config: body.config,
+      config,
       isDefault: body.isDefault ?? false,
     });
     return c.json({ id });
@@ -83,7 +84,7 @@ export const layoutRoutes = new Hono()
 
     const patch: Partial<typeof layouts.$inferInsert> = { updatedAt: new Date() };
     if (body.name !== undefined) patch.name = body.name;
-    if (body.config !== undefined) patch.config = body.config;
+    if (body.config !== undefined) patch.config = parseLayoutConfig(body.config);
     if (body.isDefault !== undefined) patch.isDefault = body.isDefault;
 
     await db

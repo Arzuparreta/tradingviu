@@ -50,7 +50,7 @@ describe('reflowToGrid', () => {
 
 describe('parseLayoutConfig validation', () => {
   it('rejects a panel count that does not match the grid', () => {
-    const bad = { grid: '4', panels: [makePanel()], sync: { symbol: false, interval: true, crosshair: true }, activePanel: 0 };
+    const bad = { grid: '4', panels: [makePanel()], sync: { symbol: false, interval: false, crosshair: true }, activePanel: 0 };
     expect(() => parseLayoutConfig(bad)).toThrow();
   });
 
@@ -59,7 +59,7 @@ describe('parseLayoutConfig validation', () => {
     const bad = {
       grid: '2',
       panels: [dupe, { ...dupe }],
-      sync: { symbol: false, interval: true, crosshair: true },
+      sync: { symbol: false, interval: false, crosshair: true },
       activePanel: 0,
     };
     expect(() => parseLayoutConfig(bad)).toThrow();
@@ -68,7 +68,26 @@ describe('parseLayoutConfig validation', () => {
   it('applies sync defaults when omitted', () => {
     const cfg = defaultLayoutConfig('2');
     const parsed = LayoutConfigSchema.parse({ grid: cfg.grid, panels: cfg.panels });
-    expect(parsed.sync).toEqual({ symbol: false, interval: true, crosshair: true });
+    expect(parsed.sync).toEqual({ symbol: false, interval: false, crosshair: true });
     expect(parsed.activePanel).toBe(0);
+  });
+
+  it('normalizes legacy interval sync off', () => {
+    const cfg = defaultLayoutConfig('2');
+    const parsed = parseLayoutConfig({ ...cfg, sync: { symbol: false, interval: true, crosshair: true } });
+    expect(parsed.sync.interval).toBe(false);
+  });
+
+  it('keeps drawings scoped per panel', () => {
+    const cfg = defaultLayoutConfig('2', 'sym_a');
+    const parsed = parseLayoutConfig({
+      ...cfg,
+      panels: [
+        { ...cfg.panels[0]!, drawings: [{ id: 'd1', kind: 'horizontal-line', points: [{ time: 1, price: 10 }], style: { color: '#fff', width: 1, lineStyle: 'solid' }, createdAt: 1, updatedAt: 1 }] },
+        { ...cfg.panels[1]!, symbolId: 'sym_a', interval: '1h', drawings: [] },
+      ],
+    });
+    expect(parsed.panels[0]?.drawings).toHaveLength(1);
+    expect(parsed.panels[1]?.drawings).toHaveLength(0);
   });
 });

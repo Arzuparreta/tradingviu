@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTvChart, addSeries, setData, removeChart, darkTheme } from '@tv/chart-engine';
 import { INTERVALS, type Interval, type Panel } from '@tv/layout-sync';
+import type { Drawing, DrawingStyle, DrawingTool } from '@tv/drawing-tools';
 import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
 import { SymbolSearch } from './SymbolSearch';
+import { DrawingOverlay } from './DrawingOverlay';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream } from '../hooks/use-bar-stream';
 
@@ -19,6 +21,9 @@ export interface ChartPanelProps {
   live: boolean;
   onActivate: () => void;
   onChange: (patch: Partial<Panel>) => void;
+  drawingTool: DrawingTool;
+  drawingStyle: DrawingStyle;
+  deleteDrawingRequest: number;
   /** Register the chart + candle series with the parent (for crosshair sync). */
   onReady?: (id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => void;
   onDestroy?: (id: string) => void;
@@ -36,6 +41,9 @@ export function ChartPanel({
   live,
   onActivate,
   onChange,
+  drawingTool,
+  drawingStyle,
+  deleteDrawingRequest,
   onReady,
   onDestroy,
   replayActive = false,
@@ -46,6 +54,8 @@ export function ChartPanel({
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
   const volumeRef = useRef<ISeriesApi<SeriesType> | null>(null);
+  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const [candleApi, setCandleApi] = useState<ISeriesApi<SeriesType> | null>(null);
   const [picking, setPicking] = useState(false);
 
   const onReadyRef = useRef(onReady);
@@ -75,6 +85,8 @@ export function ChartPanel({
     chartRef.current = chart;
     candleRef.current = candle;
     volumeRef.current = volume;
+    setChartApi(chart);
+    setCandleApi(candle);
     onReadyRef.current?.(panel.id, chart, candle);
     return () => {
       onDestroyRef.current?.(panel.id);
@@ -82,6 +94,8 @@ export function ChartPanel({
       chartRef.current = null;
       candleRef.current = null;
       volumeRef.current = null;
+      setChartApi(null);
+      setCandleApi(null);
     };
   }, [panel.id]);
 
@@ -181,7 +195,19 @@ export function ChartPanel({
           ))}
         </select>
       </div>
-      <div ref={containerRef} className="chart-panel-canvas" />
+      <div className="chart-panel-chart">
+        <div ref={containerRef} className="chart-panel-canvas" />
+        <DrawingOverlay
+          chart={chartApi}
+          series={candleApi}
+          drawings={panel.drawings}
+          tool={drawingTool}
+          style={drawingStyle}
+          active={active}
+          deleteRequest={deleteDrawingRequest}
+          onChange={(drawings: Drawing[]) => onChange({ drawings })}
+        />
+      </div>
       {panel.symbolId && historyQ.isLoading && <div className="chart-panel-loading muted small">loading…</div>}
     </div>
   );

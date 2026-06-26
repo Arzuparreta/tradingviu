@@ -302,6 +302,8 @@ label {
   padding: 0 var(--gap);
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
+  min-width: 0;
+  overflow-x: auto;
 }
 .layout-toolbar select {
   width: auto;
@@ -328,6 +330,27 @@ label {
 .layout-toggle input {
   width: auto;
 }
+.drawing-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.drawing-toolbar button {
+  min-width: 32px;
+  padding: 4px 8px;
+}
+.drawing-toolbar input[type='color'] {
+  width: 30px;
+  height: 28px;
+  padding: 2px;
+}
+.drawing-toolbar select {
+  min-width: 58px;
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+}
 
 .layout-grid {
   display: grid;
@@ -347,6 +370,12 @@ label {
 }
 .chart-panel.active {
   border-color: var(--accent);
+}
+.layout-grid.multi-panel .chart-panel:hover .chart-panel-head {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 46%),
+    var(--bg-2);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 74%, transparent);
 }
 .chart-panel-head {
   display: flex;
@@ -370,8 +399,24 @@ label {
   text-align: left;
 }
 .chart-panel-canvas {
+  position: absolute;
+  inset: 0;
   min-width: 0;
   min-height: 0;
+}
+.chart-panel-chart {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.drawing-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  overflow: hidden;
+  touch-action: none;
 }
 .chart-panel-loading {
   position: absolute;

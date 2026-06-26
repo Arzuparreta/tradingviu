@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import { ChartPanel, type PanelBounds } from '../components/ChartPanel';
+import { DEFAULT_DRAWING_STYLE, type DrawingStyle, type DrawingTool } from '@tv/drawing-tools';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -20,12 +21,30 @@ import {
   type LayoutConfig,
   type Panel,
 } from '@tv/layout-sync';
-import type { IChartApi, ISeriesApi, SeriesType, Time } from 'lightweight-charts';
+import { LineStyle, type IChartApi, type ISeriesApi, type MouseEventParams, type SeriesType, type Time } from 'lightweight-charts';
 
 interface ChartRef {
   chart: IChartApi;
   series: ISeriesApi<SeriesType>;
 }
+
+type CrosshairTone = 'base' | 'mirror' | 'real';
+
+const CROSSHAIR_TONES: Record<CrosshairTone, { color: string; style: LineStyle; labelBackgroundColor: string }> = {
+  base: { color: '#758696', style: LineStyle.LargeDashed, labelBackgroundColor: '#4c525e' },
+  mirror: { color: '#6b7280', style: LineStyle.LargeDashed, labelBackgroundColor: '#4b5563' },
+  real: { color: '#22d3ee', style: LineStyle.Solid, labelBackgroundColor: '#0891b2' },
+};
+
+const applyCrosshairTone = (entry: ChartRef, tone: CrosshairTone): void => {
+  const { color, style, labelBackgroundColor } = CROSSHAIR_TONES[tone];
+  entry.chart.applyOptions({
+    crosshair: {
+      vertLine: { color, style, labelBackgroundColor },
+      horzLine: { color, style, labelBackgroundColor },
+    },
+  });
+};
 
 export function LayoutPage() {
   const { user } = useAuth();
@@ -33,9 +52,13 @@ export function LayoutPage() {
   const [config, setConfig] = useState<LayoutConfig>(() => defaultLayoutConfig('1'));
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [currentName, setCurrentName] = useState<string>('Untitled');
+  const [drawingTool, setDrawingTool] = useState<DrawingTool>('cursor');
+  const [drawingStyle, setDrawingStyle] = useState<DrawingStyle>(DEFAULT_DRAWING_STYLE);
+  const [deleteDrawingRequest, setDeleteDrawingRequest] = useState(0);
   const initialized = useRef(false);
   const charts = useRef<Map<string, ChartRef>>(new Map());
   const [chartsVersion, setChartsVersion] = useState(0);
+  const realCrosshairPanel = useRef<string | null>(null);
 
   // --- Multi-chart Bar Replay (synced by cursor *time*, not bar index) ---
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -148,17 +171,25 @@ export function LayoutPage() {
     if (!config.sync.crosshair) return;
     const entries = [...charts.current.entries()];
     if (entries.length < 2) return;
+    const setRealCrosshairPanel = (sourceId: string | null) => {
+      if (realCrosshairPanel.current === sourceId) return;
+      realCrosshairPanel.current = sourceId;
+      for (const [entryId, entry] of entries) {
+        applyCrosshairTone(entry, sourceId === null ? 'base' : entryId === sourceId ? 'real' : 'mirror');
+      }
+    };
     const handlers = entries.map(([id, src]) => {
-      const handler = (param: { time?: Time; seriesData: Map<ISeriesApi<SeriesType>, unknown> }) => {
+      const handler = (param: MouseEventParams<Time>) => {
         for (const [otherId, dst] of entries) {
           if (otherId === id) continue;
-          if (param.time === undefined) {
+          if (param.time === undefined || param.point === undefined) {
             dst.chart.clearCrosshairPosition();
+            setRealCrosshairPanel(null);
             continue;
           }
-          const d = param.seriesData.get(src.series) as { close?: number; value?: number } | undefined;
-          const price = d?.close ?? d?.value;
-          if (price !== undefined) dst.chart.setCrosshairPosition(price, param.time, dst.series);
+          setRealCrosshairPanel(id);
+          const price = src.series.coordinateToPrice(param.point.y);
+          if (price !== null) dst.chart.setCrosshairPosition(price, param.time, dst.series);
         }
       };
       src.chart.subscribeCrosshairMove(handler as never);
@@ -166,6 +197,7 @@ export function LayoutPage() {
     });
     return () => {
       for (const { chart, handler } of handlers) chart.unsubscribeCrosshairMove(handler as never);
+      setRealCrosshairPanel(null);
     };
   }, [config.sync.crosshair, chartsVersion]);
 
@@ -176,9 +208,6 @@ export function LayoutPage() {
       let panels = cfg.panels.map((p, i) => (i === idx ? { ...p, ...patch } : p));
       if (cfg.sync.symbol && patch.symbolId !== undefined) {
         panels = panels.map((p) => ({ ...p, symbolId: patch.symbolId! }));
-      }
-      if (cfg.sync.interval && patch.interval !== undefined) {
-        panels = panels.map((p) => ({ ...p, interval: patch.interval! }));
       }
       return { ...cfg, panels };
     });
@@ -237,6 +266,7 @@ export function LayoutPage() {
   }
 
   const preset = GRID_PRESETS[config.grid];
+  const showMousePanelIndicator = config.panels.length > 1;
 
   return (
     <div className="layout-page">
@@ -268,8 +298,56 @@ export function LayoutPage() {
 
         <div className="row" style={{ gap: 10 }}>
           <label className="layout-toggle"><input type="checkbox" checked={config.sync.symbol} onChange={() => toggleSync('symbol')} /> symbol</label>
-          <label className="layout-toggle"><input type="checkbox" checked={config.sync.interval} onChange={() => toggleSync('interval')} /> interval</label>
           <label className="layout-toggle"><input type="checkbox" checked={config.sync.crosshair} onChange={() => toggleSync('crosshair')} /> crosshair</label>
+        </div>
+
+        <span className="layout-divider" />
+
+        <div className="drawing-toolbar">
+          {([
+            ['cursor', 'Cursor'],
+            ['select', 'Select'],
+            ['trend-line', 'Line'],
+            ['ray', 'Ray'],
+            ['extended-line', 'Extend'],
+            ['horizontal-line', 'H'],
+            ['vertical-line', 'V'],
+            ['rectangle', 'Rect'],
+            ['text', 'Text'],
+          ] as const).map(([tool, label]) => (
+            <button
+              key={tool}
+              className={drawingTool === tool ? 'primary' : 'ghost'}
+              onClick={() => setDrawingTool(tool)}
+              title={label}
+              style={{ padding: '4px 8px' }}
+            >
+              {label}
+            </button>
+          ))}
+          <input
+            type="color"
+            value={drawingStyle.color}
+            onChange={(e) => setDrawingStyle((s) => ({ ...s, color: e.target.value }))}
+            title="Drawing color"
+          />
+          <select
+            value={drawingStyle.lineStyle}
+            onChange={(e) => setDrawingStyle((s) => ({ ...s, lineStyle: e.target.value as DrawingStyle['lineStyle'] }))}
+            title="Line style"
+          >
+            <option value="solid">solid</option>
+            <option value="dashed">dash</option>
+            <option value="dotted">dot</option>
+          </select>
+          <select
+            value={drawingStyle.width}
+            onChange={(e) => setDrawingStyle((s) => ({ ...s, width: Number(e.target.value) }))}
+            title="Line width"
+          >
+            {[1, 2, 3, 4, 5, 6].map((w) => <option key={w} value={w}>{w}px</option>)}
+          </select>
+          <button className="ghost" onClick={() => setDeleteDrawingRequest((n) => n + 1)} title="Delete selected drawing">Delete</button>
         </div>
 
         <span className="layout-divider" />
@@ -312,7 +390,7 @@ export function LayoutPage() {
       </div>
 
       <div
-        className="layout-grid"
+        className={`layout-grid${showMousePanelIndicator ? ' multi-panel' : ''}`}
         style={{
           gridTemplateColumns: `repeat(${preset.cols}, 1fr)`,
           gridTemplateRows: `repeat(${preset.rows}, 1fr)`,
@@ -324,6 +402,9 @@ export function LayoutPage() {
             panel={p}
             active={config.activePanel === i}
             live={config.activePanel === i && !replayActive}
+            drawingTool={drawingTool}
+            drawingStyle={drawingStyle}
+            deleteDrawingRequest={deleteDrawingRequest}
             onActivate={() => setConfig((cfg) => ({ ...cfg, activePanel: i }))}
             onChange={(patch) => updatePanel(i, patch)}
             onReady={onReady}

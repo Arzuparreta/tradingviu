@@ -66,16 +66,19 @@ export const tenantContext = (deps: { db: Database; redis: RedisClient }): Middl
     // Phase 2: run the request in a transaction with the resolved RLS context.
     await runWithTenant(ctx, async () => {
       await deps.db.transaction(async (txDb) => {
-        if (ctx.isSuperAdmin) {
-          await withSuperAdminRls(txDb as never, ctx.userId);
-        } else {
-          await withTenantRls(txDb as never, ctx);
+        try {
+          if (ctx.isSuperAdmin) {
+            await withSuperAdminRls(txDb as never, ctx.userId);
+          } else {
+            await withTenantRls(txDb as never, ctx);
+          }
+          // Override the context db with the transactional one so route handlers
+          // share this connection.
+          c.set('db', txDb as never);
+          await next();
+        } finally {
+          await clearRls(txDb as never);
         }
-        // Override the context db with the transactional one so route handlers
-        // share this connection.
-        c.set('db', txDb as never);
-        await next();
-        await clearRls(txDb as never);
       });
     });
   };

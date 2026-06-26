@@ -15,6 +15,7 @@
     "@tv/chart-engine": "workspace:*",
     "@tv/core": "workspace:*",
     "@tv/data-types": "workspace:*",
+    "@tv/drawing-tools": "workspace:*",
     "@tv/ta-lib": "workspace:*",
     "@tv/layout-sync": "workspace:*",
     "@tv/pine-runtime": "workspace:*",

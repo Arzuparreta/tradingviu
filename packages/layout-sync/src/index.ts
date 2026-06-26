@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DrawingsSchema, type Drawing } from '@tv/drawing-tools';
 
 /** Chart intervals supported by the platform (mirrors apps/web ChartPage + chart route). */
 export const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'] as const;
@@ -30,13 +31,16 @@ export const PanelSchema = z.object({
   interval: IntervalSchema,
   /** Indicator ids active on this panel (overlay only, for now). */
   indicators: z.array(z.string().min(1).max(60)).max(20).default([]),
+  /** Drawings owned by this panel. Same asset in another panel gets its own list. */
+  drawings: DrawingsSchema.default([]),
 });
 export type Panel = z.infer<typeof PanelSchema>;
+export type LayoutDrawing = Drawing;
 
 /** Cross-panel sync toggles. When on, an interaction in one panel propagates to the others. */
 export const SyncSchema = z.object({
   symbol: z.boolean().default(false),
-  interval: z.boolean().default(true),
+  interval: z.boolean().default(false),
   crosshair: z.boolean().default(true),
 });
 export type Sync = z.infer<typeof SyncSchema>;
@@ -45,7 +49,7 @@ export const LayoutConfigSchema = z
   .object({
     grid: GridSchema,
     panels: z.array(PanelSchema).min(1).max(16),
-    sync: SyncSchema.default({ symbol: false, interval: true, crosshair: true }),
+    sync: SyncSchema.default({ symbol: false, interval: false, crosshair: true }),
     /** Index of the focused panel (drives sync source + toolbar context). */
     activePanel: z.number().int().min(0).default(0),
   })
@@ -82,6 +86,7 @@ export const makePanel = (symbolId: string | null = null, interval: Interval = '
   symbolId,
   interval,
   indicators: [],
+  drawings: [],
 });
 
 /** A fresh layout config for a given grid, optionally seeding the first panel's symbol. */
@@ -93,7 +98,7 @@ export const defaultLayoutConfig = (grid: GridKey = '1', firstSymbolId: string |
   return {
     grid,
     panels,
-    sync: { symbol: false, interval: true, crosshair: true },
+    sync: { symbol: false, interval: false, crosshair: true },
     activePanel: 0,
   };
 };
@@ -110,5 +115,15 @@ export const reflowToGrid = (cfg: LayoutConfig, grid: GridKey): LayoutConfig => 
   return { ...cfg, grid, panels, activePanel };
 };
 
-/** Validate untrusted layout config (API edge). Throws ZodError on failure. */
-export const parseLayoutConfig = (input: unknown): LayoutConfig => LayoutConfigSchema.parse(input);
+/** Validate and normalize untrusted layout config (API edge). Throws ZodError on invalid shapes. */
+export const parseLayoutConfig = (input: unknown): LayoutConfig => normalizeLayoutConfig(LayoutConfigSchema.parse(input));
+
+/** Disable legacy interval sync and fill newer defaults for saved layout configs. */
+export const normalizeLayoutConfig = (cfg: LayoutConfig): LayoutConfig => ({
+  ...cfg,
+  sync: { ...cfg.sync, interval: false },
+  panels: cfg.panels.map((panel) => ({
+    ...panel,
+    drawings: panel.drawings ?? [],
+  })),
+});

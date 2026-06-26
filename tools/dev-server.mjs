@@ -61,6 +61,11 @@ async function start() {
     'mailpit',
   ]);
 
+  // Keep workspace links current before spawning long-lived Vite/Bun watchers.
+  // Adding a package while the dev server is alive otherwise leaves the old
+  // process unable to resolve the new workspace until a manual install/restart.
+  run('pnpm', ['install', '--offline']);
+
   const logFd = openSync(logFile, 'a');
   const child = spawn('pnpm', ['dev'], {
     cwd: repoRoot,

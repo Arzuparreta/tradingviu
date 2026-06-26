@@ -144,6 +144,9 @@ importers:
       '@tv/data-types':
         specifier: workspace:*
         version: link:../../packages/data-types
+      '@tv/drawing-tools':
+        specifier: workspace:*
+        version: link:../../packages/drawing-tools
       '@tv/layout-sync':
         specifier: workspace:*
         version: link:../../packages/layout-sync
@@ -468,6 +471,19 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/drawing-tools:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/bun':
+        specifier: ^1.1.14
+        version: 1.3.14
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/fundamentals:
     dependencies:
       '@tv/core':
@@ -499,6 +515,9 @@ importers:
 
   packages/layout-sync:
     dependencies:
+      '@tv/drawing-tools':
+        specifier: workspace:*
+        version: link:../drawing-tools
       zod:
         specifier: ^3.24.1
         version: 3.25.76
