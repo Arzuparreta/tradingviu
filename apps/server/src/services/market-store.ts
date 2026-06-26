@@ -21,6 +21,7 @@ type MarketEventHandler = (event: MarketEvent) => void;
 interface MarketState {
   readonly key: MarketKey;
   readonly listeners: Set<MarketEventHandler>;
+  readonly listenerChannels: Map<MarketEventHandler, Set<MarketChannel>>;
   channels: Set<MarketChannel>;
   status: MarketStatus;
   ws: WebSocket | null;
@@ -33,6 +34,7 @@ interface MarketState {
 }
 
 const keyStr = (key: MarketKey): string => `${key.provider}:${key.ticker}`;
+const channelKey = (channels: ReadonlySet<MarketChannel>): string => [...channels].sort().join(',');
 const toBinanceSymbol = ccxt.toBinanceSymbol;
 const streamSymbol = (ticker: string): string => toBinanceSymbol(ticker).toLowerCase();
 
@@ -53,7 +55,10 @@ const depthLimit = (levels: number): number => {
 const toSide = (levels: readonly [string, string][], side: 'bid' | 'ask', limit: number) => {
   const sorted = levels
     .map(([price, size]) => ({ price: Number(price), size: Number(size) }))
-    .filter((row) => Number.isFinite(row.price) && Number.isFinite(row.size) && row.price > 0 && row.size >= 0)
+    .filter(
+      (row) =>
+        Number.isFinite(row.price) && Number.isFinite(row.size) && row.price > 0 && row.size >= 0,
+    )
     .sort((a, b) => (side === 'bid' ? b.price - a.price : a.price - b.price))
     .slice(0, limit);
   let cumulative = 0;
@@ -115,7 +120,10 @@ export class MarketStore {
       throw new Error(`Provider ${key.provider} does not support live depth`);
     }
     const limit = depthLimit(levels);
-    const params = new URLSearchParams({ symbol: toBinanceSymbol(key.ticker), limit: String(limit) });
+    const params = new URLSearchParams({
+      symbol: toBinanceSymbol(key.ticker),
+      limit: String(limit),
+    });
     const res = await fetch(`https://api.binance.com/api/v3/depth?${params.toString()}`);
     if (!res.ok) throw new Error(`Binance depth HTTP ${res.status}`);
     const payload = (await res.json()) as { bids?: unknown[]; asks?: unknown[] };
@@ -126,27 +134,41 @@ export class MarketStore {
     return book;
   }
 
-  subscribe(key: MarketKey, channels: readonly MarketChannel[], cb: MarketEventHandler): () => void {
+  subscribe(
+    key: MarketKey,
+    channels: readonly MarketChannel[],
+    cb: MarketEventHandler,
+  ): () => void {
     const ks = keyStr(key);
     let state = this.states.get(ks);
     if (!state) {
       state = this.createState(key);
       this.states.set(ks, state);
     }
-    for (const channel of channels) state.channels.add(channel);
+    const requestedChannels = new Set(channels);
+    const previousStreams = channelKey(state.channels);
+    for (const channel of requestedChannels) state.channels.add(channel);
     if (state.idleTimer) {
       clearTimeout(state.idleTimer);
       state.idleTimer = null;
     }
     state.listeners.add(cb);
-    cb({ kind: 'status', status: state.status, ...(state.lastError ? { message: state.lastError } : {}) });
-    if (state.quote && state.channels.has('quote')) cb({ kind: 'quote', quote: state.quote });
-    if (state.book && state.channels.has('book')) cb({ kind: 'book', book: state.book });
+    state.listenerChannels.set(cb, requestedChannels);
+    cb({
+      kind: 'status',
+      status: state.status,
+      ...(state.lastError ? { message: state.lastError } : {}),
+    });
+    if (state.quote && requestedChannels.has('quote')) cb({ kind: 'quote', quote: state.quote });
+    if (state.book && requestedChannels.has('book')) cb({ kind: 'book', book: state.book });
     if (!state.ws) this.connect(state);
+    else if (previousStreams !== channelKey(state.channels)) this.restart(state);
     return () => {
       const s = this.states.get(ks);
       if (!s) return;
       s.listeners.delete(cb);
+      s.listenerChannels.delete(cb);
+      this.rebuildChannels(s);
       if (s.listeners.size === 0) {
         s.idleTimer = setTimeout(() => this.deactivate(ks), 30_000);
       }
@@ -162,6 +184,7 @@ export class MarketStore {
     return {
       key,
       listeners: new Set(),
+      listenerChannels: new Map(),
       channels: new Set(),
       status: 'idle',
       ws: null,
@@ -183,6 +206,9 @@ export class MarketStore {
   private fanout(state: MarketState, event: MarketEvent): void {
     for (const listener of state.listeners) {
       try {
+        const channels = state.listenerChannels.get(listener);
+        if (event.kind === 'quote' && !channels?.has('quote')) continue;
+        if (event.kind === 'book' && !channels?.has('book')) continue;
         listener(event);
       } catch {
         void 0;
@@ -190,9 +216,34 @@ export class MarketStore {
     }
   }
 
+  private rebuildChannels(state: MarketState): void {
+    state.channels = new Set();
+    for (const channels of state.listenerChannels.values()) {
+      for (const channel of channels) state.channels.add(channel);
+    }
+  }
+
+  private restart(state: MarketState): void {
+    if (state.reconnectTimer) {
+      clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = null;
+    }
+    const ws = state.ws;
+    state.ws = null;
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
+    this.connect(state);
+  }
+
   private connect(state: MarketState): void {
     if (state.key.provider !== 'binance') {
-      this.setStatus(state, 'down', `Provider ${state.key.provider} does not support live market streams`);
+      this.setStatus(
+        state,
+        'down',
+        `Provider ${state.key.provider} does not support live market streams`,
+      );
       return;
     }
     const streams: string[] = [];
@@ -238,15 +289,19 @@ export class MarketStore {
     const payload = parseCombinedPayload(raw);
     if (typeof payload !== 'object' || payload === null) return;
     const eventType = (payload as { e?: unknown }).e;
-    const maybeTicker = payload as { b?: unknown; B?: unknown; a?: unknown; A?: unknown; E?: unknown };
+    const maybeTicker = payload as {
+      b?: unknown;
+      B?: unknown;
+      a?: unknown;
+      A?: unknown;
+      E?: unknown;
+    };
     if (
       eventType === 'bookTicker' ||
-      (
-        typeof maybeTicker.b === 'string' &&
+      (typeof maybeTicker.b === 'string' &&
         typeof maybeTicker.B === 'string' &&
         typeof maybeTicker.a === 'string' &&
-        typeof maybeTicker.A === 'string'
-      )
+        typeof maybeTicker.A === 'string')
     ) {
       const p = maybeTicker;
       const bid = Number(p.b);
@@ -264,8 +319,10 @@ export class MarketStore {
       this.fanout(state, { kind: 'quote', quote: state.quote });
       return;
     }
-    const bidsRaw = (payload as { bids?: unknown; b?: unknown }).bids ?? (payload as { b?: unknown }).b;
-    const asksRaw = (payload as { asks?: unknown; a?: unknown }).asks ?? (payload as { a?: unknown }).a;
+    const bidsRaw =
+      (payload as { bids?: unknown; b?: unknown }).bids ?? (payload as { b?: unknown }).b;
+    const asksRaw =
+      (payload as { asks?: unknown; a?: unknown }).asks ?? (payload as { a?: unknown }).a;
     if (Array.isArray(bidsRaw) && Array.isArray(asksRaw)) {
       const bids = bidsRaw.filter(isLevel);
       const asks = asksRaw.filter(isLevel);
@@ -290,6 +347,7 @@ export class MarketStore {
     state.ws?.close();
     state.ws = null;
     state.listeners.clear();
+    state.listenerChannels.clear();
     state.channels.clear();
     this.setStatus(state, 'idle');
   }

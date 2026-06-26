@@ -18,19 +18,22 @@ interface FakeInsertCall {
   time: number;
 }
 
-const makeStubDb = (): { transaction: (cb: (tx: never) => Promise<void>) => Promise<void>; insertCalls: FakeInsertCall[] } => {
+const makeStubDb = (): {
+  transaction: (cb: (tx: never) => Promise<void>) => Promise<void>;
+  insertCalls: FakeInsertCall[];
+} => {
   const insertCalls: FakeInsertCall[] = [];
   return {
     insertCalls,
     transaction: async (cb) => {
       const tx = {
-        insert: (table: { provider: unknown; ticker: unknown; interval: unknown; time: unknown }) => ({
-          values: (v: {
-            provider: string;
-            ticker: string;
-            interval: string;
-            time: number;
-          }) => ({
+        insert: (table: {
+          provider: unknown;
+          ticker: unknown;
+          interval: unknown;
+          time: unknown;
+        }) => ({
+          values: (v: { provider: string; ticker: string; interval: string; time: number }) => ({
             onConflictDoUpdate: () => {
               insertCalls.push(v);
               return Promise.resolve();
@@ -75,9 +78,13 @@ describe('PersistQueue', () => {
         if (attempts === 1) throw new Error('boom');
         // 2nd attempt: succeed
         const tx = {
+          execute: () => Promise.resolve(),
           insert: () => ({
-            values: () => ({
-              onConflictDoUpdate: () => Promise.resolve(),
+            values: (v: { provider: string; ticker: string; interval: string; time: number }) => ({
+              onConflictDoUpdate: () => {
+                db.insertCalls.push(v);
+                return Promise.resolve();
+              },
             }),
           }),
         } as never;
@@ -88,11 +95,24 @@ describe('PersistQueue', () => {
     q2.start();
     q2.enqueue({ provider: 'binance', ticker: 'BTC/USDT', interval: '1m', bar: makeBar(100) });
     // First attempt fails after the batch window; batch is re-queued.
-    await new Promise((r) => setTimeout(r, 20));
-    expect(attempts).toBe(1);
-    // Manually trigger another flush — should succeed.
-    await q2.flushNow();
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+      await new Promise((r) => setTimeout(r, 20));
+      expect(attempts).toBe(1);
+      // Manually trigger another flush — should succeed.
+      await q2.flushNow();
+    } finally {
+      console.error = originalError;
+    }
     expect(attempts).toBe(2);
+    expect(db.insertCalls).toHaveLength(1);
+    expect(db.insertCalls[0]).toMatchObject({
+      provider: 'binance',
+      ticker: 'BTC/USDT',
+      interval: '1m',
+      time: 100,
+    });
   });
 
   test('stop() drops new enqueues', async () => {

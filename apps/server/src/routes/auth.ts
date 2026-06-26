@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { setCookie, deleteCookie } from 'hono/cookie';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { createDb } from '@tv/db';
 import { users, tenantMembers, tenants } from '@tv/db/schema';
 import { signup, issueAccessToken, verifyPassword } from '@tv/auth';
@@ -21,7 +21,10 @@ const SignupBody = z.object({
   password: z.string().min(10).max(200),
   displayName: z.string().min(1).max(80).optional(),
   tenantName: z.string().min(1).max(80).optional(),
-  tenantSlug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/).optional(),
+  tenantSlug: z
+    .string()
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/)
+    .optional(),
 });
 
 const LoginBody = z.object({
@@ -33,32 +36,41 @@ const LoginBody = z.object({
 export const authRoutes = new Hono()
   .post('/signup', zValidator('json', SignupBody), async (c) => {
     const body = c.req.valid('json');
-    const cleanBody: { email: string; password: string; displayName?: string; tenantName?: string; tenantSlug?: string } = {
+    const cleanBody: {
+      email: string;
+      password: string;
+      displayName?: string;
+      tenantName?: string;
+      tenantSlug?: string;
+    } = {
       email: body.email,
       password: body.password,
     };
     if (body.displayName) cleanBody.displayName = body.displayName;
     if (body.tenantName) cleanBody.tenantName = body.tenantName;
     if (body.tenantSlug) cleanBody.tenantSlug = body.tenantSlug;
-    const { userId, tenantId, isFirstUser, user, tenant, member } = await db.transaction(async (txDb) => {
-      const { withSuperAdminRls, clearRls } = await import('@tv/db');
-      await withSuperAdminRls(txDb as never, 'system');
-      try {
-        const { userId, tenantId, isFirstUser } = await signup(txDb as never, cleanBody);
-        const [u] = await txDb.select().from(users).where(eq(users.id, userId)).limit(1);
-        if (!u) throw new ValidationError('User not found after signup');
-        const [t] = await txDb.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-        if (!t) throw new ValidationError('Tenant not found after signup');
-        const [m] = await txDb
-          .select()
-          .from(tenantMembers)
-          .where(eq(tenantMembers.userId, userId));
-        if (!m) throw new ValidationError('Membership not found after signup');
-        return { userId, tenantId, isFirstUser, user: u, tenant: t, member: m };
-      } finally {
-        await clearRls(txDb as never);
-      }
-    });
+    const { userId, tenantId, isFirstUser, user, tenant, member } = await db.transaction(
+      async (txDb) => {
+        const { withSuperAdminRls, clearRls } = await import('@tv/db');
+        await withSuperAdminRls(txDb as never, 'system');
+        try {
+          const { userId, tenantId, isFirstUser } = await signup(txDb as never, cleanBody);
+          const [u] = await txDb.select().from(users).where(eq(users.id, userId)).limit(1);
+          if (!u) throw new ValidationError('User not found after signup');
+          const [t] = await txDb.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+          if (!t) throw new ValidationError('Tenant not found after signup');
+          const [m] = await txDb
+            .select()
+            .from(tenantMembers)
+            .where(and(eq(tenantMembers.userId, userId), eq(tenantMembers.tenantId, tenantId)))
+            .limit(1);
+          if (!m) throw new ValidationError('Membership not found after signup');
+          return { userId, tenantId, isFirstUser, user: u, tenant: t, member: m };
+        } finally {
+          await clearRls(txDb as never);
+        }
+      },
+    );
     const token = await issueAccessToken(
       {
         sub: userId,
@@ -79,7 +91,12 @@ export const authRoutes = new Hono()
     });
     return c.json({
       token,
-      user: { id: userId, email: user.email, displayName: user.displayName, globalRole: user.globalRole },
+      user: {
+        id: userId,
+        email: user.email,
+        displayName: user.displayName,
+        globalRole: user.globalRole,
+      },
       tenant: { id: tenantId, slug: tenant.slug, name: tenant.name, planCode: tenant.planCode },
     });
   })
@@ -89,20 +106,31 @@ export const authRoutes = new Hono()
       const { withSuperAdminRls, clearRls } = await import('@tv/db');
       await withSuperAdminRls(txDb as never, 'system');
       try {
-        const [u] = await txDb.select().from(users).where(eq(users.email, body.email.toLowerCase())).limit(1);
+        const [u] = await txDb
+          .select()
+          .from(users)
+          .where(eq(users.email, body.email.toLowerCase()))
+          .limit(1);
         if (!u) throw new AuthError('Invalid credentials');
         const ok = await verifyPassword(u.passwordHash, body.password);
         if (!ok) throw new AuthError('Invalid credentials');
-        const memberships = await txDb
-          .select()
+        const [row] = await txDb
+          .select({ member: tenantMembers, tenant: tenants })
           .from(tenantMembers)
-          .where(eq(tenantMembers.userId, u.id));
-        if (memberships.length === 0) throw new AuthError('No tenants for user');
-        const m = memberships[0]!;
-        const [t] = await txDb.select().from(tenants).where(eq(tenants.id, m.tenantId)).limit(1);
-        if (!t) throw new AuthError('Tenant missing');
-        if (t.status !== 'active') throw new AuthError('Tenant suspended');
-        return { user: u, tenant: t, member: m };
+          .innerJoin(tenants, eq(tenants.id, tenantMembers.tenantId))
+          .where(
+            and(
+              eq(tenantMembers.userId, u.id),
+              body.tenantSlug ? eq(tenants.slug, body.tenantSlug) : undefined,
+            ),
+          )
+          .limit(1);
+        if (!row)
+          throw new AuthError(
+            body.tenantSlug ? 'Tenant not found for user' : 'No tenants for user',
+          );
+        if (row.tenant.status !== 'active') throw new AuthError('Tenant suspended');
+        return { user: u, tenant: row.tenant, member: row.member };
       } finally {
         await clearRls(txDb as never);
       }
@@ -127,7 +155,12 @@ export const authRoutes = new Hono()
     });
     return c.json({
       token,
-      user: { id: user.id, email: user.email, displayName: user.displayName, globalRole: user.globalRole },
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        globalRole: user.globalRole,
+      },
       tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, planCode: tenant.planCode },
     });
   })
@@ -145,11 +178,22 @@ export const authRoutes = new Hono()
       if (!user) return c.json({ user: null, reason: 'no_user', claims });
       const [tenant] = await db.select().from(tenants).where(eq(tenants.id, claims.tid)).limit(1);
       return c.json({
-        user: { id: user.id, email: user.email, displayName: user.displayName, globalRole: user.globalRole },
-        tenant: tenant ? { id: tenant.id, slug: tenant.slug, name: tenant.name, planCode: tenant.planCode } : null,
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          globalRole: user.globalRole,
+        },
+        tenant: tenant
+          ? { id: tenant.id, slug: tenant.slug, name: tenant.name, planCode: tenant.planCode }
+          : null,
         claims,
       });
     } catch (e) {
-      return c.json({ user: null, reason: 'verify_failed', error: e instanceof Error ? e.message : String(e) });
+      return c.json({
+        user: null,
+        reason: 'verify_failed',
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   });

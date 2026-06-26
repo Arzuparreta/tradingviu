@@ -41,6 +41,7 @@ import { apiKeyContext } from './middleware/api-key.js';
 import { rateLimit } from './services/rate-limit.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
+import { authenticateWsToken } from './services/ws-auth.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
 import { initBarStore, getBarStore, shutdownBarStore } from './services/data.js';
 import { shutdownMarketStore } from './services/market-store.js';
@@ -137,10 +138,17 @@ if (searchEnabled()) {
 
 const _server: ReturnType<typeof Bun.serve> = Bun.serve({
   port,
-  fetch(req: Request) {
+  async fetch(req: Request) {
     const url = new URL(req.url);
     if (url.pathname === '/ws') {
-      const ok = _server.upgrade(req, { data: undefined });
+      const token = url.searchParams.get('token') ?? '';
+      let wsData: { userId: string; tenantId: string };
+      try {
+        wsData = await authenticateWsToken(db, token, env.JWT_SECRET);
+      } catch {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      const ok = _server.upgrade(req, { data: wsData });
       if (ok) return undefined;
     }
     return app.fetch(req);

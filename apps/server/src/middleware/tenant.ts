@@ -1,11 +1,16 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '@tv/db';
 import { withTenantRls, withSuperAdminRls, clearRls } from '@tv/db';
 import { users, tenantMembers, tenants } from '@tv/db/schema';
 import { verifyAccessToken, type TokenClaims } from '@tv/auth';
-import { AuthError, type TenantContext as CoreTenantContext, runWithTenant, loadEnv } from '@tv/core';
+import {
+  AuthError,
+  type TenantContext as CoreTenantContext,
+  runWithTenant,
+  loadEnv,
+} from '@tv/core';
 
 export type RedisClient = Awaited<ReturnType<typeof import('redis').createClient>>;
 
@@ -20,7 +25,8 @@ export const tenantContext = (deps: { db: Database; redis: RedisClient }): Middl
     const token =
       c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ??
       getCookie(c, 'tv_session') ??
-      (c.req.query('token') ?? '');
+      c.req.query('token') ??
+      '';
 
     if (!token) throw new AuthError('Missing session token');
 
@@ -39,9 +45,9 @@ export const tenantContext = (deps: { db: Database; redis: RedisClient }): Middl
       const [m] = await txDb
         .select()
         .from(tenantMembers)
-        .where(eq(tenantMembers.userId, claims.sub))
-        .limit(50);
-      if (!m || m.tenantId !== claims.tid) throw new AuthError('Tenant membership missing');
+        .where(and(eq(tenantMembers.userId, claims.sub), eq(tenantMembers.tenantId, claims.tid)))
+        .limit(1);
+      if (!m) throw new AuthError('Tenant membership missing');
       return { tenant: t, member: m };
     });
 
