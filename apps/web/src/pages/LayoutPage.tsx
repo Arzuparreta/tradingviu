@@ -21,29 +21,22 @@ import {
   type LayoutConfig,
   type Panel,
 } from '@tv/layout-sync';
-import { LineStyle, type IChartApi, type ISeriesApi, type MouseEventParams, type SeriesType, type Time } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, MouseEventParams, SeriesType, Time } from 'lightweight-charts';
 
 interface ChartRef {
   chart: IChartApi;
   series: ISeriesApi<SeriesType>;
+  realCursorMarker: HTMLDivElement;
 }
 
-type CrosshairTone = 'base' | 'mirror' | 'real';
-
-const CROSSHAIR_TONES: Record<CrosshairTone, { color: string; style: LineStyle; labelBackgroundColor: string }> = {
-  base: { color: '#758696', style: LineStyle.LargeDashed, labelBackgroundColor: '#4c525e' },
-  mirror: { color: '#6b7280', style: LineStyle.LargeDashed, labelBackgroundColor: '#4b5563' },
-  real: { color: '#22d3ee', style: LineStyle.Solid, labelBackgroundColor: '#0891b2' },
+const hideRealCursorMarkers = (entries: readonly (readonly [string, ChartRef])[]): void => {
+  for (const [, entry] of entries) entry.realCursorMarker.style.display = 'none';
 };
 
-const applyCrosshairTone = (entry: ChartRef, tone: CrosshairTone): void => {
-  const { color, style, labelBackgroundColor } = CROSSHAIR_TONES[tone];
-  entry.chart.applyOptions({
-    crosshair: {
-      vertLine: { color, style, labelBackgroundColor },
-      horzLine: { color, style, labelBackgroundColor },
-    },
-  });
+const showRealCursorMarker = (entry: ChartRef, point: { x: number; y: number }): void => {
+  entry.realCursorMarker.style.display = 'block';
+  entry.realCursorMarker.style.left = `${point.x}px`;
+  entry.realCursorMarker.style.top = `${point.y}px`;
 };
 
 export function LayoutPage() {
@@ -58,7 +51,7 @@ export function LayoutPage() {
   const initialized = useRef(false);
   const charts = useRef<Map<string, ChartRef>>(new Map());
   const [chartsVersion, setChartsVersion] = useState(0);
-  const realCrosshairPanel = useRef<string | null>(null);
+  const syncingCrosshair = useRef(false);
 
   // --- Multi-chart Bar Replay (synced by cursor *time*, not bar index) ---
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -105,8 +98,8 @@ export function LayoutPage() {
     }
   }, [layoutsQ.data]);
 
-  const onReady = useCallback((id: string, chart: IChartApi, series: ISeriesApi<SeriesType>) => {
-    charts.current.set(id, { chart, series });
+  const onReady = useCallback((id: string, chart: IChartApi, series: ISeriesApi<SeriesType>, realCursorMarker: HTMLDivElement) => {
+    charts.current.set(id, { chart, series, realCursorMarker });
     setChartsVersion((v) => v + 1);
   }, []);
   const onDestroy = useCallback((id: string) => {
@@ -171,25 +164,27 @@ export function LayoutPage() {
     if (!config.sync.crosshair) return;
     const entries = [...charts.current.entries()];
     if (entries.length < 2) return;
-    const setRealCrosshairPanel = (sourceId: string | null) => {
-      if (realCrosshairPanel.current === sourceId) return;
-      realCrosshairPanel.current = sourceId;
-      for (const [entryId, entry] of entries) {
-        applyCrosshairTone(entry, sourceId === null ? 'base' : entryId === sourceId ? 'real' : 'mirror');
-      }
-    };
     const handlers = entries.map(([id, src]) => {
       const handler = (param: MouseEventParams<Time>) => {
+        if (syncingCrosshair.current || !param.sourceEvent) return;
         for (const [otherId, dst] of entries) {
           if (otherId === id) continue;
           if (param.time === undefined || param.point === undefined) {
             dst.chart.clearCrosshairPosition();
-            setRealCrosshairPanel(null);
+            hideRealCursorMarkers(entries);
             continue;
           }
-          setRealCrosshairPanel(id);
+          hideRealCursorMarkers(entries);
+          showRealCursorMarker(src, param.point);
           const price = src.series.coordinateToPrice(param.point.y);
-          if (price !== null) dst.chart.setCrosshairPosition(price, param.time, dst.series);
+          if (price !== null) {
+            syncingCrosshair.current = true;
+            try {
+              dst.chart.setCrosshairPosition(price, param.time, dst.series);
+            } finally {
+              syncingCrosshair.current = false;
+            }
+          }
         }
       };
       src.chart.subscribeCrosshairMove(handler as never);
@@ -197,7 +192,7 @@ export function LayoutPage() {
     });
     return () => {
       for (const { chart, handler } of handlers) chart.unsubscribeCrosshairMove(handler as never);
-      setRealCrosshairPanel(null);
+      hideRealCursorMarkers(entries);
     };
   }, [config.sync.crosshair, chartsVersion]);
 

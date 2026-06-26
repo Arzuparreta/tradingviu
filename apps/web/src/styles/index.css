@@ -371,12 +371,6 @@ label {
 .chart-panel.active {
   border-color: var(--accent);
 }
-.layout-grid.multi-panel .chart-panel:hover .chart-panel-head {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 46%),
-    var(--bg-2);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 74%, transparent);
-}
 .chart-panel-head {
   display: flex;
   align-items: center;
@@ -408,6 +402,33 @@ label {
   position: relative;
   min-width: 0;
   min-height: 0;
+}
+.real-cursor-marker {
+  display: none;
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  transform: translate(-3px, -3px);
+  pointer-events: none;
+  z-index: 5;
+}
+.real-cursor-marker::before,
+.real-cursor-marker::after {
+  content: '';
+  position: absolute;
+  background: rgba(34, 211, 238, 0.48);
+}
+.real-cursor-marker::before {
+  left: 1px;
+  top: 3px;
+  width: 5px;
+  height: 1px;
+}
+.real-cursor-marker::after {
+  left: 3px;
+  top: 1px;
+  width: 1px;
+  height: 5px;
 }
 .drawing-overlay {
   position: absolute;
