@@ -99,6 +99,33 @@ export const alerts = pgTable(
   }),
 );
 
+// Personal access tokens for the public API (distinct from `api_keys`, which
+// stores *external* provider credentials). Only a hash + lookup prefix are kept.
+export const accessTokens = pgTable(
+  'access_tokens',
+  {
+    id: id(),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    prefix: text('prefix').notNull(),
+    hash: text('hash').notNull(),
+    scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
+    createdAt: ts('created_at'),
+  },
+  (t) => ({
+    prefixIdx: uniqueIndex('access_tokens_prefix_uq').on(t.prefix),
+    tenantUserIdx: index('access_tokens_tenant_user_idx').on(t.tenantId, t.userId),
+  }),
+);
+
 export const alertHistory = pgTable(
   'alert_history',
   {

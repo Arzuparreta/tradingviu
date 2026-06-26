@@ -22,7 +22,7 @@
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
 | 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | ✅ done (9a–9h; footprint deferred — needs trade tape) |
-| 10    | Public API + plugin SDK + ecosystem                                                                        | pending                  |
+| 10    | Public API + plugin SDK + ecosystem                                                                        | in progress (10a done)   |
 | 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11d done) |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
@@ -132,6 +132,7 @@ tradingviu/
 │   ├── SLICE-4.md               # what slice 4 delivered
 │   ├── SLICE-5.md               # what slice 5 delivers (5a options engine)
 │   ├── SLICE-9.md               # what slice 9 delivers (9a–9h: patterns, chart patterns, volume profile, TPO, bar replay, Ichimoku, pivots)
+│   ├── SLICE-10.md              # what slice 10 delivers (10a: public API keys + /v1 + OpenAPI)
 │   ├── SLICE-11.md              # what slice 11 delivers (11a–11d: backtest engine, strategies, Pine signal backtest, optimization, walk-forward)
 │   └── SELF_HOST.md             # how to deploy on a VPS
 ├── AGENTS.md                    # conventions (read first)
@@ -320,11 +321,15 @@ tradingviu/
 
 ### Slice 10 — Ecosystem
 
-- Public REST + WebSocket API
-- OpenAPI spec
-- Webhook out
-- Plugin SDK
-- Pine v6 compatibility (matrices, maps, UDTs, methods)
+- **10a (done) — Personal access tokens + public `/v1` + OpenAPI:** API-key
+  primitives in `@tv/auth` (generate/hash/parse/verify, `tvk_…`), an
+  `access_tokens` table (migration `0009`), `/api/access-tokens` management,
+  an `apiKeyContext` middleware mirroring `tenantContext`, a public `/v1`
+  surface (`/v1/symbols`, `/v1/symbols/:id/history`) mounted outside the JWT
+  middleware, `GET /openapi.json` (OpenAPI 3.1), and an **API keys** web page.
+  See `docs/SLICE-10.md`.
+- Later — per-scope enforcement + rate limiting, more `/v1` endpoints + writes,
+  public WebSocket API, webhook out, plugin SDK, Pine v6 compatibility.
 
 ### Slice 11 — Strategy Backtesting
 

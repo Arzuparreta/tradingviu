@@ -128,6 +128,7 @@ DECLARE
   t text;
   tables text[] := ARRAY[
     'api_keys',
+    'access_tokens',
     'data_subscriptions',
     'layouts','drawings','alerts','alert_history',
     'screener_presets','user_indicators','backtests',

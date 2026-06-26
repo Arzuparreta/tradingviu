@@ -379,6 +379,17 @@ export interface PivotPoints {
   latest: PivotSet | null;
 }
 
+export interface AccessToken {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 export interface Watchlist {
   id: string;
   name: string;

@@ -8,6 +8,8 @@ import { createClient as createRedisClient } from 'redis';
 import { authRoutes } from './routes/auth.js';
 import { symbolRoutes, chartRoutes } from './routes/symbols.js';
 import { billingRoutes } from './routes/billing.js';
+import { accessTokenRoutes } from './routes/access-tokens.js';
+import { publicV1Routes, openApiDocument } from './routes/public-v1.js';
 import { healthRoutes } from './routes/health.js';
 import { adminRoutes } from './routes/admin.js';
 import { indicatorRoutes } from './routes/indicators.js';
@@ -35,6 +37,7 @@ import { scriptRoutes } from './routes/scripts.js';
 import { spaceRoutes } from './routes/spaces.js';
 import { tenantContext } from './middleware/tenant.js';
 import { superAdminContext } from './middleware/super-admin.js';
+import { apiKeyContext } from './middleware/api-key.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
@@ -106,6 +109,13 @@ app.route('/api', followRoutes);
 app.route('/api', scriptRoutes);
 app.route('/api', spaceRoutes);
 app.route('/api', billingRoutes);
+app.route('/api', accessTokenRoutes);
+
+// Public API: OpenAPI spec is unauthenticated; /v1/* requires a personal access
+// token (resolved by apiKeyContext, outside the JWT-based /api/* middleware).
+app.get('/openapi.json', (c) => c.json(openApiDocument));
+app.use('/v1/*', apiKeyContext({ db, redis }));
+app.route('/v1', publicV1Routes);
 
 const port = env.API_PORT;
 console.log(`tradingviu api listening on :${port}`);

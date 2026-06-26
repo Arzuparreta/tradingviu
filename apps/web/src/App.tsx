@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ChartPage } from './pages/ChartPage';
 import { AdminPage } from './pages/AdminPage';
 import { WatchlistsPage } from './pages/WatchlistsPage';
+import { ApiKeysPage } from './pages/ApiKeysPage';
 import { LayoutPage } from './pages/LayoutPage';
 import { PineEditorPage } from './pages/PineEditorPage';
 import { AlertsPage } from './pages/AlertsPage';
@@ -75,6 +76,9 @@ function TopBar() {
             </Link>
             <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>
               Watchlists
+            </Link>
+            <Link to="/api-keys" className={loc.pathname === '/api-keys' ? 'active' : ''}>
+              API
             </Link>
             {user.globalRole === 'super_admin' && (
               <Link to="/admin" className={loc.pathname === '/admin' ? 'active' : ''}>
@@ -202,6 +206,14 @@ export function App() {
           element={
             <RequireAuth>
               <WatchlistsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/api-keys"
+          element={
+            <RequireAuth>
+              <ApiKeysPage />
             </RequireAuth>
           }
         />

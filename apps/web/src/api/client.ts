@@ -49,6 +49,7 @@ import type {
   EconomicEvent,
   FundamentalSnapshot,
   MacroSeriesObservation,
+  AccessToken,
   ScreenerPreset,
   ScreenerQuery,
   ScreenerResult,
@@ -628,6 +629,14 @@ export const api = {
     } = {},
   ) =>
     request<{ observations: MacroSeriesObservation[] }>(`/api/macro/series${queryString(params)}`),
+  accessTokens: () => request<{ tokens: AccessToken[] }>('/api/access-tokens'),
+  createAccessToken: (body: { name: string; scopes?: string[]; expiresAt?: string }) =>
+    request<{ id: string; prefix: string; key: string }>('/api/access-tokens', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  revokeAccessToken: (id: string) =>
+    request<{ ok: true }>(`/api/access-tokens/${id}`, { method: 'DELETE' }),
   screener: (params: ScreenerQuery = {}) =>
     request<{ results: ScreenerResult[] }>('/api/screener', {
       method: 'POST',
