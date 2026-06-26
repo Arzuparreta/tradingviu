@@ -16,6 +16,7 @@ import { alertHistory, alerts, exchanges, symbols } from '@tv/db/schema';
 import { ulid } from 'ulid';
 import { getProvider } from '../services/data.js';
 import { evaluateAlertCondition } from '../services/alert-engine.js';
+import { buildAlertWebhookPayload, deliverWebhook } from '@tv/notifications';
 
 const ccxtMap: Record<string, string> = {
   BINANCE: 'binance',
@@ -42,6 +43,7 @@ export const alertRoutes = new Hono()
         kind: alerts.kind,
         condition: alerts.condition,
         channels: alerts.channels,
+        webhookUrl: alerts.webhookUrl,
         active: alerts.active,
         expiresAt: alerts.expiresAt,
         lastFiredAt: alerts.lastFiredAt,
@@ -79,6 +81,7 @@ export const alertRoutes = new Hono()
       condition: body.condition,
       channels: body.channels,
       active: body.active,
+      ...(body.webhookUrl !== undefined ? { webhookUrl: body.webhookUrl } : {}),
       ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt } : {}),
     });
     return c.json({ id });
@@ -95,6 +98,7 @@ export const alertRoutes = new Hono()
       patch.kind = body.condition.type;
     }
     if (body.channels !== undefined) patch.channels = body.channels;
+    if (body.webhookUrl !== undefined) patch.webhookUrl = body.webhookUrl;
     if (body.active !== undefined) patch.active = body.active;
     if (body.expiresAt !== undefined) patch.expiresAt = body.expiresAt;
 
@@ -134,9 +138,11 @@ export const alertRoutes = new Hono()
     const [row] = await db
       .select({
         id: alerts.id,
+        name: alerts.name,
         active: alerts.active,
         condition: alerts.condition,
         channels: alerts.channels,
+        webhookUrl: alerts.webhookUrl,
         symbolId: alerts.symbolId,
         ticker: symbols.ticker,
         exchange: exchanges.code,
@@ -165,6 +171,22 @@ export const alertRoutes = new Hono()
       const delivered: Record<string, boolean> = {};
       for (const channel of row.channels) {
         delivered[channel] = channel === 'in_app';
+      }
+      // Outbound webhook delivery (native fetch; failures recorded as pending).
+      if (row.channels.includes('webhook') && row.webhookUrl) {
+        const payload = buildAlertWebhookPayload({
+          alertId: row.id,
+          alertName: row.name,
+          symbol: `${row.exchange}:${row.ticker}`,
+          price,
+          fired: result.fired,
+          value: result.value,
+          reason: result.reason,
+          firedAt: new Date(),
+        });
+        delivered['webhook'] = await deliverWebhook(row.webhookUrl, payload, (url, init) =>
+          fetch(url, init),
+        );
       }
       await db.insert(alertHistory).values({
         alertId: row.id,

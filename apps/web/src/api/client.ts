@@ -425,9 +425,10 @@ export const api = {
     name: string;
     condition: PriceAlertCondition;
     channels: string[];
+    webhookUrl?: string;
     active?: boolean;
   }) => request<{ id: string }>('/api/alerts', { method: 'POST', body: JSON.stringify(body) }),
-  updateAlert: (id: string, body: { active?: boolean }) =>
+  updateAlert: (id: string, body: { active?: boolean; webhookUrl?: string | null }) =>
     request<{ ok: true }>(`/api/alerts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteAlert: (id: string) => request<{ ok: true }>(`/api/alerts/${id}`, { method: 'DELETE' }),
   evaluateAlert: (id: string, body: { price?: number; previousPrice?: number } = {}) =>

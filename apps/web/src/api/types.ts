@@ -430,6 +430,7 @@ export interface AlertRow {
   kind: string;
   condition: PriceAlertCondition | Record<string, unknown>;
   channels: AlertChannel[];
+  webhookUrl: string | null;
   active: boolean;
   expiresAt: string | null;
   lastFiredAt: string | null;

@@ -19,6 +19,7 @@ export function AlertsPage() {
   const [operator, setOperator] = useState<AlertOperator>('above');
   const [value, setValue] = useState('100');
   const [manualPrice, setManualPrice] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
 
   const alertsQ = useQuery({ queryKey: ['alerts'], queryFn: () => api.alerts() });
   const symbolsQ = useQuery({ queryKey: ['symbols', 'alerts'], queryFn: () => api.allSymbols(200) });
@@ -31,11 +32,13 @@ export function AlertsPage() {
         symbolId,
         name: name || `Price ${operator} ${value}`,
         condition: { type: 'price', operator, value: Number(value) },
-        channels: ['in_app'],
+        channels: webhookUrl.trim() ? ['in_app', 'webhook'] : ['in_app'],
+        ...(webhookUrl.trim() ? { webhookUrl: webhookUrl.trim() } : {}),
         active: true,
       }),
     onSuccess: () => {
       setName('');
+      setWebhookUrl('');
       queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
@@ -87,6 +90,16 @@ export function AlertsPage() {
                 <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" />
               </div>
             </div>
+            <div>
+              <label>Webhook URL (optional)</label>
+              <input
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder="https://example.com/hook"
+                inputMode="url"
+              />
+              <span className="muted small">POSTed when the alert fires.</span>
+            </div>
             <button className="primary" disabled={!symbolId || Number(value) <= 0 || create.isPending} onClick={() => create.mutate()}>
               Create alert
             </button>
@@ -114,6 +127,7 @@ export function AlertsPage() {
                     {alert.lastFiredAt && <div className="small up">Last fired {new Date(alert.lastFiredAt).toLocaleString()}</div>}
                   </div>
                   <span className="grow" />
+                  {alert.webhookUrl && <span className="muted small mono" title={alert.webhookUrl}>🔗 webhook</span>}
                   <span className={alert.active ? 'up small' : 'muted small'}>{alert.active ? 'active' : 'paused'}</span>
                   <button onClick={() => toggle.mutate({ id: alert.id, active: !alert.active })}>
                     {alert.active ? 'Pause' : 'Resume'}

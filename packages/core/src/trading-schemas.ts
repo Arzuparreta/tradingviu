@@ -58,6 +58,8 @@ export const CreateAlertSchema = z.object({
   name: z.string().min(1).max(120),
   condition: AlertConditionSchema,
   channels: z.array(AlertChannelSchema).min(1).max(3).default(['in_app']),
+  /** Outbound webhook target; required for the `webhook` channel to deliver. */
+  webhookUrl: z.string().url().max(2048).optional(),
   active: z.boolean().default(true),
   expiresAt: z.coerce.date().optional(),
 });
@@ -67,6 +69,7 @@ export const UpdateAlertSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   condition: AlertConditionSchema.optional(),
   channels: z.array(AlertChannelSchema).min(1).max(3).optional(),
+  webhookUrl: z.string().url().max(2048).nullable().optional(),
   active: z.boolean().optional(),
   expiresAt: z.coerce.date().nullable().optional(),
 });

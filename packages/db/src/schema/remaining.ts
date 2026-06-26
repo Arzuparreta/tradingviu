@@ -85,6 +85,7 @@ export const alerts = pgTable(
     kind: text('kind').notNull(),
     condition: jsonb('condition').$type<unknown>().notNull(),
     channels: jsonb('channels').$type<string[]>().notNull().default([]),
+    webhookUrl: text('webhook_url'),
     active: boolean('active').notNull().default(true),
     expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
     lastFiredAt: timestamp('last_fired_at', { withTimezone: true, mode: 'date' }),

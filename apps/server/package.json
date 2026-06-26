@@ -25,6 +25,7 @@
     "@tv/db": "workspace:*",
     "@tv/ichimoku": "workspace:*",
     "@tv/layout-sync": "workspace:*",
+    "@tv/notifications": "workspace:*",
     "@tv/options-engine": "workspace:*",
     "@tv/pine-parser": "workspace:*",
     "@tv/pine-runtime": "workspace:*",

@@ -76,3 +76,37 @@ Status: done.
   the empty case, and determinism.
 - No DB migration: prices come from the existing provider path; metadata from
   the `symbols` table.
+
+## 4g — Alert webhook delivery (later addition)
+
+Status: done.
+
+- Completes the alert channel loop the original slice left "for future workers":
+  a fired alert now **delivers an outbound webhook** (the `in_app` channel was
+  already delivered; `email` remains deferred).
+- `packages/notifications`: a small, mostly-pure package — `buildAlertWebhookPayload`
+  (the `alert.fired` JSON), `renderAlertTitle`, an **SSRF guard**
+  `isPublicWebhookUrl` (rejects non-http(s), loopback, private, link-local /
+  cloud-metadata, and IPv6 ULA/link-local hosts), and `deliverWebhook(url,
+  payload, fetchImpl)` which refuses unsafe URLs and never throws (a failed POST
+  is recorded as pending). The fetch is injected so it is unit-tested with a
+  fake — no network.
+- Migration `0008` adds a nullable `alerts.webhook_url`. `CreateAlert` /
+  `UpdateAlert` accept `webhookUrl` (Zod-validated URL); the alerts route stores
+  it, and `POST /api/alerts/:id/evaluate` POSTs the payload (native `fetch`) when
+  the alert fires with the `webhook` channel + a URL, writing the result into the
+  history row's `delivered.webhook`.
+- `AlertsPage` gains an optional **Webhook URL** field (adds the `webhook`
+  channel) and a 🔗 indicator on alerts that have one.
+- `packages/notifications/src/index.test.ts` covers the payload, the title, the
+  SSRF guard (loopback / private / metadata / non-http), and that `deliverWebhook`
+  succeeds on 2xx, fails on non-2xx, never throws, and refuses unsafe URLs
+  without calling fetch.
+
+Notes:
+
+- The SSRF guard is hostname-level (no DNS resolution), so it can't stop DNS
+  rebinding — a network egress policy is the real defense; the guard blocks the
+  obvious cases.
+- Email delivery (SMTP → Mailpit) is the natural follow-up; the notifications
+  package is structured to host it.

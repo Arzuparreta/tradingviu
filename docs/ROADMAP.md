@@ -16,7 +16,7 @@
 | 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`), **superseded by 2.5** |
 | 2.5   | Real-time market data: BarStore (1 upstream per key, fanout), TimescaleDB hypertable, paginated history, status events, in-progress bars, timezone-correct chart | ✅ done (this slice)     |
 | 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)      |
-| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine, portfolio analytics | ✅ done (`4fd3fd3` + 4f) |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine, portfolio analytics, alert webhooks | ✅ done (`4fd3fd3` + 4f/4g) |
 | 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                  |
 | 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6l done) |
 | 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
@@ -105,6 +105,7 @@ tradingviu/
 │   ├── calendar/                # earnings/economic/dividend provider contract + mock/FMP adapters
 │   ├── portfolio/               # [TODO] P&L, holdings, transactions
 │   ├── portfolio-analytics/     # allocation, concentration (HHI), P&L attribution over priced holdings (slice 4f)
+│   ├── notifications/           # alert webhook payload + SSRF guard + delivery (slice 4g)
 │   ├── layout-sync/             # multi-chart layout schema + grid presets + helpers
 │   ├── ui-kit/                  # [TODO] shared React components
 │   ├── cli/                     # tvctl operator CLI (tenants, users, plans)
@@ -191,7 +192,7 @@ tradingviu/
 ### Slice 4 (done) — Alerts + Portfolios + Paper trading
 
 - Alert engine: price, indicator, multi-condition evaluator
-- Channels: in-app delivered now; email/webhook recorded for future workers
+- Channels: in-app + outbound webhook delivered (see 4g); email recorded for a future SMTP worker
 - Alerts CRUD + manual evaluation endpoint + alert history
 - Portfolios CRUD with transactions, holdings rebuild, dividends, fees, realized P&L
 - Paper accounts + market/limit paper orders with instant/pending fills, fees, slippage, buying-power check
@@ -204,6 +205,12 @@ tradingviu/
   (prices each holding from the provider); and an **Analytics** card on
   `PortfoliosPage` (totals, allocation bars, concentration, positions table).
   See `docs/SLICE-4.md`.
+- **4g (done, later) — Alert webhook delivery:** completes the alert channel loop
+  — a fired alert POSTs an outbound webhook. `packages/notifications` (pure
+  payload builder + SSRF guard `isPublicWebhookUrl` + injectable-fetch
+  `deliverWebhook`), migration `0008` (`alerts.webhook_url`), evaluate-time
+  dispatch writing `delivered.webhook`, and a Webhook URL field on `AlertsPage`.
+  Email (SMTP) deferred. See `docs/SLICE-4.md`.
 
 ### Slice 5 (done) — Brokers + DOM + Options
 
