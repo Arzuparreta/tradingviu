@@ -19,6 +19,7 @@ import { DiscoveryPage } from './pages/DiscoveryPage';
 import { IdeasPage } from './pages/IdeasPage';
 import { ScriptsPage } from './pages/ScriptsPage';
 import { SpacesPage } from './pages/SpacesPage';
+import { BacktestsPage } from './pages/BacktestsPage';
 import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
@@ -61,6 +62,9 @@ function TopBar() {
             </Link>
             <Link to="/options" className={loc.pathname.startsWith('/options') ? 'active' : ''}>
               Options
+            </Link>
+            <Link to="/backtests" className={loc.pathname.startsWith('/backtests') ? 'active' : ''}>
+              Backtests
             </Link>
             <Link to="/discovery" className={loc.pathname.startsWith('/discovery') ? 'active' : ''}>
               Discovery
@@ -198,6 +202,14 @@ export function App() {
           element={
             <RequireAuth>
               <OptionsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/backtests"
+          element={
+            <RequireAuth>
+              <BacktestsPage />
             </RequireAuth>
           }
         />

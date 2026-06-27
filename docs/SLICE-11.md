@@ -175,7 +175,25 @@ Notes:
   in-sample grid search of 11c — the backtesting vertical (engine, built-ins,
   Pine signals, optimization, walk-forward) is now complete.
 
+## 11e — Dedicated backtest report page
+
+Status: done.
+
+Delivered:
+
+- A dedicated **Backtests** web page at `/backtests`, linked from the authenticated
+  top nav, for running a built-in strategy report outside the cramped chart-side
+  panel.
+- The page reuses the existing `POST /api/backtest` contract and deterministic
+  engine output. It adds report-level controls for symbol, interval, bar count,
+  strategy parameters, capital, fees, slippage, position size, and shorts.
+- Report output includes a full stats grid, equity curve, drawdown chart, trade
+  summary, largest absolute P&L moves, and the complete round-trip trade table
+  with entry/exit time, prices, quantity, P&L, return, bars held, and exit reason.
+- No schema migration or new server route was required: the existing
+  `BacktestResult` already contains the trades, equity curve, and stats needed
+  for an auditable report.
+
 ## Remaining Slice 11 Work
 
 - Event-driven Pine `strategy.*` (stops / targets / trailing exits, pyramiding).
-- A dedicated backtest report page with a trade list and drawdown chart.

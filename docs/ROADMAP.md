@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, freshness-aware history, native Binance REST/WS market data, live quote/depth fanout, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, Ichimoku cloud, and pivot points — only per-candle footprint is deferred (needs a trade tape). Slice 11 (strategy backtesting) is in progress: a deterministic simulator with three built-in strategies, equity curve, and full performance stats. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, freshness-aware history, native Binance REST/WS market data, live quote/depth fanout, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, Ichimoku cloud, and pivot points — only per-candle footprint is deferred (needs a trade tape). Slice 11 (strategy backtesting) is in progress: deterministic built-in and Pine-signal backtests, optimization, walk-forward analysis, and a dedicated report page are delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -23,7 +23,7 @@
 | 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
 | 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | ✅ done (9a–9h; footprint deferred — needs trade tape) |
 | 10    | Public API + plugin SDK + ecosystem                                                                        | in progress (10a–10b done) |
-| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11d done) |
+| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11e done) |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -365,8 +365,11 @@ tradingviu/
   aggregate (compounded OOS return, profitable-fold %, **walk-forward
   efficiency**); `POST /api/backtest/walkforward`; and a **Walk-forward** button +
   fold table in the ChartPage backtest panel. See `docs/SLICE-11.md`.
-- Later — event-driven Pine `strategy.*` (stops/targets/trailing) and a dedicated
-  backtest report page.
+- **11e (done) — Dedicated report page:** `/backtests` runs a built-in strategy
+  through the existing `POST /api/backtest` contract and renders report-level
+  stats, equity curve, drawdown chart, trade summary, largest moves, and a full
+  trade list. See `docs/SLICE-11.md`.
+- Later — event-driven Pine `strategy.*` (stops/targets/trailing, pyramiding).
 
 ### Drawing tools (in progress)
 
