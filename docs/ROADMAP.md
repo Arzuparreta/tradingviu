@@ -4,26 +4,26 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, freshness-aware history, native Binance REST/WS market data, live quote/depth fanout, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, Ichimoku cloud, and pivot points — only per-candle footprint is deferred (needs a trade tape). Slice 11 (strategy backtesting) is in progress: deterministic built-in and Pine-signal backtests, optimization, walk-forward analysis, and a dedicated report page are delivered. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, freshness-aware history, native Binance REST/WS market data, live quote/depth fanout, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, Ichimoku cloud, and pivot points — only per-candle footprint is deferred (needs a trade tape). Slice 10 is in progress with public tokens, `/v1` read endpoints, rate limiting, and scoped watchlist writes delivered. Slice 11 (strategy backtesting) is in progress: deterministic built-in and Pine-signal backtests, optimization, walk-forward analysis, and a dedicated report page are delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
 > Slice numbers are 1-indexed and match the `docs/SLICE-N.md` files and the "What each slice delivers" section below.
 
-| Slice | Scope                                                                                                      | Status                   |
-| ----- | ---------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                             | ✅ done (`cf23b90`)      |
-| 2     | Indicators (31), live WS bars, watchlists                                                                  | ✅ done (`39a6465`), **superseded by 2.5** |
-| 2.5   | Real-time market data: BarStore (1 upstream per key, fanout), native Binance klines/quote/depth, TimescaleDB hypertable, freshness-aware history, status events, in-progress bars, timezone-correct chart | ✅ done (this slice)     |
-| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                         | ✅ done (`ac02b78`)      |
-| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine, portfolio analytics, alert webhooks | ✅ done (`4fd3fd3` + 4f/4g) |
-| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder | ✅ done                  |
-| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener             | in progress (6a–6l done) |
-| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                        | in progress (7a–7e done) |
-| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                               | pending                  |
-| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                   | ✅ done (9a–9h; footprint deferred — needs trade tape) |
-| 10    | Public API + plugin SDK + ecosystem                                                                        | in progress (10a–10b done) |
-| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                          | in progress (11a–11e done) |
+| Slice | Scope                                                                                                                                                                                                     | Status                                                 |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 1     | Foundation (monorepo, DB, auth, plans, charts)                                                                                                                                                            | ✅ done (`cf23b90`)                                    |
+| 2     | Indicators (31), live WS bars, watchlists                                                                                                                                                                 | ✅ done (`39a6465`), **superseded by 2.5**             |
+| 2.5   | Real-time market data: BarStore (1 upstream per key, fanout), native Binance klines/quote/depth, TimescaleDB hypertable, freshness-aware history, status events, in-progress bars, timezone-correct chart | ✅ done (this slice)                                   |
+| 3     | Pine Script v5 subset + interpreter, multi-chart layout (1/2/4/8/16), Meili search                                                                                                                        | ✅ done (`ac02b78`)                                    |
+| 4     | Alerts engine (price/indicator/multi-condition + channels), portfolios CRUD, paper trading engine, portfolio analytics, alert webhooks                                                                    | ✅ done (`4fd3fd3` + 4f/4g)                            |
+| 5     | Broker adapters (Alpaca, IBKR, Binance live trading), DOM, chart trading, options chain + strategy builder                                                                                                | ✅ done                                                |
+| 6     | News aggregator, calendars (earnings/economic/dividends), yield curves, fundamentals, screener                                                                                                            | in progress (6a–6l done)                               |
+| 7     | Social (ideas, comments, follows, scripts marketplace, paid spaces)                                                                                                                                       | in progress (7a–7e done)                               |
+| 8     | Desktop (Tauri) + Mobile (React Native) + push notifications                                                                                                                                              | pending                                                |
+| 9     | Candlestick patterns, volume footprint, TPO, Bar Replay multi-chart, auto chart patterns                                                                                                                  | ✅ done (9a–9h; footprint deferred — needs trade tape) |
+| 10    | Public API + plugin SDK + ecosystem                                                                                                                                                                       | in progress (10a–10c done)                             |
+| 11    | Strategy backtesting (deterministic simulator, built-in strategies, equity/stats)                                                                                                                         | in progress (11a–11e done)                             |
 
 The product is "TradingView-equivalent" — every feature of TV (including premium) should eventually be there. We're working vertical slices that maximize user value per unit of work.
 
@@ -334,8 +334,11 @@ tradingviu/
   needs `read`) and a per-token fixed-window `rateLimit` (Redis, fail-open,
   `X-RateLimit-*` headers + `429`, `API_RATE_LIMIT`/`API_RATE_WINDOW_SEC`); pure
   window math unit-tested. See `docs/SLICE-10.md`.
-- Later — more `/v1` endpoints + writes (a `write` scope), public WebSocket API,
-  webhook out, plugin SDK, Pine v6 compatibility.
+- **10c (done) — Expanded `/v1` + scoped watchlist writes:** public indicators,
+  screener, and news endpoints are documented; tokens have explicit `read` /
+  `write` scopes; and `/v1/watchlists` supports token-user-scoped CRUD/items
+  with mutations guarded by `write`. See `docs/SLICE-10.md`.
+- Later — public WebSocket API, webhook out, plugin SDK, Pine v6 compatibility.
 
 ### Slice 11 — Strategy Backtesting
 
@@ -425,47 +428,47 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 
 ### Key files to know
 
-| File                                           | What it does                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
-| `apps/server/src/index.ts`                     | Server entrypoint, route mounting, WS upgrade, BarStore/MarketStore shutdown |
-| `apps/server/src/middleware/tenant.ts`         | JWT verify + transactional RLS context (the most subtle code)       |
-| `apps/server/src/middleware/super-admin.ts`    | Same but bypasses RLS (gated by `claims.sa`)                        |
-| `apps/server/src/middleware/error.ts`          | TvError → JSON response                                             |
-| `apps/server/src/routes/auth.ts`               | Signup, login, /me — uses admin connection for cross-tenant inserts |
-| `apps/server/src/routes/alerts.ts`             | Alerts CRUD, evaluation, and history                                |
-| `apps/server/src/routes/portfolios.ts`         | Portfolios, transactions, holdings rebuild, P&L metrics             |
-| `apps/server/src/routes/paper.ts`              | Paper accounts and market/limit paper orders                        |
-| `apps/server/src/routes/options.ts`            | Stateless options pricing/chain/strategy endpoints                  |
-| `packages/options-engine/src/black-scholes.ts` | BS pricing, greeks, implied vol                                     |
-| `packages/options-engine/src/strategy.ts`      | Strategy templates + payoff/greeks analysis                         |
-| `apps/web/src/pages/OptionsPage.tsx`           | Options strategy builder + SVG payoff diagram                       |
-| `apps/server/src/services/ws.ts`               | WebSocket fanout via BarStore and MarketStore                       |
-| `apps/server/src/services/bar-store.ts`        | **Slice 2.5** — single upstream per key, ref-counted fanout         |
+| File                                           | What it does                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `apps/server/src/index.ts`                     | Server entrypoint, route mounting, WS upgrade, BarStore/MarketStore shutdown       |
+| `apps/server/src/middleware/tenant.ts`         | JWT verify + transactional RLS context (the most subtle code)                      |
+| `apps/server/src/middleware/super-admin.ts`    | Same but bypasses RLS (gated by `claims.sa`)                                       |
+| `apps/server/src/middleware/error.ts`          | TvError → JSON response                                                            |
+| `apps/server/src/routes/auth.ts`               | Signup, login, /me — uses admin connection for cross-tenant inserts                |
+| `apps/server/src/routes/alerts.ts`             | Alerts CRUD, evaluation, and history                                               |
+| `apps/server/src/routes/portfolios.ts`         | Portfolios, transactions, holdings rebuild, P&L metrics                            |
+| `apps/server/src/routes/paper.ts`              | Paper accounts and market/limit paper orders                                       |
+| `apps/server/src/routes/options.ts`            | Stateless options pricing/chain/strategy endpoints                                 |
+| `packages/options-engine/src/black-scholes.ts` | BS pricing, greeks, implied vol                                                    |
+| `packages/options-engine/src/strategy.ts`      | Strategy templates + payoff/greeks analysis                                        |
+| `apps/web/src/pages/OptionsPage.tsx`           | Options strategy builder + SVG payoff diagram                                      |
+| `apps/server/src/services/ws.ts`               | WebSocket fanout via BarStore and MarketStore                                      |
+| `apps/server/src/services/bar-store.ts`        | **Slice 2.5** — single upstream per key, ref-counted fanout                        |
 | `apps/server/src/services/market-data.ts`      | Freshness-aware shared historical bars for chart, analytics, alerts, and backtests |
-| `apps/server/src/services/market-store.ts`     | Live Binance quote/book state, DOM snapshots, and WS fanout         |
-| `apps/server/src/services/persist-queue.ts`    | **Slice 2.5** — batched writes to `bars` table                      |
-| `apps/server/src/services/streams/binance.ts`  | **Slice 2.5** — Binance native WS kline stream                      |
-| `apps/server/src/services/streams/ccxt.ts`     | **Slice 2.5** — CCXT polling stream wrapper                         |
-| `apps/server/src/services/alert-engine.ts`     | Pure alert condition evaluator                                      |
-| `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic                                     |
-| `apps/server/src/services/paper-trading.ts`    | Pure paper fill model                                               |
-| `apps/server/src/services/data.ts`             | Provider registry + BarStore singleton factory                      |
-| `apps/web/src/pages/ChartPage.tsx`             | The chart UI: indicators, live bars, live DOM, multi-pane           |
-| `apps/web/src/hooks/use-chart-history.ts`      | **Slice 2.5** — paginated history hook with `loadMore`/`loadNewer`  |
-| `apps/web/src/hooks/use-bar-stream.ts`         | **Slice 2.5** — WS hook with status + auto-reconnect                |
-| `apps/web/src/hooks/use-market-stream.ts`      | Live quote/book/status hook for price and DOM                       |
-| `apps/server/src/routes/drawings.ts`           | Drawing CRUD (`GET`/`PUT /api/drawings`) scoped per (symbol, interval) |
-| `apps/server/src/services/drawings.ts`         | Pure row↔`Drawing` mapping for the `drawings` table                  |
-| `apps/web/src/components/DrawingOverlay.tsx`    | SVG overlay: render/select/drag drawings, reproject on pan/zoom      |
-| `apps/web/src/hooks/use-drawings.ts`           | Load drawings per (symbol, interval) + debounced replace-all save   |
-| `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                   |
-| `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                         |
-| `packages/db/src/seed.ts`                      | Plan + exchange + symbol seed                                       |
-| `packages/ta-lib/src/registry.ts`              | All 31 indicators with their params                                 |
-| `packages/auth/src/signup.ts`                  | Signup flow (chicken-and-egg tenant context)                        |
-| `infra/postgres-init/02-app-role.sql`          | Creates the `tv_app` role that respects RLS                         |
-| `tools/backfill-bars/src/index.ts`             | **Slice 2.5** — idempotent CLI to seed `bars` from provider adapters |
-| `.env.example`                                 | All env vars documented                                             |
+| `apps/server/src/services/market-store.ts`     | Live Binance quote/book state, DOM snapshots, and WS fanout                        |
+| `apps/server/src/services/persist-queue.ts`    | **Slice 2.5** — batched writes to `bars` table                                     |
+| `apps/server/src/services/streams/binance.ts`  | **Slice 2.5** — Binance native WS kline stream                                     |
+| `apps/server/src/services/streams/ccxt.ts`     | **Slice 2.5** — CCXT polling stream wrapper                                        |
+| `apps/server/src/services/alert-engine.ts`     | Pure alert condition evaluator                                                     |
+| `apps/server/src/services/portfolio-engine.ts` | Pure holdings/P&L rebuild logic                                                    |
+| `apps/server/src/services/paper-trading.ts`    | Pure paper fill model                                                              |
+| `apps/server/src/services/data.ts`             | Provider registry + BarStore singleton factory                                     |
+| `apps/web/src/pages/ChartPage.tsx`             | The chart UI: indicators, live bars, live DOM, multi-pane                          |
+| `apps/web/src/hooks/use-chart-history.ts`      | **Slice 2.5** — paginated history hook with `loadMore`/`loadNewer`                 |
+| `apps/web/src/hooks/use-bar-stream.ts`         | **Slice 2.5** — WS hook with status + auto-reconnect                               |
+| `apps/web/src/hooks/use-market-stream.ts`      | Live quote/book/status hook for price and DOM                                      |
+| `apps/server/src/routes/drawings.ts`           | Drawing CRUD (`GET`/`PUT /api/drawings`) scoped per (symbol, interval)             |
+| `apps/server/src/services/drawings.ts`         | Pure row↔`Drawing` mapping for the `drawings` table                                |
+| `apps/web/src/components/DrawingOverlay.tsx`   | SVG overlay: render/select/drag drawings, reproject on pan/zoom                    |
+| `apps/web/src/hooks/use-drawings.ts`           | Load drawings per (symbol, interval) + debounced replace-all save                  |
+| `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                                  |
+| `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                                        |
+| `packages/db/src/seed.ts`                      | Plan + exchange + symbol seed                                                      |
+| `packages/ta-lib/src/registry.ts`              | All 31 indicators with their params                                                |
+| `packages/auth/src/signup.ts`                  | Signup flow (chicken-and-egg tenant context)                                       |
+| `infra/postgres-init/02-app-role.sql`          | Creates the `tv_app` role that respects RLS                                        |
+| `tools/backfill-bars/src/index.ts`             | **Slice 2.5** — idempotent CLI to seed `bars` from provider adapters               |
+| `.env.example`                                 | All env vars documented                                                            |
 
 ### Common pitfalls
 

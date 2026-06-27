@@ -270,4 +270,32 @@ describe('v1 public API', () => {
       expect(res.status).toBe(200);
     });
   });
+
+  // ── Watchlists ────────────────────────────────────────────────────────────
+
+  describe('POST /v1/watchlists', () => {
+    test('requires the write scope', async () => {
+      const app = appFor(new FakeDb(), ['read']);
+      const res = await app.request('/v1/watchlists', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Momentum' }),
+      });
+      expect(res.status).toBe(403);
+
+      const body = (await res.json()) as { error: string; requiredScope: string };
+      expect(body.error).toBe('insufficient_scope');
+      expect(body.requiredScope).toBe('write');
+    });
+
+    test('validates write payloads before touching storage', async () => {
+      const app = appFor(new FakeDb(), ['read', 'write']);
+      const res = await app.request('/v1/watchlists', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: '' }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
 });

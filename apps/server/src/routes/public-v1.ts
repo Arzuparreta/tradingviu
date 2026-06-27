@@ -2,11 +2,14 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from 'drizzle-orm';
+import { ulid } from 'ulid';
 import {
   exchanges,
   fundamentalSnapshots,
   newsArticles,
   symbols,
+  watchlistItems,
+  watchlists,
 } from '@tv/db/schema';
 import { all, compute, find } from '@tv/ta-lib';
 import {
@@ -16,7 +19,17 @@ import {
   screenerMetricCatalog,
   screenerOrderBy,
 } from '@tv/screener-engine';
-import { NewsQuerySchema, ScreenerQuerySchema } from '@tv/core';
+import {
+  AddPublicWatchlistItemSchema,
+  CreatePublicWatchlistSchema,
+  NewsQuerySchema,
+  NotFoundError,
+  ScreenerQuerySchema,
+  tryGetTenant,
+  type TenantContext,
+  UpdatePublicWatchlistItemSchema,
+  ValidationError,
+} from '@tv/core';
 import { requireScope } from '../middleware/api-key.js';
 import { getFreshBars } from '../services/market-data.js';
 
@@ -82,6 +95,223 @@ export const publicV1Routes = new Hono()
     const db = c.get('db');
     const result = await getFreshBars(db, c.req.param('id'), q.interval, { limit: q.limit });
     return c.json({ symbol: result.symbol, interval: q.interval, bars: result.bars });
+  })
+  // ---- Watchlists ----
+  .get('/watchlists', async (c) => {
+    const db = c.get('db');
+    const tenant = tryGetTenant() as TenantContext;
+    const rows = await db
+      .select({
+        id: watchlists.id,
+        name: watchlists.name,
+        createdAt: watchlists.createdAt,
+        updatedAt: watchlists.updatedAt,
+      })
+      .from(watchlists)
+      .where(and(eq(watchlists.tenantId, tenant.tenantId), eq(watchlists.userId, tenant.userId)))
+      .orderBy(asc(watchlists.name));
+    return c.json({ watchlists: rows });
+  })
+  .post(
+    '/watchlists',
+    requireScope('write'),
+    zValidator('json', CreatePublicWatchlistSchema),
+    async (c) => {
+      const db = c.get('db');
+      const tenant = tryGetTenant() as TenantContext;
+      const body = c.req.valid('json');
+      const id = ulid();
+      await db.insert(watchlists).values({
+        id,
+        tenantId: tenant.tenantId,
+        userId: tenant.userId,
+        name: body.name,
+      });
+      return c.json({ id }, 201);
+    },
+  )
+  .delete('/watchlists/:id', requireScope('write'), async (c) => {
+    const db = c.get('db');
+    const tenant = tryGetTenant() as TenantContext;
+    const id = c.req.param('id');
+    const [list] = await db
+      .select({ id: watchlists.id })
+      .from(watchlists)
+      .where(
+        and(
+          eq(watchlists.id, id),
+          eq(watchlists.tenantId, tenant.tenantId),
+          eq(watchlists.userId, tenant.userId),
+        ),
+      )
+      .limit(1);
+    if (!list) throw new NotFoundError('Watchlist not found');
+    await db.delete(watchlists).where(eq(watchlists.id, id));
+    return c.json({ ok: true });
+  })
+  .get('/watchlists/:id/items', async (c) => {
+    const db = c.get('db');
+    const tenant = tryGetTenant() as TenantContext;
+    const id = c.req.param('id');
+    const [list] = await db
+      .select({ id: watchlists.id })
+      .from(watchlists)
+      .where(
+        and(
+          eq(watchlists.id, id),
+          eq(watchlists.tenantId, tenant.tenantId),
+          eq(watchlists.userId, tenant.userId),
+        ),
+      )
+      .limit(1);
+    if (!list) throw new NotFoundError('Watchlist not found');
+
+    const rows = await db
+      .select({
+        id: watchlistItems.id,
+        symbolId: watchlistItems.symbolId,
+        color: watchlistItems.color,
+        note: watchlistItems.note,
+        sortOrder: watchlistItems.sortOrder,
+        symbol: {
+          id: symbols.id,
+          ticker: symbols.ticker,
+          name: symbols.name,
+          exchange: exchanges.code,
+        },
+      })
+      .from(watchlistItems)
+      .innerJoin(symbols, eq(symbols.id, watchlistItems.symbolId))
+      .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
+      .where(and(eq(watchlistItems.tenantId, tenant.tenantId), eq(watchlistItems.watchlistId, id)))
+      .orderBy(asc(watchlistItems.sortOrder));
+    return c.json({ items: rows });
+  })
+  .post(
+    '/watchlists/:id/items',
+    requireScope('write'),
+    zValidator('json', AddPublicWatchlistItemSchema),
+    async (c) => {
+      const db = c.get('db');
+      const tenant = tryGetTenant() as TenantContext;
+      const id = c.req.param('id');
+      const body = c.req.valid('json');
+
+      const [list] = await db
+        .select({ id: watchlists.id })
+        .from(watchlists)
+        .where(
+          and(
+            eq(watchlists.id, id),
+            eq(watchlists.tenantId, tenant.tenantId),
+            eq(watchlists.userId, tenant.userId),
+          ),
+        )
+        .limit(1);
+      if (!list) throw new NotFoundError('Watchlist not found');
+
+      const [sym] = await db
+        .select({ id: symbols.id })
+        .from(symbols)
+        .where(eq(symbols.id, body.symbol))
+        .limit(1);
+      if (!sym) throw new ValidationError('Symbol not found');
+
+      const existing = await db
+        .select({ id: watchlistItems.id })
+        .from(watchlistItems)
+        .where(
+          and(eq(watchlistItems.tenantId, tenant.tenantId), eq(watchlistItems.watchlistId, id)),
+        );
+      if (existing.length >= 1000) throw new ValidationError('Watchlist full (1000 symbols max)');
+
+      const itemId = ulid();
+      const insertValues: typeof watchlistItems.$inferInsert = {
+        id: itemId,
+        tenantId: tenant.tenantId,
+        watchlistId: id,
+        symbolId: body.symbol,
+        sortOrder: existing.length,
+      };
+      if (body.color !== undefined) insertValues.color = body.color;
+      if (body.note !== undefined) insertValues.note = body.note;
+      try {
+        await db.insert(watchlistItems).values(insertValues);
+      } catch {
+        throw new ValidationError('Symbol already in watchlist');
+      }
+      return c.json({ id: itemId }, 201);
+    },
+  )
+  .patch(
+    '/watchlists/:id/items/:itemId',
+    requireScope('write'),
+    zValidator('json', UpdatePublicWatchlistItemSchema),
+    async (c) => {
+      const db = c.get('db');
+      const tenant = tryGetTenant() as TenantContext;
+      const id = c.req.param('id');
+      const itemId = c.req.param('itemId');
+      const body = c.req.valid('json');
+
+      const [list] = await db
+        .select({ id: watchlists.id })
+        .from(watchlists)
+        .where(
+          and(
+            eq(watchlists.id, id),
+            eq(watchlists.tenantId, tenant.tenantId),
+            eq(watchlists.userId, tenant.userId),
+          ),
+        )
+        .limit(1);
+      if (!list) throw new NotFoundError('Watchlist not found');
+
+      await db
+        .update(watchlistItems)
+        .set({
+          ...(body.color !== undefined ? { color: body.color } : {}),
+          ...(body.note !== undefined ? { note: body.note } : {}),
+        })
+        .where(
+          and(
+            eq(watchlistItems.id, itemId),
+            eq(watchlistItems.tenantId, tenant.tenantId),
+            eq(watchlistItems.watchlistId, id),
+          ),
+        );
+      return c.json({ ok: true });
+    },
+  )
+  .delete('/watchlists/:id/items/:itemId', requireScope('write'), async (c) => {
+    const db = c.get('db');
+    const tenant = tryGetTenant() as TenantContext;
+    const id = c.req.param('id');
+    const itemId = c.req.param('itemId');
+
+    const [list] = await db
+      .select({ id: watchlists.id })
+      .from(watchlists)
+      .where(
+        and(
+          eq(watchlists.id, id),
+          eq(watchlists.tenantId, tenant.tenantId),
+          eq(watchlists.userId, tenant.userId),
+        ),
+      )
+      .limit(1);
+    if (!list) throw new NotFoundError('Watchlist not found');
+
+    await db
+      .delete(watchlistItems)
+      .where(
+        and(
+          eq(watchlistItems.id, itemId),
+          eq(watchlistItems.tenantId, tenant.tenantId),
+          eq(watchlistItems.watchlistId, id),
+        ),
+      );
+    return c.json({ ok: true });
   })
   // ---- Indicators ----
   .get('/indicators', (c) => {
@@ -277,7 +507,10 @@ export const openApiDocument = {
         properties: {
           id: { type: 'string' },
           name: { type: 'string' },
-          category: { type: 'string', enum: ['overlap', 'momentum', 'volatility', 'volume', 'trend'] },
+          category: {
+            type: 'string',
+            enum: ['overlap', 'momentum', 'volatility', 'volume', 'trend'],
+          },
           overlay: { type: 'boolean' },
           defaults: { type: 'object' },
           minBars: { type: 'integer' },
@@ -360,6 +593,34 @@ export const openApiDocument = {
           fetchedAt: { type: 'string', format: 'date-time' },
         },
       },
+      Watchlist: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      WatchlistItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          symbolId: { type: 'string' },
+          color: { type: 'string', nullable: true },
+          note: { type: 'string', nullable: true },
+          sortOrder: { type: 'integer' },
+          symbol: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              ticker: { type: 'string' },
+              name: { type: 'string' },
+              exchange: { type: 'string' },
+            },
+          },
+        },
+      },
     },
   },
   paths: {
@@ -420,6 +681,175 @@ export const openApiDocument = {
             },
           },
           '404': { description: 'Symbol not found' },
+        },
+      },
+    },
+    '/watchlists': {
+      get: {
+        summary: 'List watchlists owned by the token user',
+        responses: {
+          '200': {
+            description: 'Watchlists',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    watchlists: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Watchlist' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        summary: 'Create a watchlist',
+        description: 'Requires a token with the `write` scope.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name'],
+                properties: { name: { type: 'string', maxLength: 80 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Created watchlist id',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { id: { type: 'string' } },
+                },
+              },
+            },
+          },
+          '403': { description: 'Missing write scope' },
+        },
+      },
+    },
+    '/watchlists/{id}': {
+      delete: {
+        summary: 'Delete a watchlist',
+        description: 'Requires a token with the `write` scope.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Deleted' },
+          '403': { description: 'Missing write scope' },
+          '404': { description: 'Watchlist not found' },
+        },
+      },
+    },
+    '/watchlists/{id}/items': {
+      get: {
+        summary: 'List watchlist items',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: 'Watchlist items',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/WatchlistItem' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '404': { description: 'Watchlist not found' },
+        },
+      },
+      post: {
+        summary: 'Add a symbol to a watchlist',
+        description: 'Requires a token with the `write` scope.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['symbol'],
+                properties: {
+                  symbol: { type: 'string', description: 'Symbol id' },
+                  note: { type: 'string', maxLength: 200 },
+                  color: { type: 'string', maxLength: 20 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Created item id',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { id: { type: 'string' } },
+                },
+              },
+            },
+          },
+          '403': { description: 'Missing write scope' },
+          '404': { description: 'Watchlist not found' },
+          '422': { description: 'Invalid symbol or duplicate item' },
+        },
+      },
+    },
+    '/watchlists/{id}/items/{itemId}': {
+      patch: {
+        summary: 'Update a watchlist item',
+        description: 'Requires a token with the `write` scope.',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'itemId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  note: { type: 'string', maxLength: 200, nullable: true },
+                  color: { type: 'string', maxLength: 20, nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Updated' },
+          '403': { description: 'Missing write scope' },
+          '404': { description: 'Watchlist not found' },
+        },
+      },
+      delete: {
+        summary: 'Remove a watchlist item',
+        description: 'Requires a token with the `write` scope.',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'itemId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Deleted' },
+          '403': { description: 'Missing write scope' },
+          '404': { description: 'Watchlist not found' },
         },
       },
     },
@@ -580,9 +1010,24 @@ export const openApiDocument = {
       get: {
         summary: 'List news articles',
         parameters: [
-          { name: 'symbol', in: 'query', schema: { type: 'string' }, description: 'Filter by symbol ticker' },
-          { name: 'source', in: 'query', schema: { type: 'string' }, description: 'Filter by source' },
-          { name: 'sentiment', in: 'query', schema: { type: 'string' }, description: 'positive/neutral/negative' },
+          {
+            name: 'symbol',
+            in: 'query',
+            schema: { type: 'string' },
+            description: 'Filter by symbol ticker',
+          },
+          {
+            name: 'source',
+            in: 'query',
+            schema: { type: 'string' },
+            description: 'Filter by source',
+          },
+          {
+            name: 'sentiment',
+            in: 'query',
+            schema: { type: 'string' },
+            description: 'positive/neutral/negative',
+          },
           { name: 'q', in: 'query', schema: { type: 'string' }, description: 'Search title/body' },
           { name: 'from', in: 'query', schema: { type: 'string', format: 'date-time' } },
           { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },

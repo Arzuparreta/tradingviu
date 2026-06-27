@@ -17,7 +17,7 @@ Delivered:
 - **`access_tokens` table** (migration `0009`, tenant + user scoped, RLS-enabled
   via `rls-policies`): `name`, unique `prefix`, `hash`, `scopes`, `lastUsedAt`,
   `expiresAt`, `revokedAt`. Distinct from the existing `api_keys` table, which
-  stores *external* provider credentials.
+  stores _external_ provider credentials.
 - **Management API** (`/api/access-tokens`, under the normal JWT/tenant auth):
   list (never returns the hash), create (returns the full key exactly once), and
   soft-revoke.
@@ -40,9 +40,7 @@ Notes:
 
 - `/v1/*` is deliberately mounted at the top level (not `/api/*`) so the
   JWT-based `tenantContext` doesn't intercept token-authenticated requests.
-- Scopes are stored (default `['read']`) but not yet enforced per-endpoint — the
-  current surface is read-only. Per-scope enforcement, rate limiting, write
-  endpoints, and a public WebSocket are the next steps.
+- Scopes started as stored metadata in 10a and are enforced in later sub-slices.
 
 ## 10b — Rate limiting + scope enforcement
 
@@ -68,9 +66,34 @@ Delivered:
 - The pure window math is unit-tested (`services/rate-limit.test.ts`): window key
   stability/rotation, allow-up-to-limit-then-block, remaining + reset reporting.
 
+## 10c — Expanded public reads + watchlist writes
+
+Status: done.
+
+Delivered:
+
+- Expanded the public `/v1` read surface beyond symbols/history:
+  `GET /v1/indicators`, `POST /v1/indicators/compute`,
+  `GET /v1/screener/metrics`, `POST /v1/screener`, and `GET /v1/news`.
+- Added the first public write surface, guarded by a `write` scope:
+  `GET/POST/DELETE /v1/watchlists`, `GET/POST /v1/watchlists/:id/items`, and
+  `PATCH/DELETE /v1/watchlists/:id/items/:itemId`.
+- Personal tokens now validate against explicit scopes (`read`, `write`) and
+  must include `read`; `write` extends a token for mutations instead of replacing
+  the base read permission.
+- Public watchlists are scoped to the token's user, not just the tenant, so a
+  personal access token cannot enumerate or mutate another tenant member's
+  watchlists.
+- The API keys page can create read-only or read/write tokens and includes a
+  write example; OpenAPI documents the new endpoints and write-scope
+  requirements.
+
+Notes:
+
+- No migration was required. The watchlist tables already existed and remain
+  tenant-scoped under RLS; the `/v1` layer adds user ownership checks on top.
+
 ## Remaining Slice 10 Work
 
-- More `/v1` endpoints (indicators, news, screener) and write operations
-  (guarded by a `write` scope).
 - Public WebSocket streaming API.
 - Plugin SDK and Pine v6 compatibility.
