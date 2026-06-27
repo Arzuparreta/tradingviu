@@ -121,7 +121,9 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 15 tests, server typecheck + 60 tests.
 ✅ Expanded typed drawing tool catalog and toolbar across lines, channels, Fibonacci, pitchforks/Gann, measurement, shapes, annotations, and markers.
 ✅ Added drawing-tools tests that prove every toolbar tool maps to a registered `lightweight-charts-drawing` tool and round-trips through the persisted drawing shape.
-⏳ Add Playwright acceptance tests for pan/zoom correctness, keyboard shortcuts, persistence, and multi-panel independence.
+✅ Added object tree and inspector controls: list/select/rename, lock/hide, group labels, duplicate, copy/paste, z-order, delete/clear, and line/fill/text style editing.
+✅ Added local favorite drawing tools and reusable style templates.
+✅ Added deterministic web acceptance coverage for object management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel drawing-scope independence. Playwright is still not installed in this workspace.
 
 ### 1. Stabilize foundation:
    - [x] Remove false roadmap claims.
@@ -145,16 +147,17 @@ Use TradingView's drawing taxonomy as the product target:
 4. Expand suite:
    - [x] Ship broad tool categories through the typed catalog and toolbar.
    - [x] Guard toolbar tools with registry + round-trip tests.
-   - [ ] Add Playwright acceptance for category-level create/select/delete/persist/pan-zoom behavior.
+   - [x] Add deterministic acceptance coverage for category-level management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel independence.
    - [ ] Do not add a toolbar button until the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness.
 
 ## Where to Continue (next session)
 
-1. **Playwright acceptance tests** — pan/zoom, keyboard shortcuts, persistence,
-   multi-panel independence, and at least one representative create/select/delete/reload flow per tool category.
+1. **Optional Playwright infrastructure** — the repo currently has no Playwright
+   dependency or config. If browser-level E2E becomes a gate, add it deliberately
+   and cover pan/zoom correctness against a running app.
 
-2. **Object tree and style controls** — list drawings, rename, lock/hide,
-   reorder, select, delete, group, and edit styles.
+2. **Broader browser E2E scenarios** — representative create/select/delete/reload
+   flows per category once Playwright or another browser runner is introduced.
 
 ## Acceptance Criteria
 

@@ -1091,6 +1091,14 @@ export function ChartPage() {
             onRemoveSelected={drawingMgr.removeSelected}
             onClearAll={drawingMgr.clearAll}
             onToggleLock={drawingMgr.toggleLock}
+            onToggleVisibility={drawingMgr.toggleVisibility}
+            onRenameDrawing={drawingMgr.renameDrawing}
+            onUpdateStyle={drawingMgr.updateStyle}
+            onDuplicateDrawing={drawingMgr.duplicateDrawing}
+            onCopyDrawing={drawingMgr.copyDrawing}
+            onPasteDrawing={drawingMgr.pasteDrawing}
+            onMoveDrawing={drawingMgr.moveDrawing}
+            onSetDrawingGroup={drawingMgr.setDrawingGroup}
             onUndo={drawingMgr.undo}
             onRedo={drawingMgr.redo}
           />

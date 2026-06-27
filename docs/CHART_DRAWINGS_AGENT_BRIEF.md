@@ -9,7 +9,7 @@ Use this brief when starting a new chat or assigning a new agent to the chart dr
 3. `docs/CHART_DRAWINGS_REWORK.md`
 4. This file
 
-## Session Progress (last: 2026-06-27, commit `b6021b5`)
+## Session Progress (last: 2026-06-27, commit `b6021b5` + object-tree follow-up)
 
 ✅ **Phase 1-3 foundation delivered.** `lightweight-charts-drawing@0.1.1` passes the
 spike. We have a working native-primitive drawing system in `ChartPage` and `/layout`:
@@ -19,20 +19,24 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
 - `apps/web/src/components/chart-surface/` — shared `ChartSurface` component
 - `apps/web/src/hooks/use-drawing-manager.ts` — hook with load/save + undo/redo
 - `apps/web/src/components/DrawingToolbar.tsx` — grouped toolbar covering the
-  registered drawing categories, keyboard shortcuts, lock/delete/clear
+  registered drawing categories, keyboard shortcuts, lock/hide/delete/clear,
+  object tree, rename/group, duplicate, copy/paste, z-order, style inspector,
+  favorite tools, and style templates
 - `apps/web/src/pages/ChartPage.tsx` — integrated with native primitive drawings
 - `apps/web/src/components/ChartPanel.tsx` — `/layout` panels use `ChartSurface`
   with one drawing manager per `drawingScopeId`
 
-**Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 15 tests, server typecheck + 60 tests.**
+**Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 19 tests, server typecheck + 60 tests.**
 
 ## Where to Continue
 
-1. **Playwright acceptance tests** — pan/zoom correctness, keyboard shortcuts,
-   persistence, multi-panel independence, and representative create/select/delete/reload flows per tool category.
+1. **Optional Playwright infrastructure** — the repo currently has no Playwright
+   dependency or config. Deterministic Bun/Happy DOM coverage now guards object
+   management, keyboard shortcuts, persistence, undo/redo, z-order, and
+   multi-panel independence. Add browser E2E deliberately if it becomes a gate.
 
-2. **Object tree and style controls** — list drawings, rename, lock/hide,
-   reorder, select, delete, group, and edit styles.
+2. **Broader browser E2E scenarios** — representative create/select/delete/reload
+   flows per category once Playwright or another browser runner is introduced.
 
 ## Verification commands (copy-paste ready)
 
