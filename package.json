@@ -22,6 +22,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "e2e": "playwright test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\" --ignore-path .gitignore",
     "db:generate": "pnpm --filter @tv/db generate",
@@ -35,6 +36,7 @@
     "tvctl": "pnpm --filter @tv/cli tvctl"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.10.0",
     "prettier": "^3.4.2",
     "turbo": "^2.3.3",

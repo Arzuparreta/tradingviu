@@ -7,8 +7,27 @@ import {
   type ReactNode,
 } from 'react';
 import type { IChartApi, ISeriesApi, SeriesType, Time, UTCTimestamp } from 'lightweight-charts';
-import { createTvChart, addSeries, setData, update, removeChart, darkTheme } from '@tv/chart-engine';
+import {
+  createTvChart,
+  addSeries,
+  setData,
+  update,
+  removeChart,
+  darkTheme,
+} from '@tv/chart-engine';
 import type { ChartTheme } from '@tv/chart-engine';
+
+interface E2EChartDebugHandle {
+  getVisibleRange(): { from: number | null; to: number | null } | null;
+  getLogicalRange(): { from: number; to: number } | null;
+  fitContent(): void;
+}
+
+declare global {
+  interface Window {
+    __TV_E2E_CHARTS__?: Record<string, E2EChartDebugHandle>;
+  }
+}
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -88,154 +107,186 @@ export interface ChartSurfaceProps {
  * <ChartSurface ref={surfaceRef} />
  * ```
  */
-export const ChartSurface = forwardRef<ChartSurfaceHandle, ChartSurfaceProps>(
-  function ChartSurface({ theme, timezone, className, style, children, onReady, onVisibleRangeChange }, ref) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const chartRef = useRef<IChartApi | null>(null);
-    const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
-    const volumeRef = useRef<ISeriesApi<SeriesType> | null>(null);
-    const firstDataRef = useRef(true);
-    const onReadyRef = useRef(onReady);
-    onReadyRef.current = onReady;
+export const ChartSurface = forwardRef<ChartSurfaceHandle, ChartSurfaceProps>(function ChartSurface(
+  { theme, timezone, className, style, children, onReady, onVisibleRangeChange },
+  ref,
+) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
+  const volumeRef = useRef<ISeriesApi<SeriesType> | null>(null);
+  const firstDataRef = useRef(true);
+  const e2eIdRef = useRef(`chart-${Math.random().toString(36).slice(2, 10)}`);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
-    // Build the handle once. All fields are getters so they always
-    // return the current ref values.
-    const handleRef = useRef<ChartSurfaceHandle>({
-      get chart() {
-        return chartRef.current!;
-      },
-      get mainSeries() {
-        return candleRef.current!;
-      },
-      get volumeSeries() {
-        return volumeRef.current!;
-      },
-      get container() {
-        return containerRef.current!;
-      },
-      get firstData() {
-        return firstDataRef;
-      },
-      fitContent() {
-        chartRef.current?.timeScale().fitContent();
-      },
-      setData(bars: readonly ChartBar[]) {
-        const candle = candleRef.current;
-        const volume = volumeRef.current;
-        const chart = chartRef.current;
-        if (!candle || !volume) return;
-        setData(
-          candle,
-          bars.map((b) => ({
-            time: b.time as UTCTimestamp,
-            open: b.open,
-            high: b.high,
-            low: b.low,
-            close: b.close,
-          })),
-        );
-        setData(
-          volume,
-          bars.map((b) => ({
-            time: b.time as UTCTimestamp,
-            value: b.volume ?? 0,
-          })),
-        );
-        if (firstDataRef.current) {
-          chart?.timeScale().fitContent();
-          firstDataRef.current = false;
-        }
-      },
-      updateBar(bar: ChartBar) {
-        const candle = candleRef.current;
-        const volume = volumeRef.current;
-        if (!candle || !volume) return;
-        update(candle, {
-          time: bar.time as UTCTimestamp,
-          open: bar.open,
-          high: bar.high,
-          low: bar.low,
-          close: bar.close,
-          ...(bar.volume != null ? { volume: bar.volume } : {}),
-        });
-        update(volume, {
-          time: bar.time as UTCTimestamp,
-          value: bar.volume ?? 0,
-        });
-      },
-    } as ChartSurfaceHandle);
-
-    // Create chart during layout so everything is ready before effects fire.
-    useLayoutEffect(() => {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const chart = createTvChart({
-        container,
-        theme: theme ?? darkTheme,
-        ...(timezone != null ? { timezone } as { timezone: string } : {}),
-      });
-
-      const candle = addSeries(chart, 'candles');
-      const volume = addSeries(chart, 'histogram', {
-        priceScaleId: '',
-        priceFormat: { type: 'volume' },
-        color: 'rgba(38, 166, 154, 0.35)',
-      });
-      volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-
-      chartRef.current = chart;
-      candleRef.current = candle;
-      volumeRef.current = volume;
-      firstDataRef.current = true;
-
-      // Notify parent synchronously (layout phase) so parent refs
-      // are populated before any useEffect runs.
-      onReadyRef.current?.(handleRef.current);
-
-      return () => {
-        removeChart(chart);
-        chartRef.current = null;
-        candleRef.current = null;
-        volumeRef.current = null;
-      };
-      // Run once on mount.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Imperative handle for ref forwarding.
-    useImperativeHandle(ref, () => handleRef.current, []);
-
-    // Subscribe to visible range changes for pagination / crosshair sync.
-    const onVRRef = useRef(onVisibleRangeChange);
-    onVRRef.current = onVisibleRangeChange;
-    useEffect(() => {
+  // Build the handle once. All fields are getters so they always
+  // return the current ref values.
+  const handleRef = useRef<ChartSurfaceHandle>({
+    get chart() {
+      return chartRef.current!;
+    },
+    get mainSeries() {
+      return candleRef.current!;
+    },
+    get volumeSeries() {
+      return volumeRef.current!;
+    },
+    get container() {
+      return containerRef.current!;
+    },
+    get firstData() {
+      return firstDataRef;
+    },
+    fitContent() {
+      chartRef.current?.timeScale().fitContent();
+    },
+    setData(bars: readonly ChartBar[]) {
+      const candle = candleRef.current;
+      const volume = volumeRef.current;
       const chart = chartRef.current;
-      if (!chart) return;
-      const ts = chart.timeScale();
-      const handler = (range: { from: Time; to: Time } | null) => {
-        if (!range) {
-          onVRRef.current?.(null);
-          return;
-        }
-        const from = typeof range.from === 'number' ? range.from : Number(range.from);
-        const to = typeof range.to === 'number' ? range.to : Number(range.to);
-        if (Number.isFinite(from) && Number.isFinite(to)) {
-          onVRRef.current?.({ from, to });
-        }
-      };
-      ts.subscribeVisibleTimeRangeChange(handler);
-      return () => ts.unsubscribeVisibleTimeRangeChange(handler);
-    }, []);
+      if (!candle || !volume) return;
+      setData(
+        candle,
+        bars.map((b) => ({
+          time: b.time as UTCTimestamp,
+          open: b.open,
+          high: b.high,
+          low: b.low,
+          close: b.close,
+        })),
+      );
+      setData(
+        volume,
+        bars.map((b) => ({
+          time: b.time as UTCTimestamp,
+          value: b.volume ?? 0,
+        })),
+      );
+      if (firstDataRef.current) {
+        chart?.timeScale().fitContent();
+        firstDataRef.current = false;
+      }
+    },
+    updateBar(bar: ChartBar) {
+      const candle = candleRef.current;
+      const volume = volumeRef.current;
+      if (!candle || !volume) return;
+      update(candle, {
+        time: bar.time as UTCTimestamp,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+        ...(bar.volume != null ? { volume: bar.volume } : {}),
+      });
+      update(volume, {
+        time: bar.time as UTCTimestamp,
+        value: bar.volume ?? 0,
+      });
+    },
+  } as ChartSurfaceHandle);
 
-    return (
-      <div
-        ref={containerRef}
-        className={className}
-        style={{ width: '100%', height: '100%', position: 'relative', ...style }}
-      >
-        {children}
-      </div>
-    );
-  },
-);
+  // Create chart during layout so everything is ready before effects fire.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const chart = createTvChart({
+      container,
+      theme: theme ?? darkTheme,
+      ...(timezone != null ? ({ timezone } as { timezone: string }) : {}),
+    });
+
+    const candle = addSeries(chart, 'candles');
+    const volume = addSeries(chart, 'histogram', {
+      priceScaleId: '',
+      priceFormat: { type: 'volume' },
+      color: 'rgba(38, 166, 154, 0.35)',
+    });
+    volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+
+    chartRef.current = chart;
+    candleRef.current = candle;
+    volumeRef.current = volume;
+    firstDataRef.current = true;
+    container.dataset.testid = container.dataset.testid ?? 'chart-surface';
+
+    if (import.meta.env.VITE_E2E === '1') {
+      const id = e2eIdRef.current;
+      container.dataset.e2eChartId = id;
+      window.__TV_E2E_CHARTS__ = window.__TV_E2E_CHARTS__ ?? {};
+      window.__TV_E2E_CHARTS__[id] = {
+        getVisibleRange() {
+          const range = chart.timeScale().getVisibleRange();
+          if (!range) return null;
+          const from = typeof range.from === 'number' ? range.from : Number(range.from);
+          const to = typeof range.to === 'number' ? range.to : Number(range.to);
+          return {
+            from: Number.isFinite(from) ? from : null,
+            to: Number.isFinite(to) ? to : null,
+          };
+        },
+        getLogicalRange() {
+          const range = chart.timeScale().getVisibleLogicalRange();
+          if (!range) return null;
+          return { from: range.from, to: range.to };
+        },
+        fitContent() {
+          chart.timeScale().fitContent();
+        },
+      };
+    }
+
+    // Notify parent synchronously (layout phase) so parent refs
+    // are populated before any useEffect runs.
+    onReadyRef.current?.(handleRef.current);
+
+    return () => {
+      if (import.meta.env.VITE_E2E === '1' && window.__TV_E2E_CHARTS__) {
+        delete window.__TV_E2E_CHARTS__[e2eIdRef.current];
+      }
+      removeChart(chart);
+      chartRef.current = null;
+      candleRef.current = null;
+      volumeRef.current = null;
+    };
+    // Run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Imperative handle for ref forwarding.
+  useImperativeHandle(ref, () => handleRef.current, []);
+
+  // Subscribe to visible range changes for pagination / crosshair sync.
+  const onVRRef = useRef(onVisibleRangeChange);
+  onVRRef.current = onVisibleRangeChange;
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const ts = chart.timeScale();
+    const handler = (range: { from: Time; to: Time } | null) => {
+      if (!range) {
+        onVRRef.current?.(null);
+        return;
+      }
+      const from = typeof range.from === 'number' ? range.from : Number(range.from);
+      const to = typeof range.to === 'number' ? range.to : Number(range.to);
+      if (Number.isFinite(from) && Number.isFinite(to)) {
+        onVRRef.current?.({ from, to });
+      }
+    };
+    ts.subscribeVisibleTimeRangeChange(handler);
+    return () => ts.unsubscribeVisibleTimeRangeChange(handler);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ width: '100%', height: '100%', position: 'relative', ...style }}
+    >
+      {children}
+    </div>
+  );
+});

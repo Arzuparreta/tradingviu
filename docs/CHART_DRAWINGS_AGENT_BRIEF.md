@@ -26,17 +26,18 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
 - `apps/web/src/components/ChartPanel.tsx` — `/layout` panels use `ChartSurface`
   with one drawing manager per `drawingScopeId`
 
-**Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 19 tests, server typecheck + 60 tests.**
+**Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck, web unit tests, server typecheck, and Playwright drawing E2E.**
 
 ## Where to Continue
 
-1. **Optional Playwright infrastructure** — the repo currently has no Playwright
-   dependency or config. Deterministic Bun/Happy DOM coverage now guards object
-   management, keyboard shortcuts, persistence, undo/redo, z-order, and
-   multi-panel independence. Add browser E2E deliberately if it becomes a gate.
+1. **Broader browser E2E scenarios** — Playwright is now installed and configured
+   at the repo root. The first specs mock app/API state and cover cursor-mode
+   pan/zoom with drawings mounted plus object-tree edit/reload/delete
+   persistence. Add representative create/select/delete/reload flows per major
+   drawing category next.
 
-2. **Broader browser E2E scenarios** — representative create/select/delete/reload
-   flows per category once Playwright or another browser runner is introduced.
+2. **Multi-panel browser E2E** — extend browser coverage to `/layout` panel
+   independence and drawing-scope isolation while preserving raw crosshair sync.
 
 ## Verification commands (copy-paste ready)
 
@@ -44,9 +45,11 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
 # Quick checks
 pnpm --filter @tv/drawing-tools typecheck && pnpm --filter @tv/web typecheck && pnpm --filter @tv/server typecheck
 pnpm --filter @tv/web test && pnpm --filter @tv/server test
+pnpm e2e
 
 # Full gate
 pnpm lint && pnpm typecheck && pnpm test
+pnpm e2e
 
 # Manual smoke
 pnpm dev:restart

@@ -20,34 +20,34 @@ requirements and will be wrapped behind our own `DrawingManager` interface in
 ### What the library provides
 
 - **68 drawing tool classes** (TrendLine, Rectangle, FibRetracement, etc.) — each
-extends `Drawing` which implements `ISeriesPrimitive`, rendering natively inside
-lightweight-charts' coordinate lifecycle (no SVG/CSS overlay).
+  extends `Drawing` which implements `ISeriesPrimitive`, rendering natively inside
+  lightweight-charts' coordinate lifecycle (no SVG/CSS overlay).
 - **DrawingManager** — manages drawing storage, selection (`selectDrawing` /
-`deselectAll` / `getSelectedDrawing`), anchor dragging via `updateAnchor()`,
-import (`importDrawings(data, factory)`) / export (`exportDrawings()`), and
-an event system (`on('drawing:added', ...)`).
+  `deselectAll` / `getSelectedDrawing`), anchor dragging via `updateAnchor()`,
+  import (`importDrawings(data, factory)`) / export (`exportDrawings()`), and
+  an event system (`on('drawing:added', ...)`).
 - **InteractionHandler** + subclasses (`TwoPointInteractionHandler`,
-`SinglePointInteractionHandler`, `ThreePointInteractionHandler`) — tool
-placement state machine (idle → placing → complete) that we wire to our own
-mouse events. Includes `PreviewRenderer` for preview during placement.
+  `SinglePointInteractionHandler`, `ThreePointInteractionHandler`) — tool
+  placement state machine (idle → placing → complete) that we wire to our own
+  mouse events. Includes `PreviewRenderer` for preview during placement.
 - **ToolRegistry** — catalog of all 68 tools by category with factory
-functions (`createDrawing(type, id, anchors, style, options)`).
+  functions (`createDrawing(type, id, anchors, style, options)`).
 - Depends on `fancy-canvas@^2.1.0` — same canvas abstraction as
-`lightweight-charts@5.2.0`. No network calls.
+  `lightweight-charts@5.2.0`. No network calls.
 
 ### Assessment against requirements
 
-| Requirement | Status | Notes |
-|------------|--------|-------|
-| Works with lw-charts 5.2.x | ✅ PASS | Same fancy-canvas dep |
-| No real network calls | ✅ PASS | Pure client-side |
-| Import/export control | ✅ PASS | `exportDrawings()` → `SerializedDrawing[]`, `importDrawings(data, factory)` |
-| Selection + drag handles | ✅ PASS | `hitTestAnchor()`, `getControlPoints()`, `updateAnchor()`, visual handles |
-| Lock/hide | ✅ PASS | `DrawingOptions.locked` and `.visible` |
-| Custom toolbar state | ✅ PASS | `setActiveTool()` / `getActiveTool()` + `tool:changed` event |
-| Renders during pan/zoom | ✅ PASS | ISeriesPrimitive-based — follows chart natively |
-| Deterministic tests | ⚠️ PARTIAL | Geometry is testable; canvas rendering is visual |
-| Tool placement workflow | ⚠️ PARTIAL | InteractionHandler handles placement state machine; must be wired manually |
+| Requirement                | Status     | Notes                                                                       |
+| -------------------------- | ---------- | --------------------------------------------------------------------------- |
+| Works with lw-charts 5.2.x | ✅ PASS    | Same fancy-canvas dep                                                       |
+| No real network calls      | ✅ PASS    | Pure client-side                                                            |
+| Import/export control      | ✅ PASS    | `exportDrawings()` → `SerializedDrawing[]`, `importDrawings(data, factory)` |
+| Selection + drag handles   | ✅ PASS    | `hitTestAnchor()`, `getControlPoints()`, `updateAnchor()`, visual handles   |
+| Lock/hide                  | ✅ PASS    | `DrawingOptions.locked` and `.visible`                                      |
+| Custom toolbar state       | ✅ PASS    | `setActiveTool()` / `getActiveTool()` + `tool:changed` event                |
+| Renders during pan/zoom    | ✅ PASS    | ISeriesPrimitive-based — follows chart natively                             |
+| Deterministic tests        | ⚠️ PARTIAL | Geometry is testable; canvas rendering is visual                            |
+| Tool placement workflow    | ⚠️ PARTIAL | InteractionHandler handles placement state machine; must be wired manually  |
 
 ### Integration risks and mitigations
 
@@ -123,14 +123,16 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Added drawing-tools tests that prove every toolbar tool maps to a registered `lightweight-charts-drawing` tool and round-trips through the persisted drawing shape.
 ✅ Added object tree and inspector controls: list/select/rename, lock/hide, group labels, duplicate, copy/paste, z-order, delete/clear, and line/fill/text style editing.
 ✅ Added local favorite drawing tools and reusable style templates.
-✅ Added deterministic web acceptance coverage for object management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel drawing-scope independence. Playwright is still not installed in this workspace.
+✅ Added deterministic web acceptance coverage for object management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel drawing-scope independence.
+✅ Added Playwright infrastructure plus browser E2E coverage for cursor-mode pan/zoom with drawings mounted and object-tree edit/reload/delete persistence.
 
 ### 1. Stabilize foundation:
-   - [x] Remove false roadmap claims.
-   - [x] Stop the SVG overlay from blocking cursor-mode pan/zoom. (native primitives render inside chart)
-   - [x] Keep schemas at API boundaries in `packages/core`.
-   - [x] Run a spike on `lightweight-charts-drawing@0.1.1` and document pass/fail.
-   - [x] Use `docs/CHART_DRAWINGS_AGENT_BRIEF.md` as the execution handoff.
+
+- [x] Remove false roadmap claims.
+- [x] Stop the SVG overlay from blocking cursor-mode pan/zoom. (native primitives render inside chart)
+- [x] Keep schemas at API boundaries in `packages/core`.
+- [x] Run a spike on `lightweight-charts-drawing@0.1.1` and document pass/fail.
+- [x] Use `docs/CHART_DRAWINGS_AGENT_BRIEF.md` as the execution handoff.
 
 2. Unify surfaces:
    - [x] Extract a shared `ChartSurface` around `lightweight-charts`. (component at `apps/web/src/components/chart-surface/`)
@@ -148,16 +150,17 @@ Use TradingView's drawing taxonomy as the product target:
    - [x] Ship broad tool categories through the typed catalog and toolbar.
    - [x] Guard toolbar tools with registry + round-trip tests.
    - [x] Add deterministic acceptance coverage for category-level management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel independence.
+   - [x] Add browser-level E2E coverage for native pan/zoom and object-tree persistence.
    - [ ] Do not add a toolbar button until the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness.
 
 ## Where to Continue (next session)
 
-1. **Optional Playwright infrastructure** — the repo currently has no Playwright
-   dependency or config. If browser-level E2E becomes a gate, add it deliberately
-   and cover pan/zoom correctness against a running app.
+1. **Broader browser E2E scenarios** — representative create/select/delete/reload
+   flows per major drawing category. Keep the app/API mocked unless the scenario
+   explicitly needs the server/database.
 
-2. **Broader browser E2E scenarios** — representative create/select/delete/reload
-   flows per category once Playwright or another browser runner is introduced.
+2. **Multi-panel browser E2E** — extend Playwright coverage from single-chart
+   pan/zoom and persistence to `/layout` panel independence with drawing scopes.
 
 ## Acceptance Criteria
 
@@ -167,4 +170,4 @@ Use TradingView's drawing taxonomy as the product target:
 - Single chart and `/layout` use the same drawing model.
 - Reload preserves drawings and selected styles.
 - `pnpm lint && pnpm typecheck && pnpm test` passes.
-- Playwright covers pan/zoom correctness, keyboard shortcuts, persistence, and multi-panel independence.
+- Playwright covers pan/zoom correctness, persistence, and eventually multi-panel independence.
