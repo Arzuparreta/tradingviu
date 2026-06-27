@@ -76,6 +76,38 @@ const lineEdgeIntersection = (
   return { from: ts[0]!, to: ts[1]! };
 };
 
+export const rayEdgeEndpoint = (a: Vec2, b: Vec2, W: number, H: number): Vec2 => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if ((dx === 0 && dy === 0) || W <= 0 || H <= 0) return b;
+  const candidates: { t: number; point: Vec2 }[] = [];
+  const pushCandidate = (t: number, point: Vec2) => {
+    if (t <= 1e-9 || !Number.isFinite(t)) return;
+    if (point.x < -1e-6 || point.x > W + 1e-6 || point.y < -1e-6 || point.y > H + 1e-6) return;
+    candidates.push({
+      t,
+      point: {
+        x: Math.max(0, Math.min(W, point.x)),
+        y: Math.max(0, Math.min(H, point.y)),
+      },
+    });
+  };
+  if (dx !== 0) {
+    const tLeft = -a.x / dx;
+    pushCandidate(tLeft, { x: 0, y: a.y + tLeft * dy });
+    const tRight = (W - a.x) / dx;
+    pushCandidate(tRight, { x: W, y: a.y + tRight * dy });
+  }
+  if (dy !== 0) {
+    const tTop = -a.y / dy;
+    pushCandidate(tTop, { x: a.x + tTop * dx, y: 0 });
+    const tBottom = (H - a.y) / dy;
+    pushCandidate(tBottom, { x: a.x + tBottom * dx, y: H });
+  }
+  candidates.sort((left, right) => left.t - right.t);
+  return candidates[0]?.point ?? { x: b.x + dx * 100, y: b.y + dy * 100 };
+};
+
 // ── Coordinate projection ─────────────────────────────────────────────────
 
 const drawingPointToScreen = (
@@ -353,6 +385,7 @@ export function LwcDrawingOverlay({
   selectedIdRef.current = selectedId;
   const activeRef = useRef(active);
   activeRef.current = active;
+  const moveBeforeRef = useRef<Drawing[] | null>(null);
 
   const commit = useCallback(
     (next: Drawing[], before?: Drawing[]) => {
@@ -460,7 +493,12 @@ export function LwcDrawingOverlay({
   // Toggle chart container cursor
   useEffect(() => {
     const el = svgRef.current?.parentElement?.parentElement;
-    if (el) el.style.cursor = active ? 'crosshair' : 'none';
+    if (!el) return;
+    const previousCursor = el.style.cursor;
+    el.style.cursor = active ? 'crosshair' : previousCursor;
+    return () => {
+      el.style.cursor = previousCursor;
+    };
   }, [active]);
 
   // Reset tool to cursor when drawing mode deactivates
@@ -516,6 +554,7 @@ export function LwcDrawingOverlay({
           setSelectedId(hit);
           const d = drawingsRef.current.find((x) => x.id === hit);
           if (d) {
+            moveBeforeRef.current = snapshotDrawings(drawingsRef.current);
             setDragging({ kind: 'move', id: hit, startPos: pos, startPoints: d.points.map((p) => ({ ...p })) });
           }
         } else {
@@ -590,6 +629,10 @@ export function LwcDrawingOverlay({
           setSelectedId(d.id);
         }
       }
+    } else if (dragging.kind === 'move') {
+      const before = moveBeforeRef.current;
+      moveBeforeRef.current = null;
+      if (before) commit(snapshotDrawings(drawingsRef.current), before);
     }
     setDragging(null);
   }, [dragging, tool, chart, candleSeries, commit, magnet]);
@@ -653,13 +696,11 @@ export function LwcDrawingOverlay({
           );
         case 'rayLine': {
           if (pts.length < 2) return null;
-          const edge = lineEdgeIntersection(a!, b!, dims.w, dims.h);
-          const tx = edge ? edge.to.x : b!.x + (b!.x - a!.x) * 100;
-          const ty = edge ? edge.to.y : b!.y + (b!.y - a!.y) * 100;
+          const endpoint = rayEdgeEndpoint(a!, b!, dims.w, dims.h);
           return (
             <g key={key}>
-              <line x1={a!.x} y1={a!.y} x2={tx} y2={ty} stroke="transparent" strokeWidth={HIT_THRESHOLD * 2} />
-              <line x1={a!.x} y1={a!.y} x2={tx} y2={ty} stroke={color} strokeWidth={width} />
+              <line x1={a!.x} y1={a!.y} x2={endpoint.x} y2={endpoint.y} stroke="transparent" strokeWidth={HIT_THRESHOLD * 2} />
+              <line x1={a!.x} y1={a!.y} x2={endpoint.x} y2={endpoint.y} stroke={color} strokeWidth={width} />
               {selHandles}
             </g>
           );
@@ -816,8 +857,8 @@ export function LwcDrawingOverlay({
     switch (tool) {
       case 'segment': return <line x1={s.x} y1={s.y} x2={c.x} y2={c.y} stroke={color} strokeWidth={w} strokeDasharray="6 3" />;
       case 'rayLine': {
-        const e = lineEdgeIntersection(s, c, dims.w, dims.h);
-        return <line x1={s.x} y1={s.y} x2={e ? e.to.x : c.x + (c.x - s.x) * 10} y2={e ? e.to.y : c.y + (c.y - s.y) * 10} stroke={color} strokeWidth={w} strokeDasharray="6 3" />;
+        const endpoint = rayEdgeEndpoint(s, c, dims.w, dims.h);
+        return <line x1={s.x} y1={s.y} x2={endpoint.x} y2={endpoint.y} stroke={color} strokeWidth={w} strokeDasharray="6 3" />;
       }
       case 'straightLine': {
         const e = lineEdgeIntersection(s, c, dims.w, dims.h);

@@ -69,11 +69,12 @@ export function useDrawings({ symbolId, interval, scopeId, enabled = true }: Use
     }
     if (query.data && seededScope.current !== scopeKey) {
       // New scope: persist anything still pending for the previous one first.
+      const hadPendingLocalWrite = pending.current !== null;
       flush();
       seededScope.current = scopeKey;
       // Don't overwrite local state if the user has already started drawing
       // before the server response arrived.
-      if (!pending.current) {
+      if (!hadPendingLocalWrite) {
         setLocal(query.data.drawings);
       }
     }
