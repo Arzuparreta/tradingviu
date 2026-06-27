@@ -1,28 +1,45 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
   BadgeCent,
+  BadgeDollarSign,
+  CalendarDays,
   ChartSpline,
-  ClipboardPaste,
-  Copy,
+  ChartNoAxesCombined,
+  Circle,
+  Flag,
   GitBranch,
+  Highlighter,
   Lock,
   LockOpen,
+  MapPin,
+  MessageSquare,
+  Milestone,
   MousePointer2,
   MoveHorizontal,
   MoveVertical,
+  NotebookText,
   PanelTop,
+  PenLine,
   Redo2,
+  Rows3,
+  Ruler,
   Slash,
+  Spline,
   Square,
   SquareArrowUpRight,
+  Table2,
   Trash2,
   TrendingUp,
+  Triangle,
   Type,
   Undo2,
+  Waypoints,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { DrawingTool } from '@tv/drawing-tools';
-import { KLINE_TOOL_LABELS } from '@tv/drawing-tools';
+import { KLINE_TOOL_GROUPS } from '@tv/drawing-tools';
 import type { DrawingManager } from '@tv/drawing-tools';
 import type { Drawing } from '@tv/drawing-tools';
 
@@ -34,17 +51,75 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   line: TrendingUp,
   rayLine: TrendingUp,
   straightLine: SquareArrowUpRight,
+  horizontalRayLine: MoveHorizontal,
   horizontalStraightLine: MoveHorizontal,
   verticalStraightLine: MoveVertical,
+  crossLine: Spline,
+  infoLine: Ruler,
+  trendAngle: ChartSpline,
+  arrow: ArrowUp,
   rect: Square,
+  circle: Circle,
+  triangle: Triangle,
+  ellipse: Circle,
+  arc: ChartSpline,
+  rotatedRectangle: SquareArrowUpRight,
+  path: PenLine,
+  polyline: Waypoints,
+  curve: Spline,
+  doubleCurve: Spline,
   text: Type,
+  callout: MessageSquare,
+  anchoredText: Type,
+  note: NotebookText,
+  priceNote: BadgeCent,
+  priceLabel: BadgeCent,
+  flag: Flag,
+  pin: MapPin,
+  comment: MessageSquare,
+  signpost: Milestone,
+  table: Table2,
   fibonacciLine: ChartSpline,
+  fibExtension: ChartSpline,
+  fibChannel: ChartSpline,
+  fibTimeZone: CalendarDays,
+  fibSpeedFan: ChartSpline,
+  fibTimeExtension: CalendarDays,
+  fibCircles: Circle,
+  fibSpiral: Spline,
+  fibArcs: ChartSpline,
+  fibWedge: ChartSpline,
+  pitchfan: ChartSpline,
   parallelStraightLine: PanelTop,
   priceChannelLine: GitBranch,
+  regressionTrend: ChartNoAxesCombined,
+  flatTopBottom: PanelTop,
+  disjointChannel: GitBranch,
   priceLine: BadgeCent,
+  priceRange: Ruler,
+  dateRange: CalendarDays,
+  datePriceRange: Ruler,
+  projection: Milestone,
+  forecast: ChartNoAxesCombined,
+  barsPattern: Rows3,
+  longPosition: BadgeDollarSign,
+  shortPosition: BadgeDollarSign,
+  andrewsPitchfork: GitBranch,
+  schiffPitchfork: GitBranch,
+  modifiedSchiffPitchfork: GitBranch,
+  insidePitchfork: GitBranch,
+  gannBox: Square,
+  gannFan: ChartSpline,
+  gannSquareFixed: Square,
+  gannSquare: Square,
+  brush: PenLine,
+  highlighter: Highlighter,
+  arrowMarker: ArrowUp,
+  arrowUp: ArrowUp,
+  arrowDown: ArrowDown,
 };
 
-const TOOL_SHORTCUTS: Partial<Record<string, string>> = {
+const TOOL_SHORTCUTS: Partial<Record<DrawingTool, string>> = {
   cursor: 'Esc',
   segment: 'T',
   rayLine: 'R',
@@ -58,7 +133,7 @@ const TOOL_SHORTCUTS: Partial<Record<string, string>> = {
   priceLine: 'P',
 };
 
-const HOTKEY_MAP: Record<string, string> = {
+const HOTKEY_MAP: Record<string, DrawingTool> = {
   t: 'segment',
   r: 'rayLine',
   e: 'straightLine',
@@ -173,30 +248,32 @@ export function DrawingToolbar({
       </div>
 
       {/* Tool buttons */}
-      <div className="lwc-drawing-toolbar-group">
-        {KLINE_TOOL_LABELS.map(([value, label]) => {
-          const Icon = TOOL_ICONS[value] ?? MousePointer2;
-          const isActive = value === 'cursor' ? !activeTool : activeTool === value;
-          return (
-            <button
-              key={value}
-              className={isActive ? 'primary icon' : 'ghost icon'}
-              type="button"
-              onClick={() => {
-                if (value === 'cursor') {
-                  onCancelPlacement();
-                } else {
-                  onStartTool(value);
-                }
-              }}
-              title={`${label}${TOOL_SHORTCUTS[value] ? ` (${TOOL_SHORTCUTS[value]})` : ''}`}
-              aria-label={label}
-            >
-              <Icon size={15} />
-            </button>
-          );
-        })}
-      </div>
+      {KLINE_TOOL_GROUPS.map((group) => (
+        <div className="lwc-drawing-toolbar-group" key={group.id} aria-label={group.label}>
+          {group.tools.map(([value, label]) => {
+            const Icon = TOOL_ICONS[value] ?? MousePointer2;
+            const isActive = value === 'cursor' ? !activeTool : activeTool === value;
+            return (
+              <button
+                key={value}
+                className={isActive ? 'primary icon' : 'ghost icon'}
+                type="button"
+                onClick={() => {
+                  if (value === 'cursor') {
+                    onCancelPlacement();
+                  } else {
+                    onStartTool(value);
+                  }
+                }}
+                title={`${label}${TOOL_SHORTCUTS[value] ? ` (${TOOL_SHORTCUTS[value]})` : ''}`}
+                aria-label={label}
+              >
+                <Icon size={15} />
+              </button>
+            );
+          })}
+        </div>
+      ))}
 
       {/* Actions */}
       <div className="lwc-drawing-toolbar-group">

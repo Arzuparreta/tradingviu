@@ -391,10 +391,11 @@ not TradingView-grade yet:
   shape until the final drawing schema migration is designed.
 - The old roadmap claim that layout panels store `Panel.drawings` is stale.
   Panels now carry `drawingScopeId`; drawing rows are persisted separately.
-- The current tool set is partial and line-heavy. A professional suite must cover
-  lines, channels, pitchforks, Fibonacci, Gann, forecasting/measurement, shapes,
-  annotations, brushes, object tree, favorites/templates, lock/hide/group, and
-  style editing.
+- The toolbar now covers the major TradingView drawing categories: lines,
+  channels, pitchforks, Fibonacci, Gann, forecasting/measurement, shapes,
+  annotations, brushes, and markers. The remaining professional gaps are
+  acceptance coverage, object tree, favorites/templates, lock/hide/group
+  workflows, and style editing.
 
 Locked direction:
 

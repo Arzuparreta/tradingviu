@@ -118,7 +118,9 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ `LwcDrawingOverlay` replaced by native primitive-based drawing rendering and removed.
 ✅ `/layout` migrated from `KLineChartSurface` to shared `ChartSurface`.
 ✅ `klinecharts` dependency and transitional `KLineChartSurface` removed from the web app.
-✅ Focused checks pass: drawing-tools typecheck + 4 tests, web typecheck + 15 tests, server typecheck + 60 tests.
+✅ Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 15 tests, server typecheck + 60 tests.
+✅ Expanded typed drawing tool catalog and toolbar across lines, channels, Fibonacci, pitchforks/Gann, measurement, shapes, annotations, and markers.
+✅ Added drawing-tools tests that prove every toolbar tool maps to a registered `lightweight-charts-drawing` tool and round-trips through the persisted drawing shape.
 ⏳ Add Playwright acceptance tests for pan/zoom correctness, keyboard shortcuts, persistence, and multi-panel independence.
 
 ### 1. Stabilize foundation:
@@ -141,17 +143,17 @@ Use TradingView's drawing taxonomy as the product target:
    - [x] Remove `LwcDrawingOverlay`.
 
 4. Expand suite:
-   - [ ] Ship tools by category, with geometry tests and Playwright acceptance for each category.
+   - [x] Ship broad tool categories through the typed catalog and toolbar.
+   - [x] Guard toolbar tools with registry + round-trip tests.
+   - [ ] Add Playwright acceptance for category-level create/select/delete/persist/pan-zoom behavior.
    - [ ] Do not add a toolbar button until the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness.
 
 ## Where to Continue (next session)
 
-1. **Expand tool coverage** — `convert.ts` maps a larger compatibility set, but the toolbar should only expose tools that support create, select, drag, delete, persist, reload, and pan/zoom correctness.
+1. **Playwright acceptance tests** — pan/zoom, keyboard shortcuts, persistence,
+   multi-panel independence, and at least one representative create/select/delete/reload flow per tool category.
 
-2. **Playwright acceptance tests** — pan/zoom, keyboard shortcuts, persistence,
-   multi-panel independence.
-
-3. **Object tree and style controls** — list drawings, rename, lock/hide,
+2. **Object tree and style controls** — list drawings, rename, lock/hide,
    reorder, select, delete, group, and edit styles.
 
 ## Acceptance Criteria

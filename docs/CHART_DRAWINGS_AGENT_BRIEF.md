@@ -18,24 +18,20 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
   public types
 - `apps/web/src/components/chart-surface/` — shared `ChartSurface` component
 - `apps/web/src/hooks/use-drawing-manager.ts` — hook with load/save + undo/redo
-- `apps/web/src/components/DrawingToolbar.tsx` — toolbar with ~13 tools,
-  keyboard shortcuts, lock/delete/clear
+- `apps/web/src/components/DrawingToolbar.tsx` — grouped toolbar covering the
+  registered drawing categories, keyboard shortcuts, lock/delete/clear
 - `apps/web/src/pages/ChartPage.tsx` — integrated with native primitive drawings
 - `apps/web/src/components/ChartPanel.tsx` — `/layout` panels use `ChartSurface`
   with one drawing manager per `drawingScopeId`
 
-**Focused checks pass: drawing-tools typecheck + 4 tests, web typecheck + 15 tests, server typecheck + 60 tests.**
+**Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 15 tests, server typecheck + 60 tests.**
 
 ## Where to Continue
 
-1. **Expand tool coverage** — `convert.ts` maps a larger compatibility set, but
-   the toolbar should only expose tools that support create, select, drag,
-   delete, persist, reload, and pan/zoom correctness.
+1. **Playwright acceptance tests** — pan/zoom correctness, keyboard shortcuts,
+   persistence, multi-panel independence, and representative create/select/delete/reload flows per tool category.
 
-2. **Playwright acceptance tests** — pan/zoom correctness, keyboard shortcuts,
-   persistence, multi-panel independence.
-
-3. **Object tree and style controls** — list drawings, rename, lock/hide,
+2. **Object tree and style controls** — list drawings, rename, lock/hide,
    reorder, select, delete, group, and edit styles.
 
 ## Verification commands (copy-paste ready)

@@ -41,21 +41,127 @@ export const DEFAULT_DRAWING_STYLE = {
 } as const;
 export type DrawingStyle = typeof DEFAULT_DRAWING_STYLE;
 
-export const KLINE_TOOL_LABELS: readonly (readonly [DrawingTool, string])[] = [
-  ['cursor', 'Cursor'],
-  ['segment', 'Trend line'],
-  ['line', 'Line'],
-  ['rayLine', 'Ray'],
-  ['straightLine', 'Extended'],
-  ['horizontalStraightLine', 'Horizontal'],
-  ['verticalStraightLine', 'Vertical'],
-  ['rect', 'Rectangle'],
-  ['text', 'Text'],
-  ['fibonacciLine', 'Fib'],
-  ['parallelStraightLine', 'Parallel'],
-  ['priceChannelLine', 'Channel'],
-  ['priceLine', 'Price'],
+export interface DrawingToolGroup {
+  readonly id: string;
+  readonly label: string;
+  readonly tools: readonly (readonly [DrawingTool, string])[];
+}
+
+export const KLINE_TOOL_GROUPS: readonly DrawingToolGroup[] = [
+  {
+    id: 'lines',
+    label: 'Lines',
+    tools: [
+      ['cursor', 'Cursor'],
+      ['segment', 'Trend line'],
+      ['rayLine', 'Ray'],
+      ['straightLine', 'Extended line'],
+      ['horizontalStraightLine', 'Horizontal line'],
+      ['horizontalRayLine', 'Horizontal ray'],
+      ['verticalStraightLine', 'Vertical line'],
+      ['crossLine', 'Cross line'],
+      ['infoLine', 'Info line'],
+      ['trendAngle', 'Trend angle'],
+      ['arrow', 'Arrow'],
+    ],
+  },
+  {
+    id: 'channels',
+    label: 'Channels',
+    tools: [
+      ['priceChannelLine', 'Parallel channel'],
+      ['regressionTrend', 'Regression trend'],
+      ['flatTopBottom', 'Flat top/bottom'],
+      ['disjointChannel', 'Disjoint channel'],
+    ],
+  },
+  {
+    id: 'fibonacci',
+    label: 'Fibonacci',
+    tools: [
+      ['fibonacciLine', 'Fib retracement'],
+      ['fibExtension', 'Fib extension'],
+      ['fibChannel', 'Fib channel'],
+      ['fibTimeZone', 'Fib time zone'],
+      ['fibSpeedFan', 'Fib speed fan'],
+      ['fibTimeExtension', 'Fib time extension'],
+      ['fibCircles', 'Fib circles'],
+      ['fibSpiral', 'Fib spiral'],
+      ['fibArcs', 'Fib arcs'],
+      ['fibWedge', 'Fib wedge'],
+      ['pitchfan', 'Pitchfan'],
+    ],
+  },
+  {
+    id: 'pitchfork-gann',
+    label: 'Pitchfork / Gann',
+    tools: [
+      ['andrewsPitchfork', 'Andrews pitchfork'],
+      ['schiffPitchfork', 'Schiff pitchfork'],
+      ['modifiedSchiffPitchfork', 'Modified Schiff'],
+      ['insidePitchfork', 'Inside pitchfork'],
+      ['gannBox', 'Gann box'],
+      ['gannFan', 'Gann fan'],
+      ['gannSquareFixed', 'Gann fixed square'],
+      ['gannSquare', 'Gann square'],
+    ],
+  },
+  {
+    id: 'measure',
+    label: 'Measure',
+    tools: [
+      ['priceRange', 'Price range'],
+      ['dateRange', 'Date range'],
+      ['datePriceRange', 'Date and price range'],
+      ['projection', 'Projection'],
+      ['forecast', 'Forecast'],
+      ['barsPattern', 'Bars pattern'],
+      ['longPosition', 'Long position'],
+      ['shortPosition', 'Short position'],
+    ],
+  },
+  {
+    id: 'shapes',
+    label: 'Shapes',
+    tools: [
+      ['rect', 'Rectangle'],
+      ['circle', 'Circle'],
+      ['triangle', 'Triangle'],
+      ['ellipse', 'Ellipse'],
+      ['arc', 'Arc'],
+      ['rotatedRectangle', 'Rotated rectangle'],
+      ['path', 'Path'],
+      ['polyline', 'Polyline'],
+      ['curve', 'Curve'],
+      ['doubleCurve', 'Double curve'],
+    ],
+  },
+  {
+    id: 'annotations',
+    label: 'Annotations',
+    tools: [
+      ['text', 'Text'],
+      ['callout', 'Callout'],
+      ['anchoredText', 'Anchored text'],
+      ['note', 'Note'],
+      ['priceNote', 'Price note'],
+      ['priceLabel', 'Price label'],
+      ['flag', 'Flag'],
+      ['pin', 'Pin'],
+      ['comment', 'Comment'],
+      ['signpost', 'Signpost'],
+      ['table', 'Table'],
+      ['brush', 'Brush'],
+      ['highlighter', 'Highlighter'],
+      ['arrowMarker', 'Arrow marker'],
+      ['arrowUp', 'Arrow up'],
+      ['arrowDown', 'Arrow down'],
+    ],
+  },
 ];
+
+export const KLINE_TOOL_LABELS: readonly (readonly [DrawingTool, string])[] =
+  KLINE_TOOL_GROUPS.flatMap((group) => group.tools);
 
 export const toolCreatesDrawing = (tool: DrawingTool): boolean => tool !== 'cursor';
 
