@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
+        // Shims for Node built-in modules pulled in via @tv/core barrel exports.
+        // These are only used server-side; the shims are dead code in the browser.
+        'node:async_hooks': path.resolve(__dirname, 'src/shims/async-hooks.ts'),
+        'node:fs': path.resolve(__dirname, 'src/shims/node-fs.ts'),
+        'node:path': path.resolve(__dirname, 'src/shims/node-path.ts'),
       },
     },
     server: {
