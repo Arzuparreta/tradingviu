@@ -4,7 +4,12 @@ import { getBarStore } from './data.js';
 import { normalizeProviderTicker } from './market-data.js';
 import { getMarketStore, type MarketChannel } from './market-store.js';
 
-type WsData = { userId?: string; tenantId?: string };
+type WsData = {
+  userId?: string;
+  tenantId?: string;
+  auth?: 'session' | 'apiKey';
+  apiTokenPrefix?: string;
+};
 type Ws = ServerWebSocket<WsData>;
 
 interface Subscription {
@@ -41,9 +46,7 @@ const broadcast = (ks: string, message: ServerMessage): void => {
   }
 };
 
-const parseSymbol = (
-  raw: string,
-): { provider: string; ticker: string } | undefined => {
+const parseSymbol = (raw: string): { provider: string; ticker: string } | undefined => {
   const [exchange, ...rest] = raw.split(':');
   const ticker = rest.join(':');
   if (!exchange || !ticker) return undefined;
@@ -112,8 +115,8 @@ const handleMarketSubscribe = (
   }
   const ks = `${parsed.provider}:${parsed.ticker}:market`;
   conn.marketSubscriptions.get(ks)?.();
-  const channels = msg.channels.filter((channel): channel is MarketChannel =>
-    channel === 'quote' || channel === 'book',
+  const channels = msg.channels.filter(
+    (channel): channel is MarketChannel => channel === 'quote' || channel === 'book',
   );
   if (channels.length === 0) {
     send(ws, { type: 'error', error: 'invalid_market_channels' });
@@ -150,10 +153,7 @@ const handleUnsubscribe = (ws: Ws, msg: { symbol: string }): void => {
   if (!parsed) return;
   // unsubscribe from all intervals for that symbol on this connection
   for (const [ks, sub] of conn.subscriptions) {
-    if (
-      sub.provider === parsed.provider &&
-      sub.ticker === parsed.ticker
-    ) {
+    if (sub.provider === parsed.provider && sub.ticker === parsed.ticker) {
       sub.unsubscribe();
       conn.subscriptions.delete(ks);
     }

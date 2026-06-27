@@ -10,6 +10,7 @@ export function ApiKeysPage() {
   const [name, setName] = useState('');
   const [writeScope, setWriteScope] = useState(false);
   const [created, setCreated] = useState<{ name: string; key: string } | null>(null);
+  const publicWsUrl = `${window.location.origin.replace(/^http/, 'ws')}/v1/ws?api_key=tvk_…`;
 
   const tokensQ = useQuery({
     queryKey: ['access-tokens'],
@@ -186,6 +187,18 @@ export function ApiKeysPage() {
               >
                 curl -H "Authorization: Bearer tvk_…" -d @watchlist.json {window.location.origin}
                 /v1/watchlists
+              </code>
+              <code
+                className="mono small"
+                style={{
+                  wordBreak: 'break-all',
+                  background: 'var(--bg-3)',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  display: 'block',
+                }}
+              >
+                const ws = new WebSocket("{publicWsUrl}")
               </code>
             </div>
           </div>

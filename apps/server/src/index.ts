@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
-import { loadEnv } from '@tv/core';
+import { isTvError, loadEnv } from '@tv/core';
 import { createDb } from '@tv/db';
 import { createClient as createRedisClient } from 'redis';
 import { authRoutes } from './routes/auth.js';
@@ -42,7 +42,7 @@ import { apiKeyContext } from './middleware/api-key.js';
 import { rateLimit } from './services/rate-limit.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
-import { authenticateWsToken } from './services/ws-auth.js';
+import { authenticateWsApiKey, authenticateWsToken, readWsApiKey } from './services/ws-auth.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
 import { initBarStore, getBarStore, shutdownBarStore } from './services/data.js';
 import { shutdownMarketStore } from './services/market-store.js';
@@ -143,12 +143,41 @@ const _server: ReturnType<typeof Bun.serve> = Bun.serve({
   async fetch(req: Request) {
     const url = new URL(req.url);
     if (url.pathname === '/ws') {
+      if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('WebSocket upgrade required', { status: 426 });
+      }
       const token = url.searchParams.get('token') ?? '';
-      let wsData: { userId: string; tenantId: string };
+      let wsData: {
+        userId: string;
+        tenantId: string;
+        auth: 'session' | 'apiKey';
+        apiTokenPrefix?: string;
+      };
       try {
         wsData = await authenticateWsToken(db, token, env.JWT_SECRET);
-      } catch {
-        return new Response('Unauthorized', { status: 401 });
+      } catch (err) {
+        return new Response('Unauthorized', { status: isTvError(err) ? err.status : 401 });
+      }
+      const ok = _server.upgrade(req, { data: wsData });
+      if (ok) return undefined;
+    }
+    if (url.pathname === '/v1/ws') {
+      if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('WebSocket upgrade required', { status: 426 });
+      }
+      let wsData: {
+        userId: string;
+        tenantId: string;
+        auth: 'session' | 'apiKey';
+        apiTokenPrefix?: string;
+      };
+      try {
+        wsData = await authenticateWsApiKey(db, redis, readWsApiKey(req, url), {
+          limit: env.API_RATE_LIMIT,
+          windowSec: env.API_RATE_WINDOW_SEC,
+        });
+      } catch (err) {
+        return new Response('Unauthorized', { status: isTvError(err) ? err.status : 401 });
       }
       const ok = _server.upgrade(req, { data: wsData });
       if (ok) return undefined;

@@ -93,7 +93,37 @@ Notes:
 - No migration was required. The watchlist tables already existed and remain
   tenant-scoped under RLS; the `/v1` layer adds user ownership checks on top.
 
+## 10d — Public WebSocket streaming API
+
+Status: done.
+
+Delivered:
+
+- A public WebSocket endpoint at **`/v1/ws`** authenticated by personal access
+  tokens. Browser clients pass `?api_key=tvk_…`; non-browser clients may also
+  use `Authorization: Bearer tvk_…` or `X-API-Key`.
+- API-key WebSocket upgrades reuse the same token validation rules as REST:
+  hash verification by prefix, revoked/expired checks, active tenant +
+  membership checks, `lastUsedAt` update, and required `read` scope. Tokens never
+  carry super-admin privileges.
+- Upgrade attempts are rate limited per token prefix with the existing public API
+  fixed-window settings (`API_RATE_LIMIT` / `API_RATE_WINDOW_SEC`) and fail open
+  if Redis is unavailable, matching the REST limiter policy.
+- The public stream reuses the existing production WS protocol and data plane:
+  `subscribe` streams live OHLCV `bar` events through BarStore, and
+  `subscribe_market` streams `quote` / `book` events through MarketStore.
+- The authenticated app endpoint **`/ws?token=<jwt>`** remains unchanged for the
+  web app. Public API clients use `/v1/ws`, so personal tokens cannot be confused
+  with session JWTs.
+- `GET /openapi.json` now documents `/v1/ws`, authentication options, upgrade
+  errors, and the client/server message shapes. The API keys page includes a
+  browser `WebSocket` example.
+
+Notes:
+
+- The streaming endpoint is read-only. Future write/event surfaces should get
+  separate message types and explicit scope checks instead of reusing `read`.
+
 ## Remaining Slice 10 Work
 
-- Public WebSocket streaming API.
 - Plugin SDK and Pine v6 compatibility.

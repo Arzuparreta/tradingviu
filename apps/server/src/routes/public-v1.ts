@@ -469,8 +469,10 @@ export const openApiDocument = {
     description:
       'Read access to market data, indicators, screener, and news. Authenticate with a ' +
       'personal access token: `Authorization: Bearer tvk_…` (or the `X-API-Key` header). ' +
-      'Tokens need the `read` scope. Requests are rate limited per token (see the ' +
-      '`X-RateLimit-*` response headers; a `429` is returned when the limit is exceeded).',
+      'Tokens need the `read` scope. Browser WebSocket clients can authenticate with ' +
+      '`/v1/ws?api_key=tvk_…`. Requests and WebSocket upgrades are rate limited per token ' +
+      '(see the `X-RateLimit-*` response headers for REST; a `429` is returned when the ' +
+      'limit is exceeded).',
   },
   servers: [{ url: '/v1' }],
   security: [{ apiKey: [] }, { bearerAuth: [] }],
@@ -621,9 +623,127 @@ export const openApiDocument = {
           },
         },
       },
+      WsClientMessage: {
+        oneOf: [
+          {
+            type: 'object',
+            required: ['type'],
+            properties: { type: { const: 'ping' }, t: { type: 'number' } },
+          },
+          {
+            type: 'object',
+            required: ['type', 'symbol', 'interval'],
+            properties: {
+              type: { const: 'subscribe' },
+              symbol: { type: 'string', example: 'binance:BTCUSDT' },
+              interval: {
+                type: 'string',
+                enum: ['1m', '5m', '15m', '1h', '4h', '1d', '1w'],
+              },
+            },
+          },
+          {
+            type: 'object',
+            required: ['type', 'symbol'],
+            properties: {
+              type: { const: 'subscribe_market' },
+              symbol: { type: 'string', example: 'binance:BTCUSDT' },
+              channels: {
+                type: 'array',
+                items: { type: 'string', enum: ['quote', 'book'] },
+                default: ['quote', 'book'],
+              },
+            },
+          },
+          {
+            type: 'object',
+            required: ['type', 'symbol'],
+            properties: {
+              type: { const: 'unsubscribe' },
+              symbol: { type: 'string', example: 'binance:BTCUSDT' },
+            },
+          },
+        ],
+      },
+      WsServerMessage: {
+        oneOf: [
+          {
+            type: 'object',
+            properties: { type: { const: 'hello' }, serverTime: { type: 'number' } },
+          },
+          { type: 'object', properties: { type: { const: 'pong' }, t: { type: 'number' } } },
+          {
+            type: 'object',
+            properties: {
+              type: { enum: ['subscribed', 'unsubscribed'] },
+              symbol: { type: 'string' },
+            },
+          },
+          {
+            type: 'object',
+            properties: {
+              type: { const: 'bar' },
+              symbol: { type: 'string' },
+              interval: { type: 'string' },
+              phase: { type: 'string', enum: ['update', 'close'] },
+              bar: { $ref: '#/components/schemas/Bar' },
+            },
+          },
+          {
+            type: 'object',
+            properties: {
+              type: { enum: ['status', 'market_status'] },
+              symbol: { type: 'string' },
+              status: {
+                type: 'string',
+                enum: ['connecting', 'live', 'reconnecting', 'down', 'idle'],
+              },
+              message: { type: 'string' },
+            },
+          },
+          {
+            type: 'object',
+            properties: {
+              type: { enum: ['quote', 'book'] },
+              symbol: { type: 'string' },
+              quote: { type: 'object' },
+              book: { type: 'object' },
+            },
+          },
+          { type: 'object', properties: { type: { const: 'error' }, error: { type: 'string' } } },
+        ],
+      },
     },
   },
   paths: {
+    '/ws': {
+      get: {
+        summary: 'Public WebSocket market stream',
+        description:
+          'Upgrade to `wss://<host>/v1/ws?api_key=tvk_…` from browser clients, or pass ' +
+          '`Authorization: Bearer tvk_…` / `X-API-Key` from non-browser clients. Tokens ' +
+          'must include the `read` scope. After the `hello` message, send `subscribe` for ' +
+          'OHLCV bars or `subscribe_market` for live quote/book events.',
+        parameters: [
+          {
+            name: 'api_key',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Personal access token for browser WebSocket clients.',
+          },
+        ],
+        responses: {
+          '101': {
+            description:
+              'WebSocket upgrade accepted. Messages use WsClientMessage/WsServerMessage.',
+          },
+          '401': { description: 'Missing or invalid API key' },
+          '403': { description: 'Missing read scope' },
+          '429': { description: 'Upgrade rate limited' },
+        },
+      },
+    },
     '/symbols': {
       get: {
         summary: 'List symbols',
