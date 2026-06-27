@@ -119,6 +119,23 @@ describe('LwcDrawingOverlay', () => {
     });
   });
 
+  test('cursor mode does not capture empty chart drags', () => {
+    const view = render(createElement(OverlayHarness));
+    const layer = view.getByTestId('lwc-drawing-interaction-layer');
+
+    expect(layer.style.pointerEvents).toBe('none');
+    expect(view.queryByTitle('Exit drawing mode (Esc)')).toBeNull();
+  });
+
+  test('drawing tools capture the chart surface while creating', () => {
+    const view = render(createElement(OverlayHarness));
+    const layer = view.getByTestId('lwc-drawing-interaction-layer');
+
+    fireEvent.click(view.getByLabelText('Trend line'));
+
+    expect(layer.style.pointerEvents).toBe('auto');
+  });
+
   test('moving a drawing creates one undoable history entry', async () => {
     const onDrawings = mock(() => {});
     const view = render(createElement(OverlayHarness, { onDrawings }));

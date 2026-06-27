@@ -55,7 +55,7 @@ These are **decisions, not suggestions**. A new agent must not change them witho
 | Language       | TypeScript                                                                      | Same language everywhere                          |
 | Frontend       | Vite + React 18 + Zustand + TanStack Query                                      | Fast build, simple state, server state caching    |
 | Editor (Pine)  | Monaco                                                                          | Same as VS Code                                   |
-| Charts         | `tradingview/lightweight-charts` + custom plugin layer (footprint, TPO, replay) | Apache 2.0, render canvas, fastest option         |
+| Charts         | `tradingview/lightweight-charts` + native primitive layer (footprint, TPO, replay, drawings) | Apache 2.0, render canvas, fastest option         |
 | Desktop        | Tauri 2                                                                         | 80% lighter than Electron                         |
 | Mobile         | React Native + lightweight-charts wrapper                                       | Sync 100%                                         |
 | Backend        | Hono on Bun (HTTP + WebSocket same process)                                     | One runtime, native WS, fast cold start           |
@@ -92,7 +92,7 @@ tradingviu/
 │   ├── pivot-points/            # pivot engine: standard/fibonacci/camarilla/woodie/demark over D/W/M periods (slice 9h)
 │   ├── pine-parser/             # Pine Script v5 subset PEG grammar (peggy) → AST
 │   ├── pine-runtime/            # AST interpreter (sandboxed, no eval), series math
-│   ├── drawing-tools/           # 7 primitives (line/ray/extend/H/V/rect/text) + screen-projection helpers; server-persisted per (symbol, interval)
+│   ├── drawing-tools/           # Drawing domain helpers and migrations; API schemas live in core
 │   ├── indicators/              # [TODO] indicator catalog with display info
 │   ├── screener-engine/         # [TODO] SQL-based screener
 │   ├── alert-engine/            # (placeholder — alert evaluator lives in apps/server/src/services/alert-engine.ts)
@@ -378,25 +378,34 @@ tradingviu/
   trade list. See `docs/SLICE-11.md`.
 - Later — event-driven Pine `strategy.*` (stops/targets/trailing, pyramiding).
 
-### Drawing tools (in progress)
+### Drawing tools (foundation rework required)
 
-- **Engine + overlay (done):** `packages/drawing-tools` (pure Zod-validated
-  schema + helpers — `makeDrawing`, point-count rules, line extension/hit-test
-  math) and an SVG `DrawingOverlay` rendering 7 primitives (trend line, ray,
-  extended line, horizontal/vertical line, rectangle, text) with select, drag,
-  and delete. The overlay reprojects on pan/zoom (subscribes to the time scale's
-  visible-range), so drawings stay pinned to their (time, price) anchors. The
-  chart hides the OS cursor in favour of the drawn TradingView-style crosshair.
-- **Multi-chart (done):** the layout grid carries per-panel drawings inside the
-  saved layout config (`Panel.drawings`).
-- **Main chart + persistence (done):** a **✎ Draw** toggle + shared
-  `DrawingToolbar` on `ChartPage`, backed by the previously-dormant `drawings`
-  table via a tenant-scoped `GET`/`PUT /api/drawings?symbol=&interval=` (pure
-  row↔drawing mapping in `apps/server/src/services/drawings.ts`, replace-all
-  save). The `useDrawings` hook loads per (symbol, interval) and debounces saves
-  so dragging doesn't flood the network.
-- Later — more primitives (Fibonacci retracement/extension, parallel channel,
-  arrows, ellipse, brushes), per-drawing style editing + lock/hide, and snapping.
+The previous drawing slice was marked too optimistically. The current product is
+not TradingView-grade yet:
+
+- `ChartPage` still uses `lightweight-charts` with `LwcDrawingOverlay`, an
+  SVG/React overlay. This caused cursor-mode chart navigation to feel modal and
+  made pan/zoom behavior depend on manual reprojection.
+- `/layout` uses `KLineChartSurface` and `klinecharts@9.8.12`, so there are two
+  chart engines and two drawing interaction models in the app.
+- The old roadmap claim that layout panels store `Panel.drawings` is stale.
+  Panels now carry `drawingScopeId`; drawing rows are persisted separately.
+- The current tool set is partial and line-heavy. A professional suite must cover
+  lines, channels, pitchforks, Fibonacci, Gann, forecasting/measurement, shapes,
+  annotations, brushes, object tree, favorites/templates, lock/hide/group, and
+  style editing.
+
+Locked direction:
+
+- `lightweight-charts@5.2.x` is the canonical web chart engine unless a formal
+  spike proves another OSS engine is better. `klinecharts` is transitional.
+- Drawing rendering must be native to the chart lifecycle via primitives or a
+  proven primitive-based manager. Empty-chart drag in cursor mode must pan the
+  chart; drawing tools may capture input only while placing/editing.
+- API schemas for drawings live in `packages/core`; `packages/drawing-tools`
+  owns domain helpers, registry, migrations, and tool geometry.
+- See `docs/CHART_DRAWINGS_REWORK.md` and `docs/CHART_DRAWINGS_AGENT_BRIEF.md`
+  before adding drawing tools.
 
 ## Working with this codebase
 
@@ -461,9 +470,10 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 | `apps/web/src/hooks/use-chart-history.ts`      | **Slice 2.5** — paginated history hook with `loadMore`/`loadNewer`                 |
 | `apps/web/src/hooks/use-bar-stream.ts`         | **Slice 2.5** — WS hook with status + auto-reconnect                               |
 | `apps/web/src/hooks/use-market-stream.ts`      | Live quote/book/status hook for price and DOM                                      |
-| `apps/server/src/routes/drawings.ts`           | Drawing CRUD (`GET`/`PUT /api/drawings`) scoped per (symbol, interval)             |
+| `apps/server/src/routes/drawings.ts`           | Drawing CRUD (`GET`/`PUT /api/drawings`) scoped per symbol, interval, and scope    |
 | `apps/server/src/services/drawings.ts`         | Pure row↔`Drawing` mapping for the `drawings` table                                |
-| `apps/web/src/components/DrawingOverlay.tsx`   | SVG overlay: render/select/drag drawings, reproject on pan/zoom                    |
+| `apps/web/src/components/LwcDrawingOverlay.tsx` | Transitional SVG drawing overlay for the single chart                              |
+| `apps/web/src/components/KLineChartSurface.tsx` | Transitional KLineCharts surface used by `/layout`                                 |
 | `apps/web/src/hooks/use-drawings.ts`           | Load drawings per (symbol, interval) + debounced replace-all save                  |
 | `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                                  |
 | `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                                        |

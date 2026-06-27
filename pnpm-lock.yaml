@@ -165,6 +165,9 @@ importers:
       lightweight-charts:
         specifier: ^5.0.0
         version: 5.2.0
+      lightweight-charts-drawing:
+        specifier: 0.1.1
+        version: 0.1.1(lightweight-charts@5.2.0)
       lucide-react:
         specifier: ^1.21.0
         version: 1.21.0(react@18.3.1)
@@ -482,9 +485,15 @@ importers:
 
   packages/drawing-tools:
     dependencies:
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
+      '@tv/core':
+        specifier: workspace:*
+        version: link:../core
+      lightweight-charts:
+        specifier: ^5.0.0
+        version: 5.2.0
+      lightweight-charts-drawing:
+        specifier: 0.1.1
+        version: 0.1.1(lightweight-charts@5.2.0)
     devDependencies:
       '@types/bun':
         specifier: ^1.1.14
@@ -2023,6 +2032,11 @@ packages:
   libsodium@0.8.4:
     resolution: {integrity: sha512-lMcYaRi0zcs7tarATsQUYC7rstliIXZuoq0c6zXSgNtSNtdvBgkSegjWhpMJAXzKX3SUSwIp7+zEsob+j3LuRw==}
 
+  lightweight-charts-drawing@0.1.1:
+    resolution: {integrity: sha512-lS5s94QnMA6mkXAbOCdLdux1rgzdlJn5vIxQSBNj+1pFtuMHaAlV+ciElSI0wNTzLNM1LQo8JN7j83GpApTcgQ==}
+    peerDependencies:
+      lightweight-charts: ^5.0.0
+
   lightweight-charts@5.2.0:
     resolution: {integrity: sha512-ey3Vas8UhV06ni+LT9TA1nEe4y8So4Mi6CL/oarNHFMyTktz/xy8e8+oh04Q//eO3t6etvFXgayz2fClyFQb5w==}
 
@@ -3243,6 +3257,11 @@ snapshots:
       libsodium: 0.8.4
 
   libsodium@0.8.4: {}
+
+  lightweight-charts-drawing@0.1.1(lightweight-charts@5.2.0):
+    dependencies:
+      fancy-canvas: 2.1.0
+      lightweight-charts: 5.2.0
 
   lightweight-charts@5.2.0:
     dependencies:

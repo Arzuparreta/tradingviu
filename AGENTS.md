@@ -4,6 +4,8 @@ Conventions for AI agents and humans working on `tradingviu`. Read this before e
 
 **Before you start, read [`docs/ROADMAP.md`](docs/ROADMAP.md)** — it tells you where the project is, what's done, what's next, and the locked architectural decisions. Without it you'll waste time rediscovering the gotchas.
 
+**If you touch chart drawing tools, also read [`docs/CHART_DRAWINGS_REWORK.md`](docs/CHART_DRAWINGS_REWORK.md) and [`docs/CHART_DRAWINGS_AGENT_BRIEF.md`](docs/CHART_DRAWINGS_AGENT_BRIEF.md).** The drawing system is under a foundation rework: do not add more tool buttons or patch the old overlay without following those docs.
+
 ## Project shape
 
 - **Monorepo.** pnpm workspaces. `apps/*` are deployable; `packages/*` are libraries; `services/*` are background workers; `tools/*` are CLIs.

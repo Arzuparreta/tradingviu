@@ -12,3 +12,4 @@ export * from './broker-schemas.js';
 export * from './dom-schemas.js';
 export * from './discovery-schemas.js';
 export * from './social-schemas.js';
+export * from './drawing-schemas.js';

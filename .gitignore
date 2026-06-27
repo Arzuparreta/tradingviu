@@ -24,3 +24,4 @@ coverage
 
 # OS
 Thumbs.db
+.gstack/

@@ -464,9 +464,13 @@ export function LwcDrawingOverlay({
 
   const esc = useCallback(() => {
     setDragging(null);
-    setTool('cursor');
+    if (tool === 'cursor') {
+      onActiveChange?.(false);
+    } else {
+      setTool('cursor');
+    }
     setSelectedId(null);
-  }, []);
+  }, [onActiveChange, tool]);
 
   // ── Resize & visible-range subscriptions ──────────────────────────────
 
@@ -890,10 +894,10 @@ export function LwcDrawingOverlay({
   const selected = drawings.find((d) => d.id === selectedId) ?? null;
   const selectedLocked = selected?.lock ?? false;
 
-  const toolbar = (
+  const toolbar = active ? (
     <div
       className="lwc-drawing-toolbar"
-      style={{ opacity: active ? 1 : 0.45, transition: 'opacity 150ms' }}
+      style={{ pointerEvents: 'auto' }}
       onMouseDown={(e) => e.stopPropagation()}
       onMouseMove={(e) => e.stopPropagation()}
       onMouseUp={(e) => e.stopPropagation()}
@@ -948,13 +952,8 @@ export function LwcDrawingOverlay({
         </button>
         <button className="ghost" type="button" onClick={clearAll} disabled={drawings.length === 0} title="Clear all">Clear</button>
       </div>
-      <div className="lwc-drawing-toolbar-group">
-        <button className="ghost small" type="button" onClick={() => onActiveChange?.(false)} title="Exit drawing mode (Esc)">
-          ✎ Done
-        </button>
-      </div>
     </div>
-  );
+  ) : null;
 
   // ── Crosshair ──────────────────────────────────────────────────────────
 
@@ -966,20 +965,32 @@ export function LwcDrawingOverlay({
       </>
     ) : null;
 
+  const capturesEmptyChart = active && (tool !== 'cursor' || dragging !== null);
+
   return (
     <div
-      style={{ position: 'absolute', inset: 0, pointerEvents: active ? 'auto' : 'none', zIndex: 10 }}
+      data-testid="lwc-drawing-interaction-layer"
+      style={{ position: 'absolute', inset: 0, pointerEvents: capturesEmptyChart ? 'auto' : 'none', zIndex: 10 }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
       {toolbar}
-      <svg ref={svgRef} width={dims.w} height={dims.h} style={{ display: 'block' }}>
+      <svg
+        ref={svgRef}
+        width={dims.w}
+        height={dims.h}
+        style={{ display: 'block', pointerEvents: capturesEmptyChart ? 'auto' : 'none' }}
+      >
         {crosshair}
         {drawings.map((d) => {
           const pts = screenDrawings.get(d.id) ?? [];
-          return renderDrawing(d, pts);
+          return (
+            <g key={d.id} style={{ pointerEvents: active && tool === 'cursor' ? 'auto' : undefined }}>
+              {renderDrawing(d, pts)}
+            </g>
+          );
         })}
         {renderCreatePreview()}
       </svg>

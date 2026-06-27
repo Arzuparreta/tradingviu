@@ -13,7 +13,9 @@
     "build": "echo skip"
   },
   "dependencies": {
-    "zod": "^3.24.1"
+    "@tv/core": "workspace:*",
+    "lightweight-charts": "^5.0.0",
+    "lightweight-charts-drawing": "0.1.1"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

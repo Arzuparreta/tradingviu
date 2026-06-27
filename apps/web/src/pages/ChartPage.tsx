@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import {
-  createTvChart,
   addSeries,
   setData,
-  update,
   createMarkers,
-  removeChart,
-  darkTheme,
   subscribeVisibleTimeRange,
   createIchimokuCloud,
   type IchimokuCloudHandle,
@@ -30,8 +26,10 @@ import type { DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPerio
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import { useMarketStream } from '../hooks/use-market-stream';
-import { useDrawings } from '../hooks/use-drawings';
-import { LwcDrawingOverlay } from '../components/LwcDrawingOverlay';
+import { useDrawingManager } from '../hooks/use-drawing-manager';
+import { DrawingToolbar } from '../components/DrawingToolbar';
+import { ChartSurface } from '../components/chart-surface';
+import type { ChartSurfaceHandle } from '../components/chart-surface';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -58,7 +56,7 @@ function formatVol(v: number): string {
 }
 
 export function ChartPage() {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<ChartSurfaceHandle>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
   const volumeRef = useRef<ISeriesApi<SeriesType> | null>(null);
@@ -96,7 +94,7 @@ export function ChartPage() {
   const [pivotMethod, setPivotMethod] = useState<PivotMethod>('standard');
   const [pivotPeriod, setPivotPeriod] = useState<PivotPeriod>('D');
   const [showIchimoku, setShowIchimoku] = useState(false);
-  const [showDrawing, setShowDrawing] = useState(false);
+
   const [showBacktest, setShowBacktest] = useState(false);
   const [strategyType, setStrategyType] = useState<StrategyType>('maCross');
   const [strategyParams, setStrategyParams] = useState<Record<string, number>>({
@@ -191,9 +189,11 @@ export function ChartPage() {
     staleTime: 30_000,
   });
 
-  const drawingsState = useDrawings({
+  const drawingMgr = useDrawingManager({
+    surfaceRef,
     symbolId: symbolId ?? null,
     interval,
+    chartReady,
     enabled: !!user && !!symbolId,
   });
 
@@ -376,48 +376,15 @@ export function ChartPage() {
     },
   });
 
-  useEffect(() => {
-    // NOTE: deps include [user, symbolId] on purpose. The component has
-    // early returns for !user / !symbolId *after* all the hooks. On
-    // client-side navigation from /, the first render sees user=null
-    // (bootstrap in flight) → early return → containerRef.current is
-    // null → this effect's first run does nothing. Once user lands, the
-    // component re-renders past the early return, the div with the ref
-    // mounts, and *this* deps change re-runs the effect with a live ref.
-    // If deps were [] we'd be stuck in the first-run state forever.
-    if (!user || !symbolId) return;
-    if (!containerRef.current) return;
-    const chart = createTvChart({ container: containerRef.current, theme: darkTheme });
-    const candle = addSeries(chart, 'candles');
-    const volume = addSeries(chart, 'histogram', {
-      priceScaleId: '',
-      priceFormat: { type: 'volume' },
-      color: 'rgba(38, 166, 154, 0.35)',
-    });
-    volume.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-    chartRef.current = chart;
-    candleRef.current = candle;
-    volumeRef.current = volume;
+  // ChartSurface fires onReady during layout — refs are populated before
+  // any useEffect runs. This replaces the old chart-creation useEffect.
+  const handleSurfaceReady = useCallback((handle: ChartSurfaceHandle) => {
+    chartRef.current = handle.chart;
+    candleRef.current = handle.mainSeries;
+    volumeRef.current = handle.volumeSeries;
     isFirstSetDataRef.current = true;
     setChartReady(true);
-    return () => {
-      setChartReady(false);
-      removeChart(chart);
-      chartRef.current = null;
-      candleRef.current = null;
-      volumeRef.current = null;
-      markersRef.current = null;
-      backtestMarkersRef.current = null;
-      chartPatternSeriesRef.current = [];
-      volumeProfileLinesRef.current = [];
-      tpoLinesRef.current = [];
-      pivotLinesRef.current = [];
-      ichimokuSeriesRef.current = [];
-      ichimokuCloudRef.current = null;
-      indicatorSeriesRef.current.clear();
-      indicatorBandSeriesRef.current.clear();
-    };
-  }, [user, symbolId]);
+  }, []);
 
   const isFirstSetDataRef = useRef(true);
 
@@ -1100,29 +1067,35 @@ export function ChartPage() {
 
   return (
     <div className="chart-layout" style={{ gridTemplateColumns: 'minmax(320px, 1fr) 340px' }}>
-      <div
-        ref={containerRef}
+      <ChartSurface
+        ref={surfaceRef}
+        onReady={handleSurfaceReady}
         style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
           minWidth: 200,
           minHeight: 200,
           background: '#0e0e0e',
         }}
       >
-        {chartReady && chartRef.current && candleRef.current && (
-          <LwcDrawingOverlay
-            chart={chartRef.current}
-            candleSeries={candleRef.current}
-            drawings={drawingsState.drawings}
-            visibleBars={visibleBars}
-            active={showDrawing}
-            onDrawingsChange={drawingsState.setDrawings}
-            onActiveChange={setShowDrawing}
+        {chartReady && drawingMgr.ready && (
+          <DrawingToolbar
+            manager={drawingMgr.manager}
+            drawings={drawingMgr.drawings}
+            activeTool={drawingMgr.activeTool}
+            selectedId={drawingMgr.selectedId}
+            isPlacing={drawingMgr.isPlacing}
+            canUndo={drawingMgr.canUndo}
+            canRedo={drawingMgr.canRedo}
+            onStartTool={drawingMgr.startTool}
+            onCancelPlacement={drawingMgr.cancelPlacement}
+            onSelectDrawing={drawingMgr.selectDrawing}
+            onRemoveSelected={drawingMgr.removeSelected}
+            onClearAll={drawingMgr.clearAll}
+            onToggleLock={drawingMgr.toggleLock}
+            onUndo={drawingMgr.undo}
+            onRedo={drawingMgr.redo}
           />
         )}
-      </div>
+      </ChartSurface>
       <aside
         className="col"
         style={{
@@ -2049,13 +2022,7 @@ export function ChartPage() {
         {showIchimoku && ichimokuQ.isFetching && (
           <span className="muted small">computing…</span>
         )}
-        <button
-          className={showDrawing ? 'primary' : ''}
-          onClick={() => setShowDrawing((s) => !s)}
-          style={{ fontSize: 12 }}
-        >
-          ✎ Draw
-        </button>
+
         <button
           className={showBacktest ? 'primary' : ''}
           onClick={() => setShowBacktest((s) => !s)}
