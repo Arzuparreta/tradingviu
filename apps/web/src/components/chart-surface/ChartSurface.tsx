@@ -3,10 +3,11 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useRef,
+  useEffect,
   type ReactNode,
 } from 'react';
-import type { IChartApi, ISeriesApi, SeriesType, UTCTimestamp } from 'lightweight-charts';
-import { createTvChart, addSeries, setData, removeChart, darkTheme } from '@tv/chart-engine';
+import type { IChartApi, ISeriesApi, SeriesType, Time, UTCTimestamp } from 'lightweight-charts';
+import { createTvChart, addSeries, setData, update, removeChart, darkTheme } from '@tv/chart-engine';
 import type { ChartTheme } from '@tv/chart-engine';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ export interface ChartSurfaceHandle {
   readonly volumeSeries: ISeriesApi<SeriesType>;
   /** The container DOM element. */
   readonly container: HTMLDivElement;
-  /** Mark that initial data load has happened (so consumers can skip fitContent). */
+  /** Mark that initial data load has happened. */
   readonly firstData: { current: boolean };
   /** Fit all visible data within the viewport. */
   fitContent(): void;
@@ -29,6 +30,11 @@ export interface ChartSurfaceHandle {
    * The first call automatically calls `fitContent`.
    */
   setData(bars: readonly ChartBar[]): void;
+  /**
+   * Update or append a single bar (for live ticks).
+   * Uses series.update() to avoid resetting the chart.
+   */
+  updateBar(bar: ChartBar): void;
 }
 
 export interface ChartBar {
@@ -57,6 +63,11 @@ export interface ChartSurfaceProps {
    * populated before parent effects run.
    */
   onReady?: (handle: ChartSurfaceHandle) => void;
+  /**
+   * Called when the visible time range changes (pan, zoom, data change).
+   * `range` is null when the chart is not yet ready.
+   */
+  onVisibleRangeChange?: (range: { from: number; to: number } | null) => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────
@@ -78,7 +89,7 @@ export interface ChartSurfaceProps {
  * ```
  */
 export const ChartSurface = forwardRef<ChartSurfaceHandle, ChartSurfaceProps>(
-  function ChartSurface({ theme, timezone, className, style, children, onReady }, ref) {
+  function ChartSurface({ theme, timezone, className, style, children, onReady, onVisibleRangeChange }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candleRef = useRef<ISeriesApi<SeriesType> | null>(null);
@@ -135,6 +146,23 @@ export const ChartSurface = forwardRef<ChartSurfaceHandle, ChartSurfaceProps>(
           firstDataRef.current = false;
         }
       },
+      updateBar(bar: ChartBar) {
+        const candle = candleRef.current;
+        const volume = volumeRef.current;
+        if (!candle || !volume) return;
+        update(candle, {
+          time: bar.time as UTCTimestamp,
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+          ...(bar.volume != null ? { volume: bar.volume } : {}),
+        });
+        update(volume, {
+          time: bar.time as UTCTimestamp,
+          value: bar.volume ?? 0,
+        });
+      },
     } as ChartSurfaceHandle);
 
     // Create chart during layout so everything is ready before effects fire.
@@ -177,6 +205,28 @@ export const ChartSurface = forwardRef<ChartSurfaceHandle, ChartSurfaceProps>(
 
     // Imperative handle for ref forwarding.
     useImperativeHandle(ref, () => handleRef.current, []);
+
+    // Subscribe to visible range changes for pagination / crosshair sync.
+    const onVRRef = useRef(onVisibleRangeChange);
+    onVRRef.current = onVisibleRangeChange;
+    useEffect(() => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const ts = chart.timeScale();
+      const handler = (range: { from: Time; to: Time } | null) => {
+        if (!range) {
+          onVRRef.current?.(null);
+          return;
+        }
+        const from = typeof range.from === 'number' ? range.from : Number(range.from);
+        const to = typeof range.to === 'number' ? range.to : Number(range.to);
+        if (Number.isFinite(from) && Number.isFinite(to)) {
+          onVRRef.current?.({ from, to });
+        }
+      };
+      ts.subscribeVisibleTimeRangeChange(handler);
+      return () => ts.unsubscribeVisibleTimeRangeChange(handler);
+    }, []);
 
     return (
       <div
