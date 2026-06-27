@@ -263,6 +263,8 @@ export class LwcDrawingManager implements IDrawingManager {
     if (!this._interaction || !this._activeTool || !this._libManager) return;
 
     const anchors = this._interaction.getAnchors();
+    const toolType = this._activeTool;
+    const manager = this._libManager;
     if (anchors.length === 0) {
       this.cancelPlacement();
       return;
@@ -271,26 +273,20 @@ export class LwcDrawingManager implements IDrawingManager {
     const registry = getToolRegistry();
     const id = freshId();
 
-    const libDrawing = registry.createDrawing(
-      this._activeTool,
-      id,
-      anchors,
-      DEFAULT_STYLE,
-      {
-        visible: true,
-        locked: false,
-        zIndex: 0,
-        extendLeft: this._activeTool === 'extended-line' || this._activeTool === 'ray',
-        extendRight: this._activeTool === 'extended-line' || this._activeTool === 'ray',
-      },
-    );
+    this.cancelPlacement();
+
+    const libDrawing = registry.createDrawing(toolType, id, anchors, DEFAULT_STYLE, {
+      visible: true,
+      locked: false,
+      zIndex: 0,
+      extendLeft: toolType === 'extended-line' || toolType === 'ray',
+      extendRight: toolType === 'extended-line' || toolType === 'ray',
+    });
 
     if (libDrawing) {
-      this._libManager.addDrawing(libDrawing);
-      this._libManager.selectDrawing(id);
+      manager.addDrawing(libDrawing);
+      manager.selectDrawing(id);
     }
-
-    this._interaction.reset();
   }
 
   // ── DOM event handlers for placement ─────────────────────────────────
@@ -326,8 +322,14 @@ export class LwcDrawingManager implements IDrawingManager {
   };
 
   private _handlePlacementMouseUp = (e: MouseEvent): void => {
-    if (!this._interaction) return;
-    this._interaction.onMouseUp({ point: { x: 0, y: 0 }, time: null, price: null, srcEvent: e });
+    if (!this._interaction || !this._container) return;
+    const rect = this._container.getBoundingClientRect();
+    this._interaction.onMouseUp({
+      point: { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      time: null,
+      price: null,
+      srcEvent: e,
+    });
 
     // After placement completes for 2-point tools (on mouse up),
     // check if the tool is complete and finish.

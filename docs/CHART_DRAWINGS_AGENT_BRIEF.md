@@ -11,7 +11,7 @@ Use this brief when starting a new chat or assigning a new agent to the chart dr
 
 ## Session Progress (last: 2026-06-27, commit `b6021b5` + object-tree follow-up)
 
-✅ **Phase 1-3 foundation delivered.** `lightweight-charts-drawing@0.1.1` passes the
+✅ **Phase 1-4 foundation and browser coverage delivered.** `lightweight-charts-drawing@0.1.1` passes the
 spike. We have a working native-primitive drawing system in `ChartPage` and `/layout`:
 
 - `packages/drawing-tools/src/` — `LwcDrawingManager` wrapper, format conversion,
@@ -28,16 +28,18 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
 
 **Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck, web unit tests, server typecheck, and Playwright drawing E2E.**
 
+Browser E2E now covers cursor-mode pan/zoom, object-tree edit/reload/delete persistence,
+representative create/reload/clear flows across major drawing categories, and
+`/layout` drawing-scope isolation across two panels using the same symbol.
+
 ## Where to Continue
 
-1. **Broader browser E2E scenarios** — Playwright is now installed and configured
-   at the repo root. The first specs mock app/API state and cover cursor-mode
-   pan/zoom with drawings mounted plus object-tree edit/reload/delete
-   persistence. Add representative create/select/delete/reload flows per major
-   drawing category next.
+1. **More per-tool browser acceptance** — expand from representative categories
+   to edge tools with different anchor counts and editing behaviors, especially
+   single-anchor annotations, brush/highlighter paths, and marker tools.
 
-2. **Multi-panel browser E2E** — extend browser coverage to `/layout` panel
-   independence and drawing-scope isolation while preserving raw crosshair sync.
+2. **Visual regression coverage** — add targeted screenshots or canvas checks for
+   selected drawings/handles after pan and zoom once the object visuals stabilize.
 
 ## Verification commands (copy-paste ready)
 

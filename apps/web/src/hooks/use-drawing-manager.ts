@@ -80,12 +80,14 @@ const nowMs = (): number => Date.now();
 const cloneDrawing = (drawing: Drawing): Drawing => ({
   ...drawing,
   points: drawing.points.map((point) => ({ ...point })),
-  styles: drawing.styles === null || drawing.styles === undefined
-    ? drawing.styles
-    : JSON.parse(JSON.stringify(drawing.styles)) as Drawing['styles'],
-  extendData: drawing.extendData === undefined
-    ? undefined
-    : JSON.parse(JSON.stringify(drawing.extendData)) as Drawing['extendData'],
+  styles:
+    drawing.styles === null || drawing.styles === undefined
+      ? drawing.styles
+      : (JSON.parse(JSON.stringify(drawing.styles)) as Drawing['styles']),
+  extendData:
+    drawing.extendData === undefined
+      ? undefined
+      : (JSON.parse(JSON.stringify(drawing.extendData)) as Drawing['extendData']),
 });
 
 const sortDrawings = (items: readonly Drawing[]): Drawing[] =>
@@ -98,9 +100,12 @@ const normalizeZLevels = (items: readonly Drawing[]): Drawing[] =>
   items.map((drawing, index) => ({ ...drawing, zLevel: index, updatedAt: drawing.updatedAt }));
 
 const withLabel = (drawing: Drawing, label: string): Drawing => {
-  const extendData = drawing.extendData && typeof drawing.extendData === 'object' && !Array.isArray(drawing.extendData)
-    ? { ...(drawing.extendData as Record<string, unknown>) }
-    : {};
+  const extendData =
+    drawing.extendData &&
+    typeof drawing.extendData === 'object' &&
+    !Array.isArray(drawing.extendData)
+      ? { ...(drawing.extendData as Record<string, unknown>) }
+      : {};
   const trimmed = label.trim();
   if (trimmed.length > 0 && trimmed !== drawing.name) {
     extendData.label = trimmed;
@@ -115,18 +120,22 @@ const withLabel = (drawing: Drawing, label: string): Drawing => {
 };
 
 const withStylePatch = (drawing: Drawing, patch: DrawingStylePatch): Drawing => {
-  const styles = drawing.styles && typeof drawing.styles === 'object' && !Array.isArray(drawing.styles)
-    ? { ...(drawing.styles as Record<string, unknown>) }
-    : {};
-  const line = styles.line && typeof styles.line === 'object' && !Array.isArray(styles.line)
-    ? { ...(styles.line as Record<string, unknown>) }
-    : {};
-  const polygon = styles.polygon && typeof styles.polygon === 'object' && !Array.isArray(styles.polygon)
-    ? { ...(styles.polygon as Record<string, unknown>) }
-    : {};
-  const text = styles.text && typeof styles.text === 'object' && !Array.isArray(styles.text)
-    ? { ...(styles.text as Record<string, unknown>) }
-    : {};
+  const styles =
+    drawing.styles && typeof drawing.styles === 'object' && !Array.isArray(drawing.styles)
+      ? { ...(drawing.styles as Record<string, unknown>) }
+      : {};
+  const line =
+    styles.line && typeof styles.line === 'object' && !Array.isArray(styles.line)
+      ? { ...(styles.line as Record<string, unknown>) }
+      : {};
+  const polygon =
+    styles.polygon && typeof styles.polygon === 'object' && !Array.isArray(styles.polygon)
+      ? { ...(styles.polygon as Record<string, unknown>) }
+      : {};
+  const text =
+    styles.text && typeof styles.text === 'object' && !Array.isArray(styles.text)
+      ? { ...(styles.text as Record<string, unknown>) }
+      : {};
 
   if (patch.lineColor !== undefined) {
     line.color = patch.lineColor;
@@ -158,7 +167,8 @@ const withStylePatch = (drawing: Drawing, patch: DrawingStylePatch): Drawing => 
   };
 };
 
-const nextDuplicateId = (): string => `draw_${nowMs().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+const nextDuplicateId = (): string =>
+  `draw_${nowMs().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const duplicateDrawingValue = (drawing: Drawing, maxZ: number): Drawing => {
   const cloned = cloneDrawing(drawing);
@@ -175,7 +185,8 @@ const duplicateDrawingValue = (drawing: Drawing, maxZ: number): Drawing => {
     id: nextDuplicateId(),
     points: cloned.points.map((point) => ({
       ...point,
-      timestamp: typeof point.timestamp === 'number' ? point.timestamp + timeOffset : point.timestamp,
+      timestamp:
+        typeof point.timestamp === 'number' ? point.timestamp + timeOffset : point.timestamp,
       value: typeof point.value === 'number' ? point.value + priceDelta : point.value,
     })),
     zLevel: maxZ + 1,
@@ -224,7 +235,12 @@ export function useDrawingManager({
 
   // Save debounce
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<{ symbol: string; interval: string; scope: string; drawings: Drawing[] } | null>(null);
+  const pending = useRef<{
+    symbol: string;
+    interval: string;
+    scope: string;
+    drawings: Drawing[];
+  } | null>(null);
 
   const setDrawingsState = useCallback((next: readonly Drawing[]) => {
     const sorted = sortDrawings(next);
@@ -244,13 +260,16 @@ export function useDrawingManager({
     void api.saveDrawings(p.symbol, p.interval, p.drawings, p.scope).catch(() => undefined);
   }, [queryClient]);
 
-  const queueSave = useCallback((newDrawings: readonly Drawing[]) => {
-    if (!symbolId || !storageScope) return;
-    const payload = sortDrawings(newDrawings);
-    pending.current = { symbol: symbolId, interval, scope: storageScope, drawings: payload };
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
-  }, [flush, interval, storageScope, symbolId]);
+  const queueSave = useCallback(
+    (newDrawings: readonly Drawing[]) => {
+      if (!symbolId || !storageScope) return;
+      const payload = sortDrawings(newDrawings);
+      pending.current = { symbol: symbolId, interval, scope: storageScope, drawings: payload };
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
+    },
+    [flush, interval, storageScope, symbolId],
+  );
 
   // Create manager and attach to surface
   useEffect(() => {
@@ -276,10 +295,16 @@ export function useDrawingManager({
 
     // Subscribe to changes
     const unsubChange = mgr.onChange((newDrawings) => {
+      if (suppressManagerChange.current) return;
       const sorted = sortDrawings(newDrawings);
       const before = drawingsRef.current;
       setDrawingsState(sorted);
-      if (!suppressManagerChange.current && !sameDrawings(before, sorted)) {
+      if (!mgr.isPlacing()) {
+        setActiveTool(null);
+        setIsPlacing(false);
+        setSelectedId(mgr.getSelectedId());
+      }
+      if (!sameDrawings(before, sorted)) {
         setUndoStack((s) => [...s.slice(-(MAX_UNDO - 1)), before]);
         setRedoStack([]);
       }
@@ -317,24 +342,27 @@ export function useDrawingManager({
 
   // ── Toolbar actions ─────────────────────────────────────────────────
 
-  const commitDrawings = useCallback((nextRaw: readonly Drawing[], selected: string | null, pushHistory = true) => {
-    const mgr = managerRef.current;
-    if (!mgr) return;
-    const before = drawingsRef.current;
-    const next = normalizeZLevels(nextRaw);
-    if (sameDrawings(before, next)) return;
-    suppressManagerChange.current = true;
-    mgr.importDrawings(next);
-    if (selected) mgr.select(selected);
-    suppressManagerChange.current = false;
-    if (pushHistory) {
-      setUndoStack((s) => [...s.slice(-(MAX_UNDO - 1)), before]);
-      setRedoStack([]);
-    }
-    setDrawingsState(next);
-    setSelectedId(selected);
-    queueSave(next);
-  }, [queueSave, setDrawingsState]);
+  const commitDrawings = useCallback(
+    (nextRaw: readonly Drawing[], selected: string | null, pushHistory = true) => {
+      const mgr = managerRef.current;
+      if (!mgr) return;
+      const before = drawingsRef.current;
+      const next = normalizeZLevels(nextRaw);
+      if (sameDrawings(before, next)) return;
+      suppressManagerChange.current = true;
+      mgr.importDrawings(next);
+      if (selected) mgr.select(selected);
+      suppressManagerChange.current = false;
+      if (pushHistory) {
+        setUndoStack((s) => [...s.slice(-(MAX_UNDO - 1)), before]);
+        setRedoStack([]);
+      }
+      setDrawingsState(next);
+      setSelectedId(selected);
+      queueSave(next);
+    },
+    [queueSave, setDrawingsState],
+  );
 
   const startTool = useCallback((ourToolName: string) => {
     const libType = ourToolToLibraryType(ourToolName);
@@ -360,7 +388,10 @@ export function useDrawingManager({
   const removeSelected = useCallback(() => {
     const id = selectedId ?? managerRef.current?.getSelectedId();
     if (id) {
-      commitDrawings(drawingsRef.current.filter((drawing) => drawing.id !== id), null);
+      commitDrawings(
+        drawingsRef.current.filter((drawing) => drawing.id !== id),
+        null,
+      );
     }
   }, [commitDrawings, selectedId]);
 
@@ -369,41 +400,59 @@ export function useDrawingManager({
     commitDrawings([], null);
   }, [commitDrawings]);
 
-  const toggleLock = useCallback((id: string) => {
-    const next = drawingsRef.current.map((drawing) =>
-      drawing.id === id ? { ...drawing, lock: !drawing.lock, updatedAt: nowMs() } : drawing,
-    );
-    commitDrawings(next, id);
-  }, [commitDrawings]);
+  const toggleLock = useCallback(
+    (id: string) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? { ...drawing, lock: !drawing.lock, updatedAt: nowMs() } : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
 
-  const toggleVisibility = useCallback((id: string) => {
-    const next = drawingsRef.current.map((drawing) =>
-      drawing.id === id ? { ...drawing, visible: !drawing.visible, updatedAt: nowMs() } : drawing,
-    );
-    commitDrawings(next, id);
-  }, [commitDrawings]);
+  const toggleVisibility = useCallback(
+    (id: string) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? { ...drawing, visible: !drawing.visible, updatedAt: nowMs() } : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
 
-  const renameDrawing = useCallback((id: string, label: string) => {
-    const next = drawingsRef.current.map((drawing) => (
-      drawing.id === id ? withLabel(drawing, label) : drawing
-    ));
-    commitDrawings(next, id);
-  }, [commitDrawings]);
+  const renameDrawing = useCallback(
+    (id: string, label: string) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? withLabel(drawing, label) : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
 
-  const updateStyle = useCallback((id: string, patch: DrawingStylePatch) => {
-    const next = drawingsRef.current.map((drawing) => (
-      drawing.id === id ? withStylePatch(drawing, patch) : drawing
-    ));
-    commitDrawings(next, id);
-  }, [commitDrawings]);
+  const updateStyle = useCallback(
+    (id: string, patch: DrawingStylePatch) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? withStylePatch(drawing, patch) : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
 
-  const duplicateDrawing = useCallback((id: string) => {
-    const source = drawingsRef.current.find((drawing) => drawing.id === id);
-    if (!source) return;
-    const maxZ = drawingsRef.current.reduce((max, drawing) => Math.max(max, drawing.zLevel ?? 0), -1);
-    const copy = duplicateDrawingValue(source, maxZ);
-    commitDrawings([...drawingsRef.current, copy], copy.id);
-  }, [commitDrawings]);
+  const duplicateDrawing = useCallback(
+    (id: string) => {
+      const source = drawingsRef.current.find((drawing) => drawing.id === id);
+      if (!source) return;
+      const maxZ = drawingsRef.current.reduce(
+        (max, drawing) => Math.max(max, drawing.zLevel ?? 0),
+        -1,
+      );
+      const copy = duplicateDrawingValue(source, maxZ);
+      commitDrawings([...drawingsRef.current, copy], copy.id);
+    },
+    [commitDrawings],
+  );
 
   const copyDrawing = useCallback((id: string) => {
     const source = drawingsRef.current.find((drawing) => drawing.id === id);
@@ -412,37 +461,51 @@ export function useDrawingManager({
 
   const pasteDrawing = useCallback(() => {
     if (!drawingClipboard) return;
-    const maxZ = drawingsRef.current.reduce((max, drawing) => Math.max(max, drawing.zLevel ?? 0), -1);
+    const maxZ = drawingsRef.current.reduce(
+      (max, drawing) => Math.max(max, drawing.zLevel ?? 0),
+      -1,
+    );
     const copy = duplicateDrawingValue(drawingClipboard, maxZ);
     commitDrawings([...drawingsRef.current, copy], copy.id);
   }, [commitDrawings]);
 
-  const moveDrawing = useCallback((id: string, direction: ZOrderDirection) => {
-    const ordered = normalizeZLevels(drawingsRef.current);
-    const index = ordered.findIndex((drawing) => drawing.id === id);
-    if (index < 0) return;
-    const [item] = ordered.splice(index, 1);
-    if (!item) return;
-    const nextIndex = direction === 'top'
-      ? ordered.length
-      : direction === 'bottom'
-        ? 0
-        : direction === 'up'
-          ? Math.min(ordered.length, index + 1)
-          : Math.max(0, index - 1);
-    ordered.splice(nextIndex, 0, item);
-    commitDrawings(ordered, id);
-  }, [commitDrawings]);
+  const moveDrawing = useCallback(
+    (id: string, direction: ZOrderDirection) => {
+      const ordered = normalizeZLevels(drawingsRef.current);
+      const index = ordered.findIndex((drawing) => drawing.id === id);
+      if (index < 0) return;
+      const [item] = ordered.splice(index, 1);
+      if (!item) return;
+      const nextIndex =
+        direction === 'top'
+          ? ordered.length
+          : direction === 'bottom'
+            ? 0
+            : direction === 'up'
+              ? Math.min(ordered.length, index + 1)
+              : Math.max(0, index - 1);
+      ordered.splice(nextIndex, 0, item);
+      commitDrawings(ordered, id);
+    },
+    [commitDrawings],
+  );
 
-  const setDrawingGroup = useCallback((id: string, groupId: string | null) => {
-    const normalized = groupId?.trim() ?? '';
-    const next = drawingsRef.current.map((drawing) => (
-      drawing.id === id
-        ? { ...drawing, groupId: normalized.length > 0 ? normalized : undefined, updatedAt: nowMs() }
-        : drawing
-    ));
-    commitDrawings(next, id);
-  }, [commitDrawings]);
+  const setDrawingGroup = useCallback(
+    (id: string, groupId: string | null) => {
+      const normalized = groupId?.trim() ?? '';
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id
+          ? {
+              ...drawing,
+              groupId: normalized.length > 0 ? normalized : undefined,
+              updatedAt: nowMs(),
+            }
+          : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
 
   const undo = useCallback(() => {
     const mgr = managerRef.current;

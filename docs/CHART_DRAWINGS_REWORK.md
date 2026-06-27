@@ -125,6 +125,8 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Added local favorite drawing tools and reusable style templates.
 ✅ Added deterministic web acceptance coverage for object management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel drawing-scope independence.
 ✅ Added Playwright infrastructure plus browser E2E coverage for cursor-mode pan/zoom with drawings mounted and object-tree edit/reload/delete persistence.
+✅ Broadened browser E2E coverage for representative drawing creation/reload/clear flows across lines, channels, Fibonacci, measurement, shapes, and annotations.
+✅ Added browser E2E coverage for `/layout` drawing-scope isolation across two panels using the same symbol.
 
 ### 1. Stabilize foundation:
 
@@ -155,12 +157,12 @@ Use TradingView's drawing taxonomy as the product target:
 
 ## Where to Continue (next session)
 
-1. **Broader browser E2E scenarios** — representative create/select/delete/reload
-   flows per major drawing category. Keep the app/API mocked unless the scenario
-   explicitly needs the server/database.
+1. **More per-tool browser acceptance** — expand from representative categories
+   to edge tools with different anchor counts and editing behaviors, especially
+   single-anchor annotations, brush/highlighter paths, and marker tools.
 
-2. **Multi-panel browser E2E** — extend Playwright coverage from single-chart
-   pan/zoom and persistence to `/layout` panel independence with drawing scopes.
+2. **Visual regression coverage** — add targeted screenshots or canvas checks for
+   selected drawings/handles after pan and zoom once the object visuals stabilize.
 
 ## Acceptance Criteria
 
