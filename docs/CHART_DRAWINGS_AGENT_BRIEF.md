@@ -12,7 +12,7 @@ Use this brief when starting a new chat or assigning a new agent to the chart dr
 ## Session Progress (last: 2026-06-27, commit `b6021b5`)
 
 ✅ **Phase 1-3 foundation delivered.** `lightweight-charts-drawing@0.1.1` passes the
-spike. We have a working native-primitive drawing system in `ChartPage`:
+spike. We have a working native-primitive drawing system in `ChartPage` and `/layout`:
 
 - `packages/drawing-tools/src/` — `LwcDrawingManager` wrapper, format conversion,
   public types
@@ -20,33 +20,23 @@ spike. We have a working native-primitive drawing system in `ChartPage`:
 - `apps/web/src/hooks/use-drawing-manager.ts` — hook with load/save + undo/redo
 - `apps/web/src/components/DrawingToolbar.tsx` — toolbar with ~13 tools,
   keyboard shortcuts, lock/delete/clear
-- `apps/web/src/pages/ChartPage.tsx` — integrated; `LwcDrawingOverlay` removed
+- `apps/web/src/pages/ChartPage.tsx` — integrated with native primitive drawings
+- `apps/web/src/components/ChartPanel.tsx` — `/layout` panels use `ChartSurface`
+  with one drawing manager per `drawingScopeId`
 
-**All typechecks pass. 85 tests pass (4 drawing-tools + 21 web + 60 server).**
+**Focused checks pass: drawing-tools typecheck + 4 tests, web typecheck + 15 tests, server typecheck + 60 tests.**
 
 ## Where to Continue
 
-1. **Migrate `/layout`** — `apps/web/src/components/ChartPanel.tsx` still uses
-   `KLineChartSurface` + `klinecharts@9.8.12`. Replace with the shared
-   `ChartSurface` and wire `useDrawingManager` per panel. Preserve panel
-   independence and raw crosshair sync.
+1. **Expand tool coverage** — `convert.ts` maps a larger compatibility set, but
+   the toolbar should only expose tools that support create, select, drag,
+   delete, persist, reload, and pan/zoom correctness.
 
-2. **Fix `useDrawingManager` for multi-panel** — currently assumes a single
-   manager per hook call. For `/layout`, each panel needs its own manager
-   scoped by `drawingScopeId`. The hook already accepts `scopeId`.
-
-3. **Expand tool mapping** — `convert.ts` maps ~13 of the library's 68 tools.
-   Add mappings for the remaining tools (channels, pitchforks, Gann, shapes,
-   annotations, brushes, etc.) and add toolbar buttons progressively.
-
-4. **Live bar updates** — `ChartSurface.setData()` replaces all data. Add an
-   `update(bar)` method that uses `series.update()` for in-progress ticks
-   without resetting the chart.
-
-5. **Playwright acceptance tests** — pan/zoom correctness, keyboard shortcuts,
+2. **Playwright acceptance tests** — pan/zoom correctness, keyboard shortcuts,
    persistence, multi-panel independence.
 
-6. **Remove `klinecharts` dependency** once `/layout` is fully migrated.
+3. **Object tree and style controls** — list drawings, rename, lock/hide,
+   reorder, select, delete, group, and edit styles.
 
 ## Verification commands (copy-paste ready)
 
@@ -73,7 +63,7 @@ The target is a single chart surface shared by `/chart/:symbol` and `/layout`, u
 ## Non-Negotiable Decisions
 
 - Canonical web chart engine: `lightweight-charts@5.2.x`.
-- `klinecharts@9.8.12` is transitional. Do not expand it with new product behavior unless a documented spike proves it should replace `lightweight-charts`.
+- `klinecharts` is no longer a runtime dependency. Keep compatibility only at the persisted drawing schema/conversion layer.
 - Drawing schemas at API boundaries belong in `packages/core/src/drawing-schemas.ts`.
 - `packages/drawing-tools` owns drawing domain helpers: registry, geometry, hit testing, migrations, and final tool implementations.
 - `/layout` panels remain independent. Crosshair sync can stay raw; timeframe sync must not come back.
@@ -83,10 +73,9 @@ The target is a single chart surface shared by `/chart/:symbol` and `/layout`, u
 ## Current Implementation Map
 
 - Single chart: `apps/web/src/pages/ChartPage.tsx`
-- Transitional single-chart drawing overlay: `apps/web/src/components/LwcDrawingOverlay.tsx`
+- Shared chart surface: `apps/web/src/components/chart-surface/ChartSurface.tsx`
 - Multi-chart panel: `apps/web/src/components/ChartPanel.tsx`
-- Transitional multi-chart KLineCharts surface: `apps/web/src/components/KLineChartSurface.tsx`
-- Drawing load/save hook: `apps/web/src/hooks/use-drawings.ts`
+- Drawing load/save manager hook: `apps/web/src/hooks/use-drawing-manager.ts`
 - Drawing API route: `apps/server/src/routes/drawings.ts`
 - Drawing row mapper: `apps/server/src/services/drawings.ts`
 - Shared drawing schemas: `packages/core/src/drawing-schemas.ts`

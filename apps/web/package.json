@@ -21,7 +21,6 @@
     "@tv/layout-sync": "workspace:*",
     "@tv/pine-runtime": "workspace:*",
     "@tv/ta-lib": "workspace:*",
-    "klinecharts": "9.8.12",
     "lightweight-charts": "^5.0.0",
     "lightweight-charts-drawing": "0.1.1",
     "lucide-react": "^1.21.0",

@@ -6,8 +6,8 @@ New agents should also read `docs/CHART_DRAWINGS_AGENT_BRIEF.md` before making c
 
 ## Current Reality
 
-- `ChartPage` still uses `lightweight-charts` plus `LwcDrawingOverlay`, an SVG/React layer over the chart. This is the source of the modal "Draw/Done" workflow and the pan/zoom mismatch.
-- `/layout` uses `KLineChartSurface` and `klinecharts@9.8.12`, so the app currently has two chart engines and two drawing interaction models.
+- `ChartPage` uses the shared `ChartSurface` plus the `LwcDrawingManager` wrapper, so drawings render as native lightweight-charts primitives.
+- `/layout` also uses the shared `ChartSurface` through `ChartPanel`, with one `useDrawingManager` instance per panel scoped by `drawingScopeId`.
 - `packages/drawing-tools` originally owned API schemas. Public API schemas now start in `packages/core/src/drawing-schemas.ts`; drawing tools should become domain geometry, registries, migrations, and tool implementations.
 - The persisted drawing shape is still a compatibility format. It is not the final professional drawing document model.
 
@@ -77,7 +77,7 @@ shapes never appear in our API contracts.
 
 - Canonical web chart engine: `lightweight-charts@5.2.x`.
 - Drawing rendering must live inside the chart's coordinate lifecycle using native primitives or a proven primitive-based drawing manager.
-- `klinecharts` is transitional and should not receive new product investment unless a spike proves it is the final engine.
+- `klinecharts` is no longer a runtime dependency. Keep compatibility only at the persisted drawing schema/conversion layer.
 - The single chart and multi-chart layout must share one `ChartSurface` implementation.
 - Cursor mode must never block chart navigation. Drawing tools may capture the chart only while placing or editing a drawing.
 
@@ -115,10 +115,11 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Shared `ChartSurface` component at `apps/web/src/components/chart-surface/`.
 ✅ `ChartSurface` integrated into `ChartPage` — refs populated via `onReady` callback.
 ✅ `LwcDrawingManager` wired into `ChartPage` via `useDrawingManager` hook + `DrawingToolbar`.
-✅ `LwcDrawingOverlay` replaced by native primitive-based drawing rendering.
-✅ All typechecks pass, all 21 web tests + 60 server tests pass.
-⏳ Migrate `/layout` from `KLineChartSurface` to shared `ChartSurface`.
-⏳ Add `update()` support for in-progress bar updates (currently uses `setData`).
+✅ `LwcDrawingOverlay` replaced by native primitive-based drawing rendering and removed.
+✅ `/layout` migrated from `KLineChartSurface` to shared `ChartSurface`.
+✅ `klinecharts` dependency and transitional `KLineChartSurface` removed from the web app.
+✅ Focused checks pass: drawing-tools typecheck + 4 tests, web typecheck + 15 tests, server typecheck + 60 tests.
+⏳ Add Playwright acceptance tests for pan/zoom correctness, keyboard shortcuts, persistence, and multi-panel independence.
 
 ### 1. Stabilize foundation:
    - [x] Remove false roadmap claims.
@@ -130,14 +131,14 @@ Use TradingView's drawing taxonomy as the product target:
 2. Unify surfaces:
    - [x] Extract a shared `ChartSurface` around `lightweight-charts`. (component at `apps/web/src/components/chart-surface/`)
    - [x] Integrate `ChartSurface` into `ChartPage` (keep behavior stable).
-   - [ ] Move `/layout` off `KLineChartSurface` or prove a better single-engine path before continuing.
-   - [ ] Preserve panel independence and raw crosshair sync.
+   - [x] Move `/layout` off `KLineChartSurface`.
+   - [x] Preserve panel independence and raw crosshair sync.
 
 3. Replace drawing internals:
    - [x] Introduce `DrawingManager` with native primitive rendering, hit testing, handles, history, import/export, and event callbacks. (`packages/drawing-tools/src/drawing-manager.ts`)
    - [x] Wire `LwcDrawingManager` into `ChartPage` replacing `LwcDrawingOverlay`.
    - [x] Migrate existing `klinecharts` drawing payloads into versioned drawing documents. (via `convert.ts`)
-   - [x] Remove `LwcDrawingOverlay` from ChartPage. (component kept for tests)
+   - [x] Remove `LwcDrawingOverlay`.
 
 4. Expand suite:
    - [ ] Ship tools by category, with geometry tests and Playwright acceptance for each category.
@@ -145,19 +146,13 @@ Use TradingView's drawing taxonomy as the product target:
 
 ## Where to Continue (next session)
 
-1. **Migrate `/layout`** — `ChartPanel` still uses `KLineChartSurface` (klinecharts).
-   Swap in the shared `ChartSurface` + `useDrawingManager` per panel.
-   Preserve panel independence and raw crosshair sync.
+1. **Expand tool coverage** — `convert.ts` maps a larger compatibility set, but the toolbar should only expose tools that support create, select, drag, delete, persist, reload, and pan/zoom correctness.
 
-2. **Expand tool mapping** — `convert.ts` maps ~13 of 68 library tools. Add
-   mappings for channels, pitchforks, Gann, shapes, annotations, brushes.
-
-3. **Add `ChartSurface.update()`** — for in-progress bar ticks via `series.update()`.
-
-4. **Playwright acceptance tests** — pan/zoom, keyboard shortcuts, persistence,
+2. **Playwright acceptance tests** — pan/zoom, keyboard shortcuts, persistence,
    multi-panel independence.
 
-5. **Remove `klinecharts`** dependency after `/layout` migration is verified.
+3. **Object tree and style controls** — list drawings, rename, lock/hide,
+   reorder, select, delete, group, and edit styles.
 
 ## Acceptance Criteria
 

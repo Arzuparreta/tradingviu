@@ -383,11 +383,12 @@ tradingviu/
 The previous drawing slice was marked too optimistically. The current product is
 not TradingView-grade yet:
 
-- `ChartPage` still uses `lightweight-charts` with `LwcDrawingOverlay`, an
-  SVG/React overlay. This caused cursor-mode chart navigation to feel modal and
-  made pan/zoom behavior depend on manual reprojection.
-- `/layout` uses `KLineChartSurface` and `klinecharts@9.8.12`, so there are two
-  chart engines and two drawing interaction models in the app.
+- `ChartPage` and `/layout` now share `ChartSurface` over `lightweight-charts`
+  with the `LwcDrawingManager` wrapper, so drawings render as chart primitives
+  instead of a React/SVG overlay.
+- The runtime `klinecharts` dependency and transitional `/layout` chart surface
+  have been removed. The persisted drawing document still keeps its compatibility
+  shape until the final drawing schema migration is designed.
 - The old roadmap claim that layout panels store `Panel.drawings` is stale.
   Panels now carry `drawingScopeId`; drawing rows are persisted separately.
 - The current tool set is partial and line-heavy. A professional suite must cover
@@ -397,8 +398,7 @@ not TradingView-grade yet:
 
 Locked direction:
 
-- `lightweight-charts@5.2.x` is the canonical web chart engine unless a formal
-  spike proves another OSS engine is better. `klinecharts` is transitional.
+- `lightweight-charts@5.2.x` is the canonical web chart engine.
 - Drawing rendering must be native to the chart lifecycle via primitives or a
   proven primitive-based manager. Empty-chart drag in cursor mode must pan the
   chart; drawing tools may capture input only while placing/editing.
@@ -472,9 +472,9 @@ bash /tmp/run-ws-test.sh    # WebSocket live test
 | `apps/web/src/hooks/use-market-stream.ts`      | Live quote/book/status hook for price and DOM                                      |
 | `apps/server/src/routes/drawings.ts`           | Drawing CRUD (`GET`/`PUT /api/drawings`) scoped per symbol, interval, and scope    |
 | `apps/server/src/services/drawings.ts`         | Pure row↔`Drawing` mapping for the `drawings` table                                |
-| `apps/web/src/components/LwcDrawingOverlay.tsx` | Transitional SVG drawing overlay for the single chart                              |
-| `apps/web/src/components/KLineChartSurface.tsx` | Transitional KLineCharts surface used by `/layout`                                 |
-| `apps/web/src/hooks/use-drawings.ts`           | Load drawings per (symbol, interval) + debounced replace-all save                  |
+| `apps/web/src/components/chart-surface/ChartSurface.tsx` | Shared lightweight-charts surface for `/chart` and `/layout`             |
+| `apps/web/src/components/ChartPanel.tsx`       | Multi-chart panel with per-panel drawing scope and raw crosshair-compatible state   |
+| `apps/web/src/hooks/use-drawing-manager.ts`    | Native primitive drawing manager hook with scoped load/save and undo/redo           |
 | `apps/web/src/pages/WatchlistsPage.tsx`        | Watchlist CRUD UI                                                                  |
 | `packages/db/src/rls-policies.ts`              | Full RLS policy definitions                                                        |
 | `packages/db/src/seed.ts`                      | Plan + exchange + symbol seed                                                      |
