@@ -143,6 +143,22 @@ Use TradingView's drawing taxonomy as the product target:
    - [ ] Ship tools by category, with geometry tests and Playwright acceptance for each category.
    - [ ] Do not add a toolbar button until the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness.
 
+## Where to Continue (next session)
+
+1. **Migrate `/layout`** — `ChartPanel` still uses `KLineChartSurface` (klinecharts).
+   Swap in the shared `ChartSurface` + `useDrawingManager` per panel.
+   Preserve panel independence and raw crosshair sync.
+
+2. **Expand tool mapping** — `convert.ts` maps ~13 of 68 library tools. Add
+   mappings for channels, pitchforks, Gann, shapes, annotations, brushes.
+
+3. **Add `ChartSurface.update()`** — for in-progress bar ticks via `series.update()`.
+
+4. **Playwright acceptance tests** — pan/zoom, keyboard shortcuts, persistence,
+   multi-panel independence.
+
+5. **Remove `klinecharts`** dependency after `/layout` migration is verified.
+
 ## Acceptance Criteria
 
 - A drawing moves continuously with the chart during pan and zoom, not only after release.

@@ -9,6 +9,61 @@ Use this brief when starting a new chat or assigning a new agent to the chart dr
 3. `docs/CHART_DRAWINGS_REWORK.md`
 4. This file
 
+## Session Progress (last: 2026-06-27, commit `b6021b5`)
+
+✅ **Phase 1-3 foundation delivered.** `lightweight-charts-drawing@0.1.1` passes the
+spike. We have a working native-primitive drawing system in `ChartPage`:
+
+- `packages/drawing-tools/src/` — `LwcDrawingManager` wrapper, format conversion,
+  public types
+- `apps/web/src/components/chart-surface/` — shared `ChartSurface` component
+- `apps/web/src/hooks/use-drawing-manager.ts` — hook with load/save + undo/redo
+- `apps/web/src/components/DrawingToolbar.tsx` — toolbar with ~13 tools,
+  keyboard shortcuts, lock/delete/clear
+- `apps/web/src/pages/ChartPage.tsx` — integrated; `LwcDrawingOverlay` removed
+
+**All typechecks pass. 85 tests pass (4 drawing-tools + 21 web + 60 server).**
+
+## Where to Continue
+
+1. **Migrate `/layout`** — `apps/web/src/components/ChartPanel.tsx` still uses
+   `KLineChartSurface` + `klinecharts@9.8.12`. Replace with the shared
+   `ChartSurface` and wire `useDrawingManager` per panel. Preserve panel
+   independence and raw crosshair sync.
+
+2. **Fix `useDrawingManager` for multi-panel** — currently assumes a single
+   manager per hook call. For `/layout`, each panel needs its own manager
+   scoped by `drawingScopeId`. The hook already accepts `scopeId`.
+
+3. **Expand tool mapping** — `convert.ts` maps ~13 of the library's 68 tools.
+   Add mappings for the remaining tools (channels, pitchforks, Gann, shapes,
+   annotations, brushes, etc.) and add toolbar buttons progressively.
+
+4. **Live bar updates** — `ChartSurface.setData()` replaces all data. Add an
+   `update(bar)` method that uses `series.update()` for in-progress ticks
+   without resetting the chart.
+
+5. **Playwright acceptance tests** — pan/zoom correctness, keyboard shortcuts,
+   persistence, multi-panel independence.
+
+6. **Remove `klinecharts` dependency** once `/layout` is fully migrated.
+
+## Verification commands (copy-paste ready)
+
+```bash
+# Quick checks
+pnpm --filter @tv/drawing-tools typecheck && pnpm --filter @tv/web typecheck && pnpm --filter @tv/server typecheck
+pnpm --filter @tv/web test && pnpm --filter @tv/server test
+
+# Full gate
+pnpm lint && pnpm typecheck && pnpm test
+
+# Manual smoke
+pnpm dev:restart
+curl -fsS http://localhost:3101/health
+# Open http://localhost:5187, test /chart/:symbol and /layout
+```
+
 ## Product Goal
 
 Build a professional TradingView-grade drawing system. Do not polish the current overlay as if it were the final architecture.
