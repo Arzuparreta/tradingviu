@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
-import { ChartPanel, type PanelBounds } from '../components/ChartPanel';
+import { KLineProChartPanel, type PanelBounds, type KLineProChartPanelHandle } from '../chart/KLineProChartPanel';
 import {
   REPLAY_SPEEDS,
   replayStepMs,
@@ -28,6 +28,9 @@ export function LayoutPage() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [currentName, setCurrentName] = useState<string>('Untitled');
   const initialized = useRef(false);
+
+  // Panel refs for drawing persistence
+  const panelRefs = useRef<Map<string, KLineProChartPanelHandle>>(new Map());
 
   // --- Multi-chart Bar Replay (synced by cursor *time*, not bar index) ---
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -141,17 +144,35 @@ export function LayoutPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['layouts'] });
 
+  const persistDrawings = useCallback(async () => {
+    for (const p of config.panels) {
+      if (!p.symbolId) continue;
+      const panelRef = panelRefs.current.get(p.id);
+      if (!panelRef) continue;
+      try {
+        const drawings = panelRef.exportDrawings();
+        if (drawings.length > 0) {
+          await api.batchDrawings(p.symbolId, p.interval, { upsert: drawings }, p.drawingScopeId);
+        }
+      } catch {
+        // drawings may fail to save individually, continue
+      }
+    }
+  }, [config.panels]);
+
   const saveAs = async () => {
     const name = window.prompt('Layout name', currentName === 'Untitled' ? '' : currentName);
     if (!name) return;
     const { id } = await api.createLayout({ name, config });
     setCurrentId(id);
     setCurrentName(name);
+    await persistDrawings();
     await refresh();
   };
   const save = async () => {
     if (!currentId) return saveAs();
     await api.updateLayout(currentId, { config, name: currentName });
+    await persistDrawings();
     await refresh();
   };
   const setDefault = async () => {
@@ -221,7 +242,6 @@ export function LayoutPage() {
 
         <div className="row" style={{ gap: 10 }}>
           <label className="layout-toggle"><input type="checkbox" checked={config.sync.symbol} onChange={() => toggleSync('symbol')} /> symbol</label>
-          <label className="layout-toggle"><input type="checkbox" checked={config.sync.crosshair} onChange={() => toggleSync('crosshair')} /> crosshair</label>
         </div>
 
         <span className="layout-divider" />
@@ -271,8 +291,12 @@ export function LayoutPage() {
         }}
       >
         {config.panels.map((p, i) => (
-          <ChartPanel
+          <KLineProChartPanel
             key={p.id}
+            ref={(r) => {
+              if (r) panelRefs.current.set(p.id, r);
+              else panelRefs.current.delete(p.id);
+            }}
             panel={p}
             active={config.activePanel === i}
             live={config.activePanel === i && !replayActive}

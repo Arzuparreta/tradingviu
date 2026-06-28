@@ -3,18 +3,12 @@ import type { KLineData } from 'klinecharts';
 import { api, getToken } from '../api/client';
 import type { Bar } from '@tv/data-types';
 
-/**
- * Datafeed adapter wiring KLineChart Pro to our existing market-data API:
- *   - searchSymbols      -> GET /api/symbols
- *   - getHistoryKLineData-> GET /api/chart/history
- *   - subscribe/unsubscribe -> the /ws live bar stream (same protocol as useBarStream)
- *
- * SymbolInfo carries our internal symbol id + exchange:ticker key via extra fields
- * so history (by id) and the WS (by exchange:ticker) both have what they need.
- */
 export interface TvSymbolInfo extends SymbolInfo {
-  /** Our internal symbol id (ULID) — used by /api/chart/history. */
   id: string;
+}
+
+export interface DatafeedCallbacks {
+  onSymbolPeriodChange?: (symbol: SymbolInfo, period: Period) => void;
 }
 
 const WS_PROTOCOL_VERSION = 1;
@@ -30,6 +24,21 @@ export const periodToInterval = (period: Period): string => {
   };
   const suffix = unit[period.timespan] ?? 'm';
   return `${period.multiplier}${suffix}`;
+};
+
+/** Map an interval string to a KLineChart Pro Period (reverse of periodToInterval). */
+export const intervalToPeriod = (interval: string): Period => {
+  const map: Record<string, Period> = {
+    '1m': { multiplier: 1, timespan: 'minute', text: '1m' },
+    '5m': { multiplier: 5, timespan: 'minute', text: '5m' },
+    '15m': { multiplier: 15, timespan: 'minute', text: '15m' },
+    '30m': { multiplier: 30, timespan: 'minute', text: '30m' },
+    '1h': { multiplier: 1, timespan: 'hour', text: '1H' },
+    '4h': { multiplier: 4, timespan: 'hour', text: '4H' },
+    '1d': { multiplier: 1, timespan: 'day', text: '1D' },
+    '1w': { multiplier: 1, timespan: 'week', text: '1W' },
+  };
+  return map[interval] ?? { multiplier: 1, timespan: 'day', text: '1D' };
 };
 
 const barToKLine = (bar: Bar): KLineData => ({
@@ -55,6 +64,24 @@ interface LiveSocket {
 
 export class TradingviuDatafeed implements Datafeed {
   private sockets = new Map<string, LiveSocket>();
+  callbacks: DatafeedCallbacks;
+  private _maxTimestamp: number | null = null;
+
+  constructor(callbacks: DatafeedCallbacks = {}) {
+    this.callbacks = callbacks;
+  }
+
+  setMaxTimestamp(ts: number | null): void {
+    this._maxTimestamp = ts;
+  }
+
+  reset(): void {
+    for (const [key, live] of this.sockets) {
+      live.stopped = true;
+      try { live.ws.close(); } catch { void 0; }
+      this.sockets.delete(key);
+    }
+  }
 
   async searchSymbols(search?: string): Promise<SymbolInfo[]> {
     const query = search?.trim() ?? '';
@@ -77,11 +104,14 @@ export class TradingviuDatafeed implements Datafeed {
     from: number,
     to: number,
   ): Promise<KLineData[]> {
+    this.callbacks.onSymbolPeriodChange?.(symbol, period);
     const interval = periodToInterval(period);
     const res = await api.history(symbolKey(symbol), interval, 1000);
-    return res.bars
-      .map(barToKLine)
-      .filter((k) => k.timestamp >= from && k.timestamp <= to);
+    let bars = res.bars.map(barToKLine).filter((k) => k.timestamp >= from && k.timestamp <= to);
+    if (this._maxTimestamp != null) {
+      bars = bars.filter((k) => k.timestamp <= this._maxTimestamp!);
+    }
+    return bars;
   }
 
   subscribe(symbol: SymbolInfo, period: Period, callback: DatafeedSubscribeCallback): void {

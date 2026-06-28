@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { KLineChartPro, type ChartProOptions, type SymbolInfo, type Period } from '@klinecharts/pro';
+import type { Chart } from 'klinecharts';
 import '@klinecharts/pro/dist/klinecharts-pro.css';
 import { TradingviuDatafeed } from './klinepro-datafeed';
 
@@ -19,52 +20,77 @@ export interface KLineProChartProps {
   symbol: SymbolInfo;
   period?: Period;
   theme?: 'dark' | 'light';
+  datafeed?: TradingviuDatafeed;
+  hidePeriodBar?: boolean;
 }
 
-/**
- * React wrapper around the imperative KLineChart Pro widget. Pro ships the full
- * TradingView-style drawing suite (toolbar via `drawingBarVisible`), indicators,
- * period bar, and symbol search out of the box.
- */
-export function KLineProChart({ symbol, period, theme = 'dark' }: KLineProChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<KLineChartPro | null>(null);
-
-  // Mount once. Symbol/period/theme updates are pushed imperatively below.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const options: ChartProOptions = {
-      container,
-      symbol,
-      period: period ?? DEFAULT_PERIOD,
-      periods: DEFAULT_PERIODS,
-      datafeed: new TradingviuDatafeed(),
-      drawingBarVisible: true,
-      theme,
-      locale: 'en-US',
-      mainIndicators: ['MA'],
-      subIndicators: ['VOL'],
-    };
-    chartRef.current = new KLineChartPro(options);
-    return () => {
-      chartRef.current = null;
-      container.innerHTML = '';
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    chartRef.current?.setSymbol(symbol);
-  }, [symbol]);
-
-  useEffect(() => {
-    if (period) chartRef.current?.setPeriod(period);
-  }, [period]);
-
-  useEffect(() => {
-    chartRef.current?.setTheme(theme);
-  }, [theme]);
-
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+export interface KLineProChartHandle {
+  getChartApi(): Chart | null;
+  getChartPro(): KLineChartPro | null;
+  getDatafeed(): TradingviuDatafeed | null;
 }
+
+export const KLineProChart = forwardRef<KLineProChartHandle, KLineProChartProps>(
+  function KLineProChart(
+    { symbol, period, theme = 'dark', datafeed, hidePeriodBar = false },
+    ref,
+  ) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const chartProRef = useRef<KLineChartPro | null>(null);
+    const datafeedRef = useRef<TradingviuDatafeed | null>(null);
+
+    useImperativeHandle(ref, () => ({
+      getChartApi: () => (chartProRef.current as Record<string, unknown> | null)?._chartApi as Chart | null ?? null,
+      getChartPro: () => chartProRef.current,
+      getDatafeed: () => datafeedRef.current,
+    }), []);
+
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const df = datafeed ?? new TradingviuDatafeed();
+      datafeedRef.current = df;
+      const options: ChartProOptions = {
+        container,
+        symbol,
+        period: period ?? DEFAULT_PERIOD,
+        periods: DEFAULT_PERIODS,
+        datafeed: df,
+        drawingBarVisible: true,
+        theme,
+        locale: 'en-US',
+        mainIndicators: ['MA'],
+        subIndicators: ['VOL'],
+      };
+      chartProRef.current = new KLineChartPro(options);
+      return () => {
+        if (!datafeed) df.reset();
+        chartProRef.current = null;
+        datafeedRef.current = null;
+        container.innerHTML = '';
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+      chartProRef.current?.setSymbol(symbol);
+    }, [symbol]);
+
+    useEffect(() => {
+      if (period) chartProRef.current?.setPeriod(period);
+    }, [period]);
+
+    useEffect(() => {
+      chartProRef.current?.setTheme(theme);
+    }, [theme]);
+
+    // Hide period bar via CSS when requested (for layout panels).
+    useEffect(() => {
+      if (hidePeriodBar && containerRef.current) {
+        containerRef.current.classList.add('klinepro-hide-period-bar');
+      }
+    }, [hidePeriodBar]);
+
+    return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+  },
+);
