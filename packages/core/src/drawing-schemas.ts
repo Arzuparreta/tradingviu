@@ -178,6 +178,42 @@ export const KLineDrawingSchema = z.object({
 });
 export type KLineDrawing = z.infer<typeof KLineDrawingSchema>;
 
+export const DrawingAnchorV2Schema = z.object({
+  time: z.number().finite().optional(),
+  price: z.number().finite().optional(),
+  logical: z.number().finite().optional(),
+  dataIndex: z.number().finite().optional(),
+});
+export type DrawingAnchorV2 = z.infer<typeof DrawingAnchorV2Schema>;
+
+export const DrawingSyncModeSchema = z.enum(['scope', 'symbol', 'global']);
+export type DrawingSyncMode = z.infer<typeof DrawingSyncModeSchema>;
+
+export const DrawingIntervalVisibilitySchema = z.object({
+  mode: z.enum(['all', 'only', 'except']).default('all'),
+  intervals: z.array(z.string().min(1).max(16)).max(64).default([]),
+});
+export type DrawingIntervalVisibility = z.infer<typeof DrawingIntervalVisibilitySchema>;
+
+export const DrawingDocumentV2Schema = z.object({
+  version: z.literal(2),
+  id: z.string().min(1).max(120),
+  tool: DrawingToolSchema,
+  anchors: z.array(DrawingAnchorV2Schema).min(1).max(32),
+  style: z.record(z.unknown()).default({}),
+  options: z.record(z.unknown()).default({}),
+  label: z.string().min(1).max(160).optional(),
+  groupId: z.string().min(1).max(120).optional(),
+  visible: z.boolean().default(true),
+  locked: z.boolean().default(false),
+  zIndex: z.number().int().default(0),
+  syncMode: DrawingSyncModeSchema.default('scope'),
+  visibility: DrawingIntervalVisibilitySchema.default({ mode: 'all', intervals: [] }),
+  createdAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
+});
+export type DrawingDocumentV2 = z.infer<typeof DrawingDocumentV2Schema>;
+
 export const DrawingSchema = KLineDrawingSchema;
 export type Drawing = KLineDrawing;
 export const DrawingsSchema = z.array(DrawingSchema).max(500);

@@ -3,16 +3,24 @@ export {
   DrawingToolSchema,
   KLineOverlayPointSchema,
   KLineDrawingSchema,
+  DrawingAnchorV2Schema,
+  DrawingDocumentV2Schema,
+  DrawingSyncModeSchema,
+  DrawingIntervalVisibilitySchema,
   DrawingSchema,
   DrawingsSchema,
   type DrawingTool,
   type KLineOverlayPoint,
   type KLineDrawing,
   type Drawing,
+  type DrawingAnchorV2,
+  type DrawingDocumentV2,
+  type DrawingSyncMode,
+  type DrawingIntervalVisibility,
 } from '@tv/core';
 
 // ── New drawing-manager wrapper ────────────────────────────────────────
-export { LwcDrawingManager } from './drawing-manager';
+export { LwcDrawingManager, drawingAllowedOnInterval } from './drawing-manager';
 export type {
   DrawingManager,
   ChartSurfaceHandle,
@@ -23,6 +31,9 @@ export {
   libraryTypeToOurTool,
   ourDrawingToLibrary,
   libraryToOurDrawing,
+  textFieldForLibraryType,
+  textFieldForTool,
+  toolSupportsText,
 } from './convert';
 import {
   DrawingSchema,

@@ -128,6 +128,23 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Broadened browser E2E coverage for representative drawing creation/reload/clear flows across lines, channels, Fibonacci, measurement, shapes, and annotations.
 ✅ Added browser E2E coverage for `/layout` drawing-scope isolation across two panels using the same symbol.
 ✅ Added browser E2E coverage for edge drawing tools: single-anchor annotations, brush/highlighter strokes, and marker tools.
+✅ Added live placement preview canvas after the first anchor.
+✅ Added direct canvas selection, keyboard copy/paste from canvas selection, whole-object body drag, and pan suppression while dragging drawings.
+✅ Added four-corner persisted/editable parallel channels while retaining native primitive rendering.
+✅ Added batch drawing upsert/delete endpoint and client path for incremental edits while keeping `GET/PUT /api/drawings` compatibility.
+✅ Added versioned v2 drawing document schema in `@tv/core` for future sync/visibility migration.
+✅ Added drawing alert conditions and deterministic server evaluation for line/channel/rectangle-style price geometry.
+
+### Progress (2026-06-28)
+
+✅ Text annotation workflow end-to-end: text content for `text`/`callout`/`anchoredText`/`note`/`comment`/`signpost` (via the library `text` option) and `flag`/`pin` (via `label`) now round-trips through `extendData.text` ↔ library options in `convert.ts`, with an inline inspector text field (`setDrawingText`) and create/edit/reload browser coverage.
+✅ Multi-point placement for `path`/`polyline` (click to add vertices, finish on Enter or double-click) and `brush`/`highlighter`, with trailing-anchor de-duplication and capture-phase double-click so the chart never resets while finishing. Covered by browser E2E.
+✅ Deeper per-tool edit coverage: browser E2E for dragging an anchor on a 3-anchor Andrews pitchfork (only the dragged anchor moves) and dragging the body of a 3-anchor Fibonacci extension (all anchors shift), both reloading cleanly.
+✅ Interval-scoped visibility is enforced on render: `DrawingManager.setIntervalContext()` plus `drawingAllowedOnInterval()` hide drawings whose `extendData.visibility` (`{ mode: only|except, intervals }`) excludes the active interval, while the persisted `visible`/`lock` stay authoritative (drags never overwrite them).
+✅ Inspector now edits drawing sync mode (`scope`/`symbol`/`global`), interval visibility (mode + interval list), and per-drawing alert config (operator + line/upper/lower target), all persisted to `extendData` and covered by component, hook, and browser tests.
+✅ Added a deterministic canvas-pixel visual check: the selected drawing's colored line keeps painting on the chart surface through pan and wheel-zoom (proving native-primitive rendering, not a stale overlay).
+✅ Hardened test isolation: the `@tv/drawing-tools` module mock now re-exports the real module so process-wide bun mocks no longer leak partial exports into sibling test files.
+✅ Full gate green: `pnpm typecheck`, `pnpm test` (drawing-tools 11, web 25, server 63), and `pnpm e2e` (17 Playwright specs) all pass.
 
 ### 1. Stabilize foundation:
 
@@ -154,15 +171,34 @@ Use TradingView's drawing taxonomy as the product target:
    - [x] Guard toolbar tools with registry + round-trip tests.
    - [x] Add deterministic acceptance coverage for category-level management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel independence.
    - [x] Add browser-level E2E coverage for native pan/zoom and object-tree persistence.
-   - [ ] Do not add a toolbar button until the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness.
+   - [x] Do not add a toolbar button until the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness for the representative browser-covered tools.
 
 ## Where to Continue (next session)
 
-1. **Visual regression coverage** — add targeted screenshots or canvas checks for
-   selected drawings/handles after pan and zoom once the object visuals stabilize.
+The 2026-06-28 pass closed the previously-listed gaps (visual regression check,
+3-anchor edit coverage, brush/path/polyline completion, annotation text, and the
+sync/interval/alert UI). Remaining work to reach deeper TradingView parity:
 
-2. **Deeper per-tool edit coverage** — expand beyond create/reload into body drag
-   and anchor drag acceptance for higher-risk tools with unusual geometry.
+1. **Cross-scope sync execution** — the inspector persists `syncMode`
+   (`scope`/`symbol`/`global`), but drawings are still loaded/saved per scope.
+   Wire `symbol`/`global` drawings so they appear across matching charts and
+   `/layout` panels, with conflict-free batch persistence.
+
+2. **Freehand brush** — `brush`/`highlighter` currently place vertices by click
+   (finish on Enter/double-click) like `path`/`polyline`. Add a true drag-to-draw
+   gesture (mousedown→sample on move→mouseup) with chart-pan suppression while
+   the stroke is active.
+
+3. **Per-tool deep editing** — expose tool-specific options the library supports
+   but we don't surface yet (fib levels/visibility, pitchfork variants, Gann
+   ratios, long/short position risk-reward fields) in the inspector.
+
+4. **Richer text styling** — font size/family/weight/alignment and callout/note
+   box styling beyond the single text-color control.
+
+5. **Screenshot-based visual regression** — the canvas-pixel check proves the
+   drawing renders; committing golden screenshots (once visuals stabilize) would
+   catch finer rendering regressions.
 
 ## Acceptance Criteria
 

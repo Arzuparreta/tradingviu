@@ -2,12 +2,16 @@ import { describe, expect, test } from 'bun:test';
 import { getToolRegistry, type Anchor } from 'lightweight-charts-drawing';
 import {
   DrawingSchema,
+  DrawingDocumentV2Schema,
   KLINE_TOOL_LABELS,
+  drawingAllowedOnInterval,
   legacyDrawingToKLine,
   libraryToOurDrawing,
   normalizeDrawings,
   ourDrawingToLibrary,
   ourToolToLibraryType,
+  textFieldForTool,
+  toolSupportsText,
   toolCreatesDrawing,
 } from './index.js';
 import type { Drawing, DrawingTool } from './index.js';
@@ -68,6 +72,26 @@ describe('drawing schemas', () => {
     expect(drawing?.name).toBe('horizontalStraightLine');
     expect(drawing?.points[0]?.timestamp).toBe(1700000000000);
   });
+
+  test('accepts versioned v2 drawing documents', () => {
+    const doc = DrawingDocumentV2Schema.parse({
+      version: 2,
+      id: 'd2',
+      tool: 'priceChannelLine',
+      anchors: [
+        { time: 1700000000, price: 100, logical: 1 },
+        { time: 1700003600, price: 110, logical: 2 },
+        { time: 1700000000, price: 105, logical: 1 },
+        { time: 1700003600, price: 115, logical: 2 },
+      ],
+      syncMode: 'symbol',
+      createdAt: 1,
+      updatedAt: 2,
+    });
+    expect(doc.version).toBe(2);
+    expect(doc.anchors).toHaveLength(4);
+    expect(doc.visibility.mode).toBe('all');
+  });
 });
 
 describe('drawing tool helpers', () => {
@@ -89,6 +113,62 @@ describe('drawing tool helpers', () => {
       expect(definition, `${tool} maps to ${libraryType}`).toBeDefined();
       expect(definition?.requiredAnchors ?? 0, `${tool} requires anchors`).toBeGreaterThan(0);
     }
+  });
+
+  test('enforces interval-scoped visibility config', () => {
+    const base = drawingForTool('segment', 2);
+    // No config → always visible.
+    expect(drawingAllowedOnInterval(base, '1h')).toBe(true);
+    // No interval context → always visible.
+    expect(drawingAllowedOnInterval({ ...base, extendData: { visibility: { mode: 'only', intervals: ['4h'] } } }, null)).toBe(true);
+
+    const onlyFourHour = { ...base, extendData: { visibility: { mode: 'only', intervals: ['4h', '1d'] } } };
+    expect(drawingAllowedOnInterval(onlyFourHour, '4h')).toBe(true);
+    expect(drawingAllowedOnInterval(onlyFourHour, '1h')).toBe(false);
+
+    const exceptOneHour = { ...base, extendData: { visibility: { mode: 'except', intervals: ['1h'] } } };
+    expect(drawingAllowedOnInterval(exceptOneHour, '1h')).toBe(false);
+    expect(drawingAllowedOnInterval(exceptOneHour, '4h')).toBe(true);
+
+    // Empty interval list falls back to always-visible.
+    expect(drawingAllowedOnInterval({ ...base, extendData: { visibility: { mode: 'only', intervals: [] } } }, '1h')).toBe(true);
+  });
+
+  test('classifies text-bearing tools and their library option field', () => {
+    expect(toolSupportsText('text')).toBe(true);
+    expect(textFieldForTool('text')).toBe('text');
+    expect(textFieldForTool('callout')).toBe('text');
+    expect(textFieldForTool('note')).toBe('text');
+    expect(textFieldForTool('flag')).toBe('label');
+    expect(textFieldForTool('pin')).toBe('label');
+    expect(toolSupportsText('segment')).toBe(false);
+    expect(textFieldForTool('rect')).toBeNull();
+  });
+
+  test('round-trips text content through library options and extendData', () => {
+    const textDrawing: Drawing = {
+      ...drawingForTool('text', 1),
+      extendData: { text: 'Buy zone' },
+    };
+    const serialized = ourDrawingToLibrary(textDrawing);
+    expect(serialized?.type).toBe('text-annotation');
+    expect((serialized?.options as Record<string, unknown>).text).toBe('Buy zone');
+
+    const roundTrip = libraryToOurDrawing(serialized!);
+    expect((roundTrip.extendData as { text?: string }).text).toBe('Buy zone');
+  });
+
+  test('round-trips flag label content through the label option field', () => {
+    const flagDrawing: Drawing = {
+      ...drawingForTool('flag', 1),
+      extendData: { text: 'E' },
+    };
+    const serialized = ourDrawingToLibrary(flagDrawing);
+    expect(serialized?.type).toBe('flag-mark');
+    expect((serialized?.options as Record<string, unknown>).label).toBe('E');
+
+    const roundTrip = libraryToOurDrawing(serialized!);
+    expect((roundTrip.extendData as { text?: string }).text).toBe('E');
   });
 
   test('toolbar tools create and round-trip through the persisted drawing shape', () => {

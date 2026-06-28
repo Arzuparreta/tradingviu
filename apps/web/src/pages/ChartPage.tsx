@@ -22,7 +22,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import type { DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPeriod } from '../api/types';
+import type { AlertOperator, DomLevel, StrategyType, OptimizeObjective, PivotMethod, PivotPeriod } from '../api/types';
 import { useChartHistory } from '../hooks/use-chart-history';
 import { useBarStream, type StreamStatus } from '../hooks/use-bar-stream';
 import { useMarketStream } from '../hooks/use-market-stream';
@@ -196,6 +196,30 @@ export function ChartPage() {
     chartReady,
     enabled: !!user && !!symbolId,
   });
+  const addDrawingAlert = useCallback(
+    (drawingId: string, operator: string, target: string) => {
+      if (!symbolId) return;
+      const drawing = drawingMgr.drawings.find((item) => item.id === drawingId);
+      if (!drawing) return;
+      const alertTarget: 'line' | 'upper' | 'lower' =
+        target === 'upper' || target === 'lower' ? target : 'line';
+      void api.createAlert({
+        symbolId,
+        name: `${drawing.name} alert`,
+        condition: {
+          type: 'drawing',
+          operator: operator as AlertOperator,
+          drawing,
+          target: alertTarget,
+        },
+        channels: ['in_app'],
+        active: true,
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      });
+    },
+    [drawingMgr.drawings, queryClient, symbolId],
+  );
 
   const strategiesQ = useQuery({
     queryKey: ['backtest-strategies'],
@@ -1093,12 +1117,16 @@ export function ChartPage() {
             onToggleLock={drawingMgr.toggleLock}
             onToggleVisibility={drawingMgr.toggleVisibility}
             onRenameDrawing={drawingMgr.renameDrawing}
+            onSetDrawingText={drawingMgr.setDrawingText}
             onUpdateStyle={drawingMgr.updateStyle}
             onDuplicateDrawing={drawingMgr.duplicateDrawing}
             onCopyDrawing={drawingMgr.copyDrawing}
             onPasteDrawing={drawingMgr.pasteDrawing}
             onMoveDrawing={drawingMgr.moveDrawing}
             onSetDrawingGroup={drawingMgr.setDrawingGroup}
+            onSetSyncMode={drawingMgr.setDrawingSyncMode}
+            onSetIntervalVisibility={drawingMgr.setDrawingIntervals}
+            onAddAlert={addDrawingAlert}
             onUndo={drawingMgr.undo}
             onRedo={drawingMgr.redo}
           />

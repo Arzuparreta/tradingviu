@@ -598,6 +598,14 @@ label {
   padding: 3px 7px;
   font-size: 11px;
 }
+.lwc-drawing-inspector textarea.lwc-drawing-text-input {
+  min-width: 0;
+  width: 100%;
+  padding: 4px 7px;
+  font-size: 11px;
+  resize: vertical;
+  font-family: inherit;
+}
 .lwc-drawing-inspector-actions {
   display: flex;
   align-items: center;
@@ -640,6 +648,23 @@ label {
   min-width: 30px;
   height: 28px;
   padding: 0;
+}
+.lwc-drawing-sync-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+}
+.lwc-drawing-alert-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+}
+.lwc-drawing-alert-row button {
+  height: 28px;
+  font-size: 11px;
+  padding: 0 8px;
 }
 .chart-panel-loading {
   position: absolute;

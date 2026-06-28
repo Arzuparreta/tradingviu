@@ -32,15 +32,33 @@ Browser E2E now covers cursor-mode pan/zoom, object-tree edit/reload/delete pers
 representative create/reload/clear flows across major drawing categories, and
 `/layout` drawing-scope isolation across two panels using the same symbol. It also
 covers edge creation/reload flows for single-anchor annotations, brush/highlighter
-strokes, and marker tools.
+strokes, marker tools, live preview after the first anchor, whole-object body drag,
+four-corner parallel-channel editing, and canvas-selection copy/paste.
+
+## Session Progress (2026-06-28 follow-up)
+
+✅ **Closed the previously-open gaps.** Text annotation workflow (round-trip +
+inline edit), multi-point placement for path/polyline/brush/highlighter, 3-anchor
+pitchfork/fib body+anchor drag coverage, interval-scoped visibility enforcement,
+and the sync-mode / interval-visibility / drawing-alert inspector UI are all
+implemented and covered by deterministic unit/component/hook tests plus browser
+E2E. A canvas-pixel visual check proves the selected drawing keeps rendering
+through pan and zoom. Full gate passes: `pnpm typecheck`, `pnpm test`
+(drawing-tools 11, web 25, server 63), and `pnpm e2e` (17 specs).
 
 ## Where to Continue
 
-1. **Visual regression coverage** — add targeted screenshots or canvas checks for
-   selected drawings/handles after pan and zoom once the object visuals stabilize.
+1. **Cross-scope sync execution** — `extendData.syncMode` is persisted but not yet
+   acted on; load/save `symbol`/`global` drawings across matching charts and panels.
 
-2. **Deeper per-tool edit coverage** — expand beyond create/reload into body drag
-   and anchor drag acceptance for higher-risk tools with unusual geometry.
+2. **Freehand brush gesture** — replace click-to-add vertices for brush/highlighter
+   with true drag sampling while suppressing chart pan.
+
+3. **Per-tool deep editing** — surface fib levels, pitchfork/Gann variants, and
+   long/short position risk-reward fields in the inspector.
+
+4. **Richer text styling + golden-screenshot visual regression** once visuals
+   stabilize.
 
 ## Verification commands (copy-paste ready)
 

@@ -55,7 +55,7 @@ import type {
   ScreenerResult,
   ScreenerMetricDef,
   YieldCurvePoint,
-  PriceAlertCondition,
+  AlertCondition,
   OptionPriceResult,
   StrategyAnalysis,
   StrategyTemplate,
@@ -422,6 +422,11 @@ export const api = {
       `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
       { method: 'PUT', body: JSON.stringify({ drawings }) },
     ),
+  batchDrawings: (symbol: string, interval: string, body: { upsert?: Drawing[]; deleteIds?: string[] }, scope?: string) =>
+    request<{ ok: true }>(
+      `/api/drawings/batch?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   pineValidate: (source: string) =>
     request<ValidateResult>('/api/pine/validate', {
       method: 'POST',
@@ -438,7 +443,7 @@ export const api = {
   createAlert: (body: {
     symbolId: string;
     name: string;
-    condition: PriceAlertCondition;
+    condition: AlertCondition;
     channels: string[];
     webhookUrl?: string;
     active?: boolean;

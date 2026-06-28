@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  Bell,
   BadgeCent,
   BadgeDollarSign,
   CalendarDays,
@@ -47,7 +48,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { DrawingTool } from '@tv/drawing-tools';
-import { KLINE_TOOL_GROUPS, KLINE_TOOL_LABELS } from '@tv/drawing-tools';
+import { KLINE_TOOL_GROUPS, KLINE_TOOL_LABELS, toolSupportsText } from '@tv/drawing-tools';
 import type { DrawingManager } from '@tv/drawing-tools';
 import type { Drawing } from '@tv/drawing-tools';
 import type { DrawingStylePatch } from '../hooks/use-drawing-manager';
@@ -191,6 +192,61 @@ const drawingDisplayName = (drawing: Drawing): string => {
   return TOOL_LABELS.get(drawing.name) ?? drawing.name;
 };
 
+const drawingTextValue = (drawing: Drawing): string => {
+  const extendData = drawing.extendData;
+  if (extendData && typeof extendData === 'object' && !Array.isArray(extendData)) {
+    const text = (extendData as Record<string, unknown>).text;
+    if (typeof text === 'string') return text;
+  }
+  return '';
+};
+
+type SyncModeValue = 'scope' | 'symbol' | 'global';
+type IntervalVisibilityMode = 'all' | 'only' | 'except';
+
+const drawingExtend = (drawing: Drawing): Record<string, unknown> => {
+  const extendData = drawing.extendData;
+  return extendData && typeof extendData === 'object' && !Array.isArray(extendData)
+    ? (extendData as Record<string, unknown>)
+    : {};
+};
+
+const drawingSyncMode = (drawing: Drawing): SyncModeValue => {
+  const mode = drawingExtend(drawing).syncMode;
+  return mode === 'symbol' || mode === 'global' ? mode : 'scope';
+};
+
+const drawingVisibility = (drawing: Drawing): { mode: IntervalVisibilityMode; intervals: string[] } => {
+  const visibility = drawingExtend(drawing).visibility;
+  if (visibility && typeof visibility === 'object' && !Array.isArray(visibility)) {
+    const vis = visibility as { mode?: unknown; intervals?: unknown };
+    const mode: IntervalVisibilityMode = vis.mode === 'only' || vis.mode === 'except' ? vis.mode : 'all';
+    const intervals = Array.isArray(vis.intervals)
+      ? vis.intervals.filter((value): value is string => typeof value === 'string')
+      : [];
+    return { mode, intervals };
+  }
+  return { mode: 'all', intervals: [] };
+};
+
+const intervalsFromText = (value: string): string[] =>
+  value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+const ALERT_OPERATORS: readonly (readonly [string, string])[] = [
+  ['crosses_above', 'Crosses up'],
+  ['crosses_below', 'Crosses down'],
+  ['above', 'Above'],
+  ['below', 'Below'],
+];
+const ALERT_TARGETS: readonly (readonly [string, string])[] = [
+  ['line', 'Line'],
+  ['upper', 'Upper'],
+  ['lower', 'Lower'],
+];
+
 const drawingStyleValue = (
   drawing: Drawing | null,
   section: 'line' | 'polygon' | 'text',
@@ -247,12 +303,16 @@ export interface DrawingToolbarProps {
   onToggleLock: (id: string) => void;
   onToggleVisibility: (id: string) => void;
   onRenameDrawing: (id: string, label: string) => void;
+  onSetDrawingText: (id: string, text: string) => void;
   onUpdateStyle: (id: string, patch: DrawingStylePatch) => void;
   onDuplicateDrawing: (id: string) => void;
   onCopyDrawing: (id: string) => void;
   onPasteDrawing: () => void;
   onMoveDrawing: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
   onSetDrawingGroup: (id: string, groupId: string | null) => void;
+  onSetSyncMode: (id: string, mode: 'scope' | 'symbol' | 'global') => void;
+  onSetIntervalVisibility: (id: string, mode: 'all' | 'only' | 'except', intervals: string[]) => void;
+  onAddAlert?: (id: string, operator: string, target: string) => void;
   onUndo: () => void;
   onRedo: () => void;
 }
@@ -275,12 +335,16 @@ export function DrawingToolbar({
   onToggleLock,
   onToggleVisibility,
   onRenameDrawing,
+  onSetDrawingText,
   onUpdateStyle,
   onDuplicateDrawing,
   onCopyDrawing,
   onPasteDrawing,
   onMoveDrawing,
   onSetDrawingGroup,
+  onSetSyncMode,
+  onSetIntervalVisibility,
+  onAddAlert,
   onUndo,
   onRedo,
 }: DrawingToolbarProps) {
@@ -292,6 +356,11 @@ export function DrawingToolbar({
   const [styleTemplates, setStyleTemplates] = useState<StyleTemplate[]>(() => readJsonArray<StyleTemplate>(STYLE_TEMPLATES_KEY));
   const [magnetMode, setMagnetMode] = useState(false);
   const [stayMode, setStayMode] = useState(false);
+  const [objectSyncMode, setObjectSyncMode] = useState<SyncModeValue>('scope');
+  const [intervalMode, setIntervalMode] = useState<IntervalVisibilityMode>('all');
+  const [intervalText, setIntervalText] = useState('');
+  const [alertOperator, setAlertOperator] = useState('crosses_above');
+  const [alertTarget, setAlertTarget] = useState('line');
   const selected = drawings.find((d) => d.id === selectedId) ?? null;
   const selectedLocked = selected?.lock ?? false;
   const selectedVisible = selected?.visible !== false;
@@ -314,6 +383,17 @@ export function DrawingToolbar({
     return q.length === 0 || label.toLowerCase().includes(q);
   });
   const quickTools = [...favoriteToolEntries, ...recentToolEntries.filter(([tool]) => !favoriteTools.includes(tool))].slice(0, 10);
+
+  // Sync the editable sync/visibility controls when the selection changes.
+  useEffect(() => {
+    if (!selected) return;
+    setObjectSyncMode(drawingSyncMode(selected));
+    const visibility = drawingVisibility(selected);
+    setIntervalMode(visibility.mode);
+    setIntervalText(visibility.intervals.join(', '));
+    // Only re-sync on selection change, not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   const rememberRecentTool = (tool: DrawingTool) => {
     if (tool === 'cursor') return;
@@ -675,12 +755,24 @@ export function DrawingToolbar({
                 aria-label="Object name"
                 onBlur={(e) => onRenameDrawing(selected.id, e.currentTarget.value)}
               />
+              {toolSupportsText(selected.name) && (
+                <textarea
+                  key={`text-${selected.id}`}
+                  className="lwc-drawing-text-input"
+                  defaultValue={drawingTextValue(selected)}
+                  aria-label="Text content"
+                  placeholder="Text"
+                  rows={2}
+                  onBlur={(e) => onSetDrawingText(selected.id, e.currentTarget.value)}
+                />
+              )}
               <div className="lwc-drawing-inspector-actions">
                 <button className="ghost icon" type="button" onClick={() => onMoveDrawing(selected.id, 'top')} title="Bring to front" aria-label="Bring to front"><ArrowUp size={14} /></button>
                 <button className="ghost icon" type="button" onClick={() => onMoveDrawing(selected.id, 'up')} title="Forward" aria-label="Forward"><ArrowUp size={14} /></button>
                 <button className="ghost icon" type="button" onClick={() => onMoveDrawing(selected.id, 'down')} title="Backward" aria-label="Backward"><ArrowDown size={14} /></button>
                 <button className="ghost icon" type="button" onClick={() => onMoveDrawing(selected.id, 'bottom')} title="Send to back" aria-label="Send to back"><ArrowDown size={14} /></button>
                 <button className="ghost icon" type="button" onClick={() => onCopyDrawing(selected.id)} title="Copy" aria-label="Copy"><Copy size={14} /></button>
+                {onAddAlert && <button className="ghost icon" type="button" onClick={() => onAddAlert(selected.id, alertOperator, alertTarget)} title="Add alert" aria-label="Add alert"><Bell size={14} /></button>}
                 <button className="ghost icon" type="button" onClick={() => onToggleVisibility(selected.id)} title="Hide / show" aria-label="Hide / show">{selectedVisible ? <Eye size={14} /> : <EyeOff size={14} />}</button>
                 <button className="ghost icon" type="button" onClick={() => onToggleLock(selected.id)} title="Lock" aria-label="Lock">{selectedLocked ? <Lock size={14} /> : <LockOpen size={14} />}</button>
               </div>
@@ -719,6 +811,63 @@ export function DrawingToolbar({
                 placeholder="Group"
                 onBlur={(e) => onSetDrawingGroup(selected.id, e.currentTarget.value || null)}
               />
+              <div className="lwc-drawing-sync-row">
+                <select
+                  aria-label="Sync mode"
+                  value={objectSyncMode}
+                  onChange={(e) => {
+                    const mode = e.currentTarget.value as SyncModeValue;
+                    setObjectSyncMode(mode);
+                    onSetSyncMode(selected.id, mode);
+                  }}
+                >
+                  <option value="scope">This chart</option>
+                  <option value="symbol">Symbol</option>
+                  <option value="global">All charts</option>
+                </select>
+                <select
+                  aria-label="Interval visibility"
+                  value={intervalMode}
+                  onChange={(e) => {
+                    const mode = e.currentTarget.value as IntervalVisibilityMode;
+                    setIntervalMode(mode);
+                    onSetIntervalVisibility(selected.id, mode, intervalsFromText(intervalText));
+                  }}
+                >
+                  <option value="all">All intervals</option>
+                  <option value="only">Only</option>
+                  <option value="except">Except</option>
+                </select>
+              </div>
+              {intervalMode !== 'all' && (
+                <input
+                  key={`intervals-${selected.id}`}
+                  value={intervalText}
+                  aria-label="Visible intervals"
+                  placeholder="1h, 4h, 1d"
+                  onChange={(e) => setIntervalText(e.currentTarget.value)}
+                  onBlur={(e) =>
+                    onSetIntervalVisibility(selected.id, intervalMode, intervalsFromText(e.currentTarget.value))
+                  }
+                />
+              )}
+              {onAddAlert && (
+                <div className="lwc-drawing-alert-row">
+                  <select aria-label="Alert condition" value={alertOperator} onChange={(e) => setAlertOperator(e.currentTarget.value)}>
+                    {ALERT_OPERATORS.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <select aria-label="Alert target" value={alertTarget} onChange={(e) => setAlertTarget(e.currentTarget.value)}>
+                    {ALERT_TARGETS.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <button className="ghost" type="button" onClick={() => onAddAlert(selected.id, alertOperator, alertTarget)} title="Create alert">
+                    Add alert
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

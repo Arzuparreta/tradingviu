@@ -1,4 +1,5 @@
 import type { LayoutConfig } from '@tv/layout-sync';
+import type { Drawing } from '@tv/drawing-tools';
 
 export interface LayoutRow {
   id: string;
@@ -442,12 +443,21 @@ export interface PriceAlertCondition {
   value: number;
 }
 
+export interface DrawingAlertCondition {
+  type: 'drawing';
+  operator: AlertOperator;
+  drawing: Drawing;
+  target?: 'line' | 'upper' | 'lower';
+}
+
+export type AlertCondition = PriceAlertCondition | DrawingAlertCondition | Record<string, unknown>;
+
 export interface AlertRow {
   id: string;
   symbolId: string;
   name: string;
   kind: string;
-  condition: PriceAlertCondition | Record<string, unknown>;
+  condition: AlertCondition;
   channels: AlertChannel[];
   webhookUrl: string | null;
   active: boolean;

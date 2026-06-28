@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drawings as drawingsTable } from '@tv/db/schema';
 import { DrawingsSchema } from '@tv/drawing-tools';
 import { tryGetTenant, type TenantContext } from '@tv/core';
@@ -17,6 +17,10 @@ const ScopeQuery = z.object({
 });
 
 const SaveBody = z.object({ drawings: DrawingsSchema });
+const BatchBody = z.object({
+  upsert: DrawingsSchema.default([]),
+  deleteIds: z.array(z.string().min(1).max(120)).max(500).default([]),
+});
 
 export const drawingRoutes = new Hono()
   .get('/drawings', zValidator('query', ScopeQuery), async (c) => {
@@ -83,6 +87,62 @@ export const drawingRoutes = new Hono()
           };
         }),
       );
+    }
+    return c.json({ ok: true });
+  })
+  .post('/drawings/batch', zValidator('query', ScopeQuery), zValidator('json', BatchBody), async (c) => {
+    const db = c.get('db');
+    const tenant = tryGetTenant() as TenantContext;
+    const { symbol, interval, scope } = c.req.valid('query');
+    const scopeId = scope ?? legacyDrawingScope(symbol, interval);
+    const { upsert, deleteIds } = c.req.valid('json');
+    const now = new Date();
+
+    if (deleteIds.length > 0) {
+      await db
+        .delete(drawingsTable)
+        .where(
+          and(
+            eq(drawingsTable.tenantId, tenant.tenantId),
+            eq(drawingsTable.userId, tenant.userId),
+            eq(drawingsTable.symbolId, symbol),
+            eq(drawingsTable.interval, interval),
+            eq(drawingsTable.scopeId, scopeId),
+            inArray(drawingsTable.id, deleteIds),
+          ),
+        );
+    }
+
+    if (upsert.length > 0) {
+      await db
+        .insert(drawingsTable)
+        .values(
+          upsert.map((d) => {
+            const cols = drawingToColumns(d);
+            return {
+              id: cols.id,
+              tenantId: tenant.tenantId,
+              userId: tenant.userId,
+              symbolId: symbol,
+              interval,
+              scopeId,
+              kind: cols.kind,
+              geometry: cols.geometry,
+              style: cols.style,
+              createdAt: now,
+              updatedAt: now,
+            };
+          }),
+        )
+        .onConflictDoUpdate({
+          target: drawingsTable.id,
+          set: {
+            kind: sql`excluded.kind`,
+            geometry: sql`excluded.geometry`,
+            style: sql`excluded.style`,
+            updatedAt: now,
+          },
+        });
     }
     return c.json({ ok: true });
   });

@@ -54,6 +54,9 @@ interface UseDrawingManagerResult {
   toggleLock: (id: string) => void;
   toggleVisibility: (id: string) => void;
   renameDrawing: (id: string, label: string) => void;
+  setDrawingText: (id: string, text: string) => void;
+  setDrawingSyncMode: (id: string, mode: DrawingSyncMode) => void;
+  setDrawingIntervals: (id: string, mode: IntervalVisibilityMode, intervals: readonly string[]) => void;
   updateStyle: (id: string, patch: DrawingStylePatch) => void;
   duplicateDrawing: (id: string) => void;
   copyDrawing: (id: string) => void;
@@ -96,6 +99,11 @@ const sortDrawings = (items: readonly Drawing[]): Drawing[] =>
 const sameDrawings = (a: readonly Drawing[], b: readonly Drawing[]): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
+const deletedDrawingIds = (before: readonly Drawing[], after: readonly Drawing[]): string[] => {
+  const afterIds = new Set(after.map((drawing) => drawing.id));
+  return before.map((drawing) => drawing.id).filter((id) => !afterIds.has(id));
+};
+
 const normalizeZLevels = (items: readonly Drawing[]): Drawing[] =>
   items.map((drawing, index) => ({ ...drawing, zLevel: index, updatedAt: drawing.updatedAt }));
 
@@ -111,6 +119,56 @@ const withLabel = (drawing: Drawing, label: string): Drawing => {
     extendData.label = trimmed;
   } else {
     delete extendData.label;
+  }
+  return {
+    ...drawing,
+    extendData: Object.keys(extendData).length > 0 ? extendData : undefined,
+    updatedAt: nowMs(),
+  };
+};
+
+const cloneExtendData = (drawing: Drawing): Record<string, unknown> =>
+  drawing.extendData &&
+  typeof drawing.extendData === 'object' &&
+  !Array.isArray(drawing.extendData)
+    ? { ...(drawing.extendData as Record<string, unknown>) }
+    : {};
+
+const withText = (drawing: Drawing, text: string): Drawing => {
+  const extendData = cloneExtendData(drawing);
+  extendData.text = text;
+  return {
+    ...drawing,
+    extendData,
+    updatedAt: nowMs(),
+  };
+};
+
+export type DrawingSyncMode = 'scope' | 'symbol' | 'global';
+export type IntervalVisibilityMode = 'all' | 'only' | 'except';
+
+const withSyncMode = (drawing: Drawing, mode: DrawingSyncMode): Drawing => {
+  const extendData = cloneExtendData(drawing);
+  if (mode === 'scope') delete extendData.syncMode;
+  else extendData.syncMode = mode;
+  return {
+    ...drawing,
+    extendData: Object.keys(extendData).length > 0 ? extendData : undefined,
+    updatedAt: nowMs(),
+  };
+};
+
+const withVisibility = (
+  drawing: Drawing,
+  mode: IntervalVisibilityMode,
+  intervals: readonly string[],
+): Drawing => {
+  const extendData = cloneExtendData(drawing);
+  const cleaned = intervals.map((value) => value.trim()).filter((value) => value.length > 0);
+  if (mode === 'all' || cleaned.length === 0) {
+    delete extendData.visibility;
+  } else {
+    extendData.visibility = { mode, intervals: cleaned };
   }
   return {
     ...drawing,
@@ -240,6 +298,7 @@ export function useDrawingManager({
     interval: string;
     scope: string;
     drawings: Drawing[];
+    deleteIds: string[];
   } | null>(null);
 
   const setDrawingsState = useCallback((next: readonly Drawing[]) => {
@@ -257,14 +316,19 @@ export function useDrawingManager({
     pending.current = null;
     if (!p) return;
     queryClient.setQueryData(['drawings', p.symbol, p.interval, p.scope], { drawings: p.drawings });
-    void api.saveDrawings(p.symbol, p.interval, p.drawings, p.scope).catch(() => undefined);
+    void api.batchDrawings(
+      p.symbol,
+      p.interval,
+      { upsert: p.drawings, deleteIds: p.deleteIds },
+      p.scope,
+    ).catch(() => undefined);
   }, [queryClient]);
 
   const queueSave = useCallback(
-    (newDrawings: readonly Drawing[]) => {
+    (newDrawings: readonly Drawing[], deleteIds: readonly string[] = []) => {
       if (!symbolId || !storageScope) return;
       const payload = sortDrawings(newDrawings);
-      pending.current = { symbol: symbolId, interval, scope: storageScope, drawings: payload };
+      pending.current = { symbol: symbolId, interval, scope: storageScope, drawings: payload, deleteIds: [...deleteIds] };
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
     },
@@ -292,6 +356,7 @@ export function useDrawingManager({
     }
 
     readyRef.current = true;
+    mgr.setIntervalContext?.(interval);
 
     // Subscribe to changes
     const unsubChange = mgr.onChange((newDrawings) => {
@@ -308,11 +373,19 @@ export function useDrawingManager({
         setUndoStack((s) => [...s.slice(-(MAX_UNDO - 1)), before]);
         setRedoStack([]);
       }
-      queueSave(sorted);
+      queueSave(sorted, deletedDrawingIds(before, sorted));
     });
+    const unsubSelection = mgr.onSelectionChange?.((id) => {
+      setSelectedId(id);
+      if (id) {
+        setActiveTool(null);
+        setIsPlacing(false);
+      }
+    }) ?? (() => undefined);
 
     return () => {
       unsubChange();
+      unsubSelection();
       flush();
       mgr.detach();
       readyRef.current = false;
@@ -337,6 +410,12 @@ export function useDrawingManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, scopeKey, query.data, setDrawingsState, readyRef.current]);
 
+  // Keep interval-scoped visibility in sync when the chart interval changes.
+  useEffect(() => {
+    if (!readyRef.current) return;
+    managerRef.current?.setIntervalContext?.(interval);
+  }, [interval]);
+
   // Cleanup on unmount
   useEffect(() => () => flush(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -359,7 +438,7 @@ export function useDrawingManager({
       }
       setDrawingsState(next);
       setSelectedId(selected);
-      queueSave(next);
+      queueSave(next, deletedDrawingIds(before, next));
     },
     [queueSave, setDrawingsState],
   );
@@ -424,6 +503,36 @@ export function useDrawingManager({
     (id: string, label: string) => {
       const next = drawingsRef.current.map((drawing) =>
         drawing.id === id ? withLabel(drawing, label) : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
+
+  const setDrawingText = useCallback(
+    (id: string, text: string) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? withText(drawing, text) : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
+
+  const setDrawingSyncMode = useCallback(
+    (id: string, mode: DrawingSyncMode) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? withSyncMode(drawing, mode) : drawing,
+      );
+      commitDrawings(next, id);
+    },
+    [commitDrawings],
+  );
+
+  const setDrawingIntervals = useCallback(
+    (id: string, mode: IntervalVisibilityMode, intervals: readonly string[]) => {
+      const next = drawingsRef.current.map((drawing) =>
+        drawing.id === id ? withVisibility(drawing, mode, intervals) : drawing,
       );
       commitDrawings(next, id);
     },
@@ -520,7 +629,7 @@ export function useDrawingManager({
     setRedoStack((s) => [...s.slice(-(MAX_UNDO - 1)), current]);
     setDrawingsState(prev);
     setSelectedId(null);
-    queueSave(prev);
+    queueSave(prev, deletedDrawingIds(current, prev));
   }, [queueSave, setDrawingsState, undoStack]);
 
   const redo = useCallback(() => {
@@ -536,7 +645,7 @@ export function useDrawingManager({
     setUndoStack((s) => [...s.slice(-(MAX_UNDO - 1)), current]);
     setDrawingsState(next);
     setSelectedId(null);
-    queueSave(next);
+    queueSave(next, deletedDrawingIds(current, next));
   }, [queueSave, redoStack, setDrawingsState]);
 
   return {
@@ -554,6 +663,9 @@ export function useDrawingManager({
     toggleLock,
     toggleVisibility,
     renameDrawing,
+    setDrawingText,
+    setDrawingSyncMode,
+    setDrawingIntervals,
     updateStyle,
     duplicateDrawing,
     copyDrawing,

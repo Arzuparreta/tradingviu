@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IntervalSchema } from './time.js';
+import { DrawingSchema } from './drawing-schemas.js';
 
 export const AlertChannelSchema = z.enum(['in_app', 'email', 'webhook']);
 export type AlertChannel = z.infer<typeof AlertChannelSchema>;
@@ -29,12 +30,21 @@ export const IndicatorAlertConditionSchema = z.object({
   value: z.number().finite(),
 });
 
+export const DrawingAlertConditionSchema = z.object({
+  type: z.literal('drawing'),
+  operator: AlertOperatorSchema,
+  drawing: DrawingSchema,
+  target: z.enum(['line', 'upper', 'lower']).default('line'),
+});
+
 export type PriceAlertCondition = z.infer<typeof PriceAlertConditionSchema>;
 export type IndicatorAlertCondition = z.infer<typeof IndicatorAlertConditionSchema>;
+export type DrawingAlertCondition = z.infer<typeof DrawingAlertConditionSchema>;
 
 export type AlertCondition =
   | PriceAlertCondition
   | IndicatorAlertCondition
+  | DrawingAlertCondition
   | {
       type: 'multi';
       match: 'all' | 'any';
@@ -45,6 +55,7 @@ export const AlertConditionSchema: z.ZodType<AlertCondition, z.ZodTypeDef, unkno
   z.discriminatedUnion('type', [
     PriceAlertConditionSchema,
     IndicatorAlertConditionSchema,
+    DrawingAlertConditionSchema,
     z.object({
       type: z.literal('multi'),
       match: z.enum(['all', 'any']),

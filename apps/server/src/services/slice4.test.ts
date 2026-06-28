@@ -19,6 +19,66 @@ describe('slice 4 engines', () => {
     expect(result.value).toBe(110);
   });
 
+  test('evaluates drawing trendline crosses', () => {
+    const result = evaluateAlertCondition(
+      {
+        type: 'drawing',
+        operator: 'crosses_above',
+        target: 'line',
+        drawing: {
+          engine: 'klinecharts',
+          id: 'draw_trend',
+          name: 'segment',
+          points: [
+            { timestamp: 1_000, value: 102 },
+            { timestamp: 2_000, value: 106 },
+          ],
+          styles: null,
+          mode: 'normal',
+          lock: false,
+          visible: true,
+          zLevel: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      { price: 110, previousPrice: 100, bars },
+    );
+    expect(result.fired).toBe(true);
+    expect(result.value).toBe(106);
+  });
+
+  test('evaluates drawing channel upper line crosses', () => {
+    const result = evaluateAlertCondition(
+      {
+        type: 'drawing',
+        operator: 'crosses_above',
+        target: 'upper',
+        drawing: {
+          engine: 'klinecharts',
+          id: 'draw_channel',
+          name: 'priceChannelLine',
+          points: [
+            { timestamp: 1_000, value: 90 },
+            { timestamp: 2_000, value: 95 },
+            { timestamp: 1_000, value: 104 },
+            { timestamp: 2_000, value: 106 },
+          ],
+          styles: null,
+          mode: 'normal',
+          lock: false,
+          visible: true,
+          zLevel: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+      { price: 110, previousPrice: 100, bars },
+    );
+    expect(result.fired).toBe(true);
+    expect(result.value).toBe(106);
+  });
+
   test('rebuilds portfolio holdings and realized pnl', () => {
     const result = computeHoldings([
       {

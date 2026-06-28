@@ -196,12 +196,15 @@ export function ChartPanel({
               onToggleLock={drawingMgr.toggleLock}
               onToggleVisibility={drawingMgr.toggleVisibility}
               onRenameDrawing={drawingMgr.renameDrawing}
+              onSetDrawingText={drawingMgr.setDrawingText}
               onUpdateStyle={drawingMgr.updateStyle}
               onDuplicateDrawing={drawingMgr.duplicateDrawing}
               onCopyDrawing={drawingMgr.copyDrawing}
               onPasteDrawing={drawingMgr.pasteDrawing}
               onMoveDrawing={drawingMgr.moveDrawing}
               onSetDrawingGroup={drawingMgr.setDrawingGroup}
+              onSetSyncMode={drawingMgr.setDrawingSyncMode}
+              onSetIntervalVisibility={drawingMgr.setDrawingIntervals}
               onUndo={drawingMgr.undo}
               onRedo={drawingMgr.redo}
             />

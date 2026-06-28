@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { AlertOperator, PriceAlertCondition, Symbol } from '../api/types';
+import type { AlertCondition, AlertOperator, Symbol } from '../api/types';
 
 const operators: AlertOperator[] = ['above', 'below', 'crosses_above', 'crosses_below', 'equals'];
 
-const formatCondition = (condition: PriceAlertCondition | Record<string, unknown>): string => {
+const formatCondition = (condition: AlertCondition): string => {
   if (condition.type === 'price') {
     return `price ${String(condition.operator)} ${String(condition.value)}`;
+  }
+  if (condition.type === 'drawing' && 'drawing' in condition && condition.drawing && typeof condition.drawing === 'object') {
+    const drawing = condition.drawing as { readonly name?: unknown };
+    return `${String(drawing.name ?? 'drawing')} ${String(condition.target ?? 'line')} ${String(condition.operator)}`;
   }
   return String(condition.type ?? 'condition');
 };

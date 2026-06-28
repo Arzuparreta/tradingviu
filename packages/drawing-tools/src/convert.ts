@@ -174,6 +174,41 @@ export const ourToolToLibraryType = (name: string): string =>
 export const libraryTypeToOurTool = (type: string): string =>
   LIBRARY_TO_OUR[type] ?? 'segment';
 
+// ── Text-bearing tools ──────────────────────────────────────────────────
+// Tools whose library option object carries editable text. The value tells
+// us which option field the library reads/writes for that drawing.
+
+const TEXT_FIELD_BY_LIBRARY_TYPE: Record<string, 'text' | 'label'> = {
+  'text-annotation': 'text',
+  callout: 'text',
+  'anchored-text': 'text',
+  note: 'text',
+  comment: 'text',
+  signpost: 'text',
+  'flag-mark': 'label',
+  pin: 'label',
+};
+
+/** Returns the library option field used for text on this library type, if any. */
+export const textFieldForLibraryType = (type: string): 'text' | 'label' | null =>
+  TEXT_FIELD_BY_LIBRARY_TYPE[type] ?? null;
+
+/** Returns the library option field used for text on this persisted tool name, if any. */
+export const textFieldForTool = (name: string): 'text' | 'label' | null =>
+  textFieldForLibraryType(ourToolToLibraryType(name));
+
+/** Whether this persisted tool supports editable text content. */
+export const toolSupportsText = (name: string): boolean => textFieldForTool(name) !== null;
+
+const readExtendText = (drawing: Drawing): string | undefined => {
+  const extend = drawing.extendData;
+  if (extend && typeof extend === 'object' && !Array.isArray(extend)) {
+    const value = (extend as Record<string, unknown>).text;
+    if (typeof value === 'string') return value;
+  }
+  return undefined;
+};
+
 // ── Point conversion ────────────────────────────────────────────────────
 
 /**
@@ -252,18 +287,26 @@ export const ourDrawingToLibrary = (drawing: Drawing): SerializedDrawing | null 
   }
   if (anchors.length === 0) return null;
 
+  const options: SerializedDrawing['options'] = {
+    visible: drawing.visible !== false,
+    locked: drawing.lock === true,
+    zIndex: drawing.zLevel ?? 0,
+    extendLeft: libType === 'extended-line' || libType === 'ray',
+    extendRight: libType === 'extended-line' || libType === 'ray',
+  };
+
+  const textField = textFieldForLibraryType(libType);
+  const text = readExtendText(drawing);
+  if (textField && text !== undefined) {
+    (options as Record<string, unknown>)[textField] = text;
+  }
+
   return {
     id: drawing.id,
     type: libType,
     anchors,
     style: extractStyle(drawing),
-    options: {
-      visible: drawing.visible !== false,
-      locked: drawing.lock === true,
-      zIndex: drawing.zLevel ?? 0,
-      extendLeft: libType === 'extended-line' || libType === 'ray',
-      extendRight: libType === 'extended-line' || libType === 'ray',
-    },
+    options,
   };
 };
 
@@ -272,6 +315,9 @@ export const ourDrawingToLibrary = (drawing: Drawing): SerializedDrawing | null 
  */
 export const libraryToOurDrawing = (ser: SerializedDrawing): Drawing => {
   const now = Date.now();
+  const textField = textFieldForLibraryType(ser.type);
+  const rawText = textField ? (ser.options as Record<string, unknown>)[textField] : undefined;
+  const extendData = typeof rawText === 'string' ? { text: rawText } : undefined;
   return {
     engine: 'klinecharts',
     id: ser.id,
@@ -297,7 +343,7 @@ export const libraryToOurDrawing = (ser: SerializedDrawing): Drawing => {
     lock: ser.options.locked === true,
     visible: ser.options.visible !== false,
     zLevel: ser.options.zIndex ?? 0,
-    extendData: undefined,
+    extendData,
     createdAt: now,
     updatedAt: now,
   };

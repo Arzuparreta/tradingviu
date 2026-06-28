@@ -4,6 +4,10 @@ import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { createElement, useRef } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ChartSurfaceHandle, Drawing } from '@tv/drawing-tools';
+// Import the real module up-front so the mock below can re-export everything it
+// does not override. `mock.module` is process-wide in bun, so a partial mock
+// would otherwise leak undefined exports into other test files.
+import * as realDrawingTools from '@tv/drawing-tools';
 
 const instances: FakeDrawingManager[] = [];
 
@@ -63,23 +67,23 @@ class FakeDrawingManager {
 }
 
 mock.module('@tv/drawing-tools', () => ({
+  ...realDrawingTools,
   LwcDrawingManager: FakeDrawingManager,
-  ourToolToLibraryType: (name: string) => name,
 }));
 
 const drawingsMock = mock(
   (_symbolId: string, _interval: string, scope?: string) =>
     Promise.resolve({ drawings: [drawing(`${scope ?? 'symbol'}-server`, 100)] }),
 );
-const saveDrawingsMock = mock(
-  (_symbolId: string, _interval: string, _drawings: Drawing[], _scope?: string) =>
+const batchDrawingsMock = mock(
+  (_symbolId: string, _interval: string, _body: { upsert?: Drawing[]; deleteIds?: string[] }, _scope?: string) =>
     Promise.resolve({ ok: true }),
 );
 
 mock.module('../src/api/client', () => ({
   api: {
     drawings: drawingsMock,
-    saveDrawings: saveDrawingsMock,
+    batchDrawings: batchDrawingsMock,
   },
 }));
 
@@ -194,7 +198,7 @@ afterEach(() => {
   instances.length = 0;
   singleResult = null;
   drawingsMock.mockClear();
-  saveDrawingsMock.mockClear();
+  batchDrawingsMock.mockClear();
 });
 
 afterAll(() => {
@@ -240,12 +244,74 @@ describe('useDrawingManager object management', () => {
 
     await waitFor(
       () => {
-        expect(saveDrawingsMock).toHaveBeenCalled();
+        expect(batchDrawingsMock).toHaveBeenCalled();
       },
       { timeout: 1_500 },
     );
-    const saved = saveDrawingsMock.mock.calls.at(-1)?.[2] as Drawing[];
+    const saved = (batchDrawingsMock.mock.calls.at(-1)?.[2] as { upsert?: Drawing[] }).upsert ?? [];
     expect(saved[0]?.groupId).toBe('setup-a');
+  });
+
+  test('persists text content for the selected drawing', async () => {
+    await renderSingleHarness();
+
+    await waitFor(() => {
+      expect(singleResult?.drawings[0]?.id).toBe('draw_single-server');
+    });
+    const id = singleResult!.drawings[0]!.id;
+
+    act(() => {
+      singleResult!.selectDrawing(id);
+      singleResult!.setDrawingText(id, 'Support retest');
+    });
+
+    await waitFor(() => {
+      const current = instances[0]?.snapshot()[0];
+      expect((current?.extendData as Record<string, unknown> | undefined)?.text).toBe('Support retest');
+    });
+
+    await waitFor(
+      () => {
+        expect(batchDrawingsMock).toHaveBeenCalled();
+      },
+      { timeout: 1_500 },
+    );
+    const saved = (batchDrawingsMock.mock.calls.at(-1)?.[2] as { upsert?: Drawing[] }).upsert ?? [];
+    expect((saved[0]?.extendData as Record<string, unknown> | undefined)?.text).toBe('Support retest');
+  });
+
+  test('persists sync mode and interval visibility config', async () => {
+    await renderSingleHarness();
+
+    await waitFor(() => {
+      expect(singleResult?.drawings[0]?.id).toBe('draw_single-server');
+    });
+    const id = singleResult!.drawings[0]!.id;
+
+    act(() => {
+      singleResult!.selectDrawing(id);
+      singleResult!.setDrawingSyncMode(id, 'symbol');
+      singleResult!.setDrawingIntervals(id, 'only', ['1h', '4h']);
+    });
+
+    await waitFor(() => {
+      const current = instances[0]?.snapshot()[0];
+      const extend = current?.extendData as Record<string, unknown> | undefined;
+      expect(extend?.syncMode).toBe('symbol');
+      expect(extend?.visibility).toEqual({ mode: 'only', intervals: ['1h', '4h'] });
+    });
+
+    // Switching back to defaults clears the config.
+    act(() => {
+      singleResult!.setDrawingSyncMode(id, 'scope');
+      singleResult!.setDrawingIntervals(id, 'all', []);
+    });
+
+    await waitFor(() => {
+      const extend = instances[0]?.snapshot()[0]?.extendData as Record<string, unknown> | undefined;
+      expect(extend?.syncMode).toBeUndefined();
+      expect(extend?.visibility).toBeUndefined();
+    });
   });
 
   test('duplicates, copy-pastes, reorders, and supports undo/redo locally', async () => {
@@ -337,10 +403,15 @@ describe('useDrawingManager multi-panel scopes', () => {
 
     await waitFor(
       () => {
-        expect(saveDrawingsMock).toHaveBeenCalledTimes(1);
+        expect(batchDrawingsMock).toHaveBeenCalledTimes(1);
       },
       { timeout: 1_500 },
     );
-    expect(saveDrawingsMock.mock.calls[0]).toEqual(['sym-a', '1h', [local], 'draw_left']);
+    expect(batchDrawingsMock.mock.calls[0]).toEqual([
+      'sym-a',
+      '1h',
+      { upsert: [local], deleteIds: ['draw_left-server'] },
+      'draw_left',
+    ]);
   });
 });

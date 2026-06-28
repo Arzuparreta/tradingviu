@@ -11,6 +11,7 @@ interface FakeRow {
 
 class FakeDb {
   inserted: FakeRow[] = [];
+  deleted = false;
 
   select() {
     return {
@@ -22,14 +23,20 @@ class FakeDb {
 
   delete() {
     return {
-      where: async () => undefined,
+      where: async () => {
+        this.deleted = true;
+        return undefined;
+      },
     };
   }
 
   insert() {
     return {
-      values: async (rows: FakeRow[]) => {
+      values: (rows: FakeRow[]) => {
         this.inserted = rows;
+        return {
+          onConflictDoUpdate: async () => undefined,
+        };
       },
     };
   }
@@ -94,5 +101,19 @@ describe('drawing routes', () => {
     expect(response.status).toBe(200);
     expect(db.inserted).toHaveLength(1);
     expect(db.inserted[0]?.scopeId).toBe('symbol:sym_btc:1h');
+  });
+
+  test('batch upserts and deletes within the requested chart scope', async () => {
+    const db = new FakeDb();
+    const response = await appFor(db).request('/api/drawings/batch?symbol=sym_btc&interval=1h&scope=panel_a', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ upsert: [drawingPayload], deleteIds: ['old_drawing'] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.deleted).toBe(true);
+    expect(db.inserted).toHaveLength(1);
+    expect(db.inserted[0]?.scopeId).toBe('panel_a');
   });
 });

@@ -73,7 +73,7 @@ export interface DrawingManager {
   moveSelection?(delta: { readonly time: number; readonly price: number }): void;
 
   /** Update one anchor of a drawing when supported. */
-  updateAnchor?(id: string, index: number, anchor: { readonly time: unknown; readonly price: number }): void;
+  updateAnchor?(id?: string, index?: number, anchor?: { readonly time: unknown; readonly price: number }): void;
 
   /** Update the default style for newly created drawings. */
   setToolDefaultStyle?(style: Record<string, unknown>): void;
@@ -81,8 +81,14 @@ export interface DrawingManager {
   /** Persist interval visibility preferences for a drawing when supported. */
   setVisibilityOnIntervals?(id: string, intervals: readonly string[]): void;
 
+  /** Set the active chart interval so interval-scoped visibility is enforced on render. */
+  setIntervalContext?(interval: string | null): void;
+
   /** Subscribe to drawing changes. Returns an unsubscribe function. */
   onChange(callback: (drawings: Drawing[]) => void): () => void;
+
+  /** Subscribe to canvas selection changes. Returns an unsubscribe function. */
+  onSelectionChange?(callback: (id: string | null) => void): () => void;
 
   /** Returns whether a tool placement is currently active. */
   isPlacing(): boolean;
