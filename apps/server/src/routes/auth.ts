@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { setCookie, deleteCookie } from 'hono/cookie';
@@ -7,12 +8,13 @@ import { createDb } from '@tv/db';
 import { users } from '@tv/db/schema';
 import {
   signup,
+  ensureOwner,
   issueAccessToken,
   verifyPassword,
   normalizeEmail,
   verifyAccessToken,
 } from '@tv/auth';
-import { loadEnv, AuthError } from '@tv/core';
+import { loadEnv, AuthError, ForbiddenError } from '@tv/core';
 
 const env = loadEnv();
 const db = createDb({ url: env.DATABASE_URL });
@@ -36,6 +38,37 @@ const userPayload = (u: { id: string; email: string; displayName: string | null 
   displayName: u.displayName,
 });
 
+const jsonSession = async (
+  c: Context,
+  user: { id: string; email: string; displayName: string | null },
+) => {
+  const token = await issueAccessToken({ sub: user.id, email: user.email }, env.JWT_SECRET);
+  setCookie(c, 'tv_session', token, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7,
+  });
+  return c.json({ token, user: userPayload(user) });
+};
+
+const getDevelopmentOwnerUser = async () => {
+  if (env.NODE_ENV === 'production') {
+    throw new ForbiddenError('Development owner login is disabled');
+  }
+  const password = process.env.OWNER_PASSWORD;
+  if (!password) throw new AuthError('OWNER_PASSWORD is not configured');
+  const owner = await ensureOwner(db, {
+    email: process.env.OWNER_EMAIL ?? 'owner@tradingviu.local',
+    password,
+    displayName: 'Owner',
+  });
+  const [user] = await db.select().from(users).where(eq(users.id, owner.userId)).limit(1);
+  if (!user) throw new AuthError('Owner not found after bootstrap');
+  return user;
+};
+
 export const authRoutes = new Hono()
   .post('/signup', zValidator('json', SignupBody), async (c) => {
     const body = c.req.valid('json');
@@ -47,15 +80,7 @@ export const authRoutes = new Hono()
     const { userId } = await signup(db, cleanBody);
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) throw new AuthError('User not found after signup');
-    const token = await issueAccessToken({ sub: userId, email: user.email }, env.JWT_SECRET);
-    setCookie(c, 'tv_session', token, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    });
-    return c.json({ token, user: userPayload(user) });
+    return jsonSession(c, user);
   })
   .post('/login', zValidator('json', LoginBody), async (c) => {
     const body = c.req.valid('json');
@@ -63,15 +88,10 @@ export const authRoutes = new Hono()
     if (!user) throw new AuthError('Invalid credentials');
     const ok = await verifyPassword(user.passwordHash, body.password);
     if (!ok) throw new AuthError('Invalid credentials');
-    const token = await issueAccessToken({ sub: user.id, email: user.email }, env.JWT_SECRET);
-    setCookie(c, 'tv_session', token, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    });
-    return c.json({ token, user: userPayload(user) });
+    return jsonSession(c, user);
+  })
+  .post('/dev-owner', async (c) => {
+    return jsonSession(c, await getDevelopmentOwnerUser());
   })
   .post('/logout', (c) => {
     deleteCookie(c, 'tv_session', { path: '/' });

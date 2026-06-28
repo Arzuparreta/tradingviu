@@ -77,4 +77,42 @@ describe('auth routes integration', () => {
     expect(loginBody.token.length).toBeGreaterThan(20);
     expect(loginBody.user.email).toBe(email);
   });
+
+  test('development owner login bootstraps the configured owner without a typed password', async () => {
+    process.env.OWNER_EMAIL = 'dev-owner@example.com';
+    process.env.OWNER_PASSWORD = 'DevOwnerPassword123!';
+
+    const login = await postJson('/auth/dev-owner', {});
+    expect(login.status).toBe(200);
+    const loginBody = (await login.json()) as {
+      token: string;
+      user: { email: string; displayName: string };
+    };
+    expect(loginBody.token.length).toBeGreaterThan(20);
+    expect(loginBody.user.email).toBe('dev-owner@example.com');
+    expect(loginBody.user.displayName).toBe('Owner');
+  });
+
+  test('invalid credentials stay rejected even when development owner login is configured', async () => {
+    process.env.OWNER_EMAIL = 'form-owner@example.com';
+    process.env.OWNER_PASSWORD = 'FormOwnerPassword123!';
+    const unique = Date.now().toString(36);
+
+    const login = await postJson('/auth/login', {
+      email: 'form-owner@example.com',
+      password: 'whatever-was-typed',
+    });
+    expect(login.status).toBe(401);
+
+    const normalUser = await postJson('/auth/signup', {
+      email: `normal-login-failure-${unique}@example.com`,
+      password: 'CorrectHorse123!',
+    });
+    expect(normalUser.status).toBe(200);
+    const fallbackLogin = await postJson('/auth/login', {
+      email: `normal-login-failure-${unique}@example.com`,
+      password: 'wrong',
+    });
+    expect(fallbackLogin.status).toBe(401);
+  });
 });

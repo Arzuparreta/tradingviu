@@ -9,6 +9,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const login = useAuth((s) => s.login);
+  const devOwnerLogin = useAuth((s) => s.devOwnerLogin);
   const navigate = useNavigate();
 
   const submit = async (e: React.FormEvent) => {
@@ -25,6 +26,19 @@ export function LoginPage() {
     }
   };
 
+  const loginAsLocalOwner = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await devOwnerLogin();
+      navigate('/');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="card auth-card">
@@ -32,16 +46,33 @@ export function LoginPage() {
         <form onSubmit={submit}>
           <div>
             <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
           </div>
           <div>
             <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
           </div>
           {error && <div className="err">{error}</div>}
           <button className="primary" type="submit" disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+          {import.meta.env.DEV && (
+            <button type="button" disabled={loading} onClick={loginAsLocalOwner}>
+              Local owner
+            </button>
+          )}
           <p className="muted small" style={{ textAlign: 'center' }}>
             No account? <Link to="/signup">Create one</Link>
           </p>

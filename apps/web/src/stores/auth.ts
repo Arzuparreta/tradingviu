@@ -7,6 +7,7 @@ interface AuthState {
   loading: boolean;
   bootstrap: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  devOwnerLogin: () => Promise<void>;
   signup: (body: { email: string; password: string; displayName?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -34,6 +35,11 @@ export const useAuth = create<AuthState>((set) => ({
   },
   login: async (email, password) => {
     const r = await api.login({ email, password });
+    setToken(r.token);
+    set({ user: r.user });
+  },
+  devOwnerLogin: async () => {
+    const r = await api.devOwnerLogin();
     setToken(r.token);
     set({ user: r.user });
   },

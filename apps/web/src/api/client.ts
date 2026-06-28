@@ -132,13 +132,11 @@ const queryString = (params: object): string => {
 };
 
 export const api = {
-  signup: (body: {
-    email: string;
-    password: string;
-    displayName?: string;
-  }) => request<AuthResponse>('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
+  signup: (body: { email: string; password: string; displayName?: string }) =>
+    request<AuthResponse>('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   login: (body: { email: string; password: string }) =>
     request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  devOwnerLogin: () => request<AuthResponse>('/auth/dev-owner', { method: 'POST' }),
   logout: () => request<{ ok: true }>('/auth/logout', { method: 'POST' }),
   me: () => request<{ user: User } | { user: null }>('/auth/me'),
   symbols: (q: string) =>
@@ -149,7 +147,7 @@ export const api = {
     if (opts.assetClass) p.set('assetClass', opts.assetClass);
     return request<{ results: Symbol[]; backend: 'meili' | 'db' }>(`/api/search?${p.toString()}`);
   },
- history: (symbol: string, interval = '1h', limit = 500) =>
+  history: (symbol: string, interval = '1h', limit = 500) =>
     request<{
       symbol: { id: string; exchange: string; ticker: string; name: string };
       interval: string;
@@ -225,13 +223,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, limit, bins }),
     }),
-  tpoProfile: (
-    symbol: string,
-    interval = '1h',
-    limit = 240,
-    bins = 24,
-    barsPerPeriod = 10,
-  ) =>
+  tpoProfile: (symbol: string, interval = '1h', limit = 240, bins = 24, barsPerPeriod = 10) =>
     request<{
       symbol: { id: string; ticker: string; exchange: string };
       interval: string;
@@ -275,8 +267,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, method, period, limit }),
     }),
-  backtestStrategies: () =>
-    request<{ strategies: StrategyDef[] }>('/api/backtest/strategies'),
+  backtestStrategies: () => request<{ strategies: StrategyDef[] }>('/api/backtest/strategies'),
   backtestOptimize: (
     symbol: string,
     interval: string,
@@ -392,7 +383,12 @@ export const api = {
       `/api/drawings?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
       { method: 'PUT', body: JSON.stringify({ drawings }) },
     ),
-  batchDrawings: (symbol: string, interval: string, body: { upsert?: Drawing[]; deleteIds?: string[] }, scope?: string) =>
+  batchDrawings: (
+    symbol: string,
+    interval: string,
+    body: { upsert?: Drawing[]; deleteIds?: string[] },
+    scope?: string,
+  ) =>
     request<{ ok: true }>(
       `/api/drawings/batch?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
       { method: 'POST', body: JSON.stringify(body) },
@@ -623,8 +619,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(params),
     }),
-  screenerMetrics: () =>
-    request<{ metrics: ScreenerMetricDef[] }>('/api/screener/metrics'),
+  screenerMetrics: () => request<{ metrics: ScreenerMetricDef[] }>('/api/screener/metrics'),
   screenerPresets: (params: { assetClass?: string } = {}) =>
     request<{ presets: ScreenerPreset[] }>(`/api/screener/presets${queryString(params)}`),
   createScreenerPreset: (body: {
