@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ChartPage } from './pages/ChartPage';
+import { ChartProPage } from './pages/ChartProPage';
 import { WatchlistsPage } from './pages/WatchlistsPage';
 import { LayoutPage } from './pages/LayoutPage';
 import { PineEditorPage } from './pages/PineEditorPage';
@@ -31,8 +32,18 @@ function TopBar() {
             <Link to="/" className={loc.pathname === '/' ? 'active' : ''}>
               Dashboard
             </Link>
-            <Link to="/chart" className={loc.pathname.startsWith('/chart') ? 'active' : ''}>
+            <Link
+              to="/chart"
+              className={
+                loc.pathname.startsWith('/chart') && !loc.pathname.startsWith('/chart-pro')
+                  ? 'active'
+                  : ''
+              }
+            >
               Chart
+            </Link>
+            <Link to="/chart-pro" className={loc.pathname.startsWith('/chart-pro') ? 'active' : ''}>
+              Pro
             </Link>
             <Link to="/layout" className={loc.pathname.startsWith('/layout') ? 'active' : ''}>
               Layouts
@@ -123,6 +134,22 @@ export function App() {
           element={
             <RequireAuth>
               <ChartPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/chart-pro"
+          element={
+            <RequireAuth>
+              <ChartProPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/chart-pro/:symbol"
+          element={
+            <RequireAuth>
+              <ChartProPage />
             </RequireAuth>
           }
         />

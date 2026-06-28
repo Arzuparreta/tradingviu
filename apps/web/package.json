@@ -12,6 +12,7 @@
     "test": "bun test test/"
   },
   "dependencies": {
+    "@klinecharts/pro": "^0.1.1",
     "@monaco-editor/react": "^4.6.0",
     "@tanstack/react-query": "^5.62.7",
     "@tv/chart-engine": "workspace:*",
@@ -21,6 +22,7 @@
     "@tv/layout-sync": "workspace:*",
     "@tv/pine-runtime": "workspace:*",
     "@tv/ta-lib": "workspace:*",
+    "klinecharts": "9.8.12",
     "lightweight-charts": "^5.0.0",
     "lightweight-charts-drawing": "0.1.1",
     "lucide-react": "^1.21.0",
