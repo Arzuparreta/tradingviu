@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./password": "./src/password.ts",
     "./tokens": "./src/tokens.ts",
-    "./signup": "./src/signup.ts"
+    "./signup": "./src/signup.ts",
+    "./owner": "./src/owner.ts"
   },
   "scripts": {
     "lint": "echo skip",

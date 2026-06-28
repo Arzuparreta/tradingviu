@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 import { createDb } from '@tv/db';
 import { users, exchanges, symbols } from '@tv/db/schema';
-import { signup } from '@tv/auth';
+import { ensureOwner, signup } from '@tv/auth';
+import { loadEnv } from '@tv/core';
+
+loadEnv();
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -26,6 +29,7 @@ const help = () => {
 
 Commands:
   create-owner --email <e> --password <p>   create the owner account (first signup)
+  ensure-owner [--email <e> --password <p>]  create or repair the owner login
   exchange list                             list exchanges
   symbol list --limit <n>                   list symbols
   symbol search --q <q>                     search symbols
@@ -42,6 +46,14 @@ try {
       if (!email || !password) throw new Error('email and password required');
       const r = await signup(db, { email, password });
       console.log('created', r);
+      break;
+    }
+    case 'ensure-owner': {
+      const email = arg('email') ?? process.env.OWNER_EMAIL ?? 'owner@tradingviu.local';
+      const password = arg('password') ?? process.env.OWNER_PASSWORD;
+      if (!password) throw new Error('password required: pass --password or set OWNER_PASSWORD');
+      const r = await ensureOwner(db, { email, password, displayName: 'Owner' });
+      console.log('owner account ready', r);
       break;
     }
     case 'exchange':
