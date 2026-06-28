@@ -1,90 +1,64 @@
 # tradingviu
 
-Self-hosted, open-source trading platform. TradingView, but yours.
+Personal trading platform for one owner. TradingView-style charting, market data,
+alerts, portfolios, paper trading, broker integrations, discovery data, Pine
+experiments, and backtesting in one local/self-hosted workspace.
 
-Multi-tenant, runs on your VPS. Charts, indicators, Pine Script subset, alerts, screening, paper trading, broker integrations, social, portfolios, news, calendars — all the things, in one platform.
-
-**Status:** active development. Slices 1–5 are done, slice 6/7/10/11 are in progress, and slice 9 advanced TA is done except true footprint tape. See `docs/ROADMAP.md`.
-
-## Quick start (self-hosted)
-
-```bash
-# 1. Clone
-git clone https://github.com/your-org/tradingviu.git
-cd tradingviu
-
-# 2. Configure
-cp .env.example .env
-# edit .env, set DOMAIN, JWT_SECRET, POSTGRES_PASSWORD
-
-# 3. Start
-docker compose -f infra/docker-compose.yml --env-file .env up -d
-
-# 4. Migrate DB
-pnpm install
-pnpm db:migrate
-pnpm db:seed
-
-# 5. Open
-open https://tradingviu.localhost
-```
+**Current pivot:** this repo is no longer a SaaS product. Billing, plans, quotas,
+public API tokens, social/community surfaces, tenants, and RLS have been stripped.
+The primary chart route uses KLineChart Pro for the built-in drawing suite.
 
 ## Development
 
 ```bash
-# 1. Install
 pnpm install
-
-# 2. Configure
 cp .env.example .env
-# edit .env
-
-# 3. Start infrastructure (Postgres, Redis, MinIO, Meilisearch, Mailpit)
-docker compose -f infra/docker-compose.yml --env-file .env up -d postgres redis minio meilisearch mailpit
-
-# 4. Migrate and seed DB
+pnpm dev:infra
 pnpm db:migrate
 pnpm db:seed
-
-# 5. Start dev servers
-pnpm dev
-
-# 6. Open
+pnpm tvctl ensure-owner
+pnpm dev:restart
 open http://localhost:5187
 ```
 
-`pnpm dev` boots all packages in watch mode via Turbo. Local development uses
-`http://localhost:5187` for the web app and `http://localhost:3101` for the API,
-kept away from common Vite/API ports used by other local projects.
+By default `pnpm tvctl ensure-owner` creates or repairs the local owner login from `.env`:
+`OWNER_EMAIL=owner@tradingviu.local` and `OWNER_PASSWORD=ChangeMeOwner123!`.
+Change those before exposing the app outside your machine.
 
-> **Firewall note:** If you're accessing the dev server from another device on the same LAN, make sure ports 5187 (web) and 3101 (API) are open:
-> ```bash
-> sudo ufw allow 5187/tcp
-> sudo ufw allow 3101/tcp
-> ```
+Local ports are repo-owned:
 
-## Architecture
+- Web: `http://localhost:5187`
+- API: `http://localhost:3101`
+- Dev wrapper: `pnpm dev:status`, `pnpm dev:restart`, `pnpm dev:down`
 
-- **Monorepo** (pnpm + Turbo)
-- **TypeScript** end-to-end
-- **Backend:** Hono on Bun (HTTP + WebSocket same process)
-- **DB:** PostgreSQL 16 + TimescaleDB, RLS for multi-tenancy
-- **Cache/pubsub:** Redis
-- **Auth:** Better Auth (multi-tenant with org plugin)
-- **Charts:** `tradingview/lightweight-charts` (Apache 2.0)
-- **Data:** native Binance market data (REST klines + WS bars/quote/depth) with CCXT fallbacks and pluggable adapters
-- **Frontend:** Vite + React 18
-- **Desktop:** Tauri 2
-- **Mobile:** React Native
+## Stack
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [AGENTS.md](AGENTS.md) for details.
+- Monorepo: pnpm workspaces + Turbo
+- Frontend: Vite + React 18 + TanStack Query + Zustand
+- Main chart: KLineChart Pro / klinecharts
+- Legacy chart surfaces still present: lightweight-charts powers `/layout` and
+  Pine preview until those surfaces are migrated
+- Backend: Hono on Bun, HTTP + WebSocket in one process
+- DB: PostgreSQL 16 + TimescaleDB
+- Infra: Redis, MinIO, Meilisearch, Mailpit
+- Market data: native Binance REST/WS plus adapter packages for other providers
 
-## License
+## Verification
 
-AGPL-3.0. See [LICENSE](LICENSE).
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm e2e
+```
 
-If you want to run a competing hosted service, you can — but you must also open-source your changes.
+For browser smoke checks:
 
-## Contributing
+```bash
+pnpm dev:restart
+curl -fsS http://localhost:3101/health
+open http://localhost:5187/chart/BTCUSDT
+```
 
-Not accepting external contributions yet (early days). Watch the repo.
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+and [AGENTS.md](AGENTS.md) before making changes.

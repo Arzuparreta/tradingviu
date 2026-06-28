@@ -1,66 +1,24 @@
-# Slice 1 — what you can run right now
+# Slice 1 Historical Note
 
-This is the first vertical slice. Everything below is end-to-end working on a fresh VPS.
+Slice 1 originally shipped the foundation for a multi-tenant SaaS product. That
+architecture is no longer the product direction.
 
-> Historical note: current chart data no longer uses the slice 1/2 polling path. Slice 2.5 adds BarStore persistence, native Binance klines, and live quote/depth.
+Current foundation:
 
-## What works
+- Single-owner auth with email/password and JWT.
+- User-owned app data scoped by `user_id`.
+- PostgreSQL + TimescaleDB for app and market data.
+- Hono on Bun for HTTP and WebSocket.
+- Vite + React web app.
+- KLineChart Pro as the primary chart surface.
+- Docker Compose local/self-hosted infrastructure.
 
-- Multi-tenant DB with PostgreSQL RLS (every request scopes `app.tenant_id`)
-- Public sign-up; first user = super admin, everyone else gets a personal tenant
-- Argon2id passwords, HS256 JWT in httpOnly cookies (7d)
-- Plan system: Free, Essential, Plus, Premium, Ultimate seeded
-- Stripe scaffold (checkout, portal, webhook) — disabled until `STRIPE_SECRET_KEY` is set
-- Symbol catalog seeded with 8 exchanges and 11 popular crypto pairs
-- CCXT data adapter: Binance, Coinbase, Kraken, Bybit (historical + WebSocket)
-- Chart history endpoint pulling OHLCV from the right exchange per symbol
-- Web app: signup, login, dashboard, chart (candles on `lightweight-charts`), admin
-- `tvctl` operator CLI: tenants, users, plans, exchanges, symbols
-- Docker Compose: Postgres+TimescaleDB, Redis, MinIO, Meili, Mailpit, Caddy, api, web
+Removed from the active model:
 
-## What doesn't work yet (slice 2+)
+- Tenant provisioning and membership.
+- RLS policies and runtime app DB role split.
+- Super-admin bootstrap.
+- Billing, plans, quotas, and Stripe.
+- Admin tenant/plan management.
 
-- Real-time bar updates over WebSocket (history polling for now)
-- Indicators on chart (TA-Lib integration pending)
-- Drawing tools
-- Watchlists / portfolios / alerts CRUD
-- Screener
-- Symbol search via Meili
-- Pine Script parser
-- Paper trading UI
-- Broker integrations
-
-## Quick start
-
-```bash
-# Boot everything
-docker compose -f infra/docker-compose.yml up -d postgres redis
-
-# Install deps (host)
-pnpm install
-
-# Migrate + seed
-pnpm db:migrate
-pnpm db:seed
-
-# Dev
-pnpm dev
-# → web on http://localhost:5173
-# → api on http://localhost:3001
-```
-
-Or fully containerized:
-
-```bash
-docker compose -f infra/docker-compose.yml up -d
-docker compose -f infra/docker-compose.yml exec api bun run packages/db/src/migrate.ts
-docker compose -f infra/docker-compose.yml exec api bun run packages/db/src/seed.ts
-```
-
-## Try it
-
-1. Open `http://localhost:5173`
-2. Sign up (first signup is super admin)
-3. Click "Open chart"
-4. Pick a symbol, e.g. `BINANCE:BTCUSDT`
-5. You should see candles rendering with live data from Binance
+Use `docs/ROADMAP.md` as the current source of truth.

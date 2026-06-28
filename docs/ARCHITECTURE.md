@@ -1,70 +1,62 @@
 # Architecture
 
-## Layers
+`tradingviu` is currently a single-owner personal trading platform. It used to be
+a multi-tenant SaaS clone; that model was deliberately removed.
+
+## Runtime Shape
 
 ```
-Clients (Web, Desktop Tauri, Mobile RN)
-   ↓ HTTPS / WSS
-Edge (Caddy — TLS, gzip, rate-limit)
-   ↓
-API Server (Hono on Bun — HTTP + WS same process)
-   ↓
-Domain services (workers, isolated)
-   ↓
-State (PostgreSQL+TSDB · Redis · S3 · Meili · NATS)
-   ↓
-External (Binance REST/WS, CCXT fallbacks, Alpaca, Polygon, Stripe, Postmark, FRED)
+Web / future desktop / future mobile
+  -> Hono API on Bun
+  -> domain services and ingest workers
+  -> PostgreSQL + TimescaleDB, Redis, MinIO, Meilisearch
+  -> market/news/calendar/broker providers
 ```
 
-## Multi-tenancy
+## Auth And Scope
 
-- Every table with tenant data has a `tenant_id` column.
-- RLS policies force isolation at the DB level.
-- `app.tenant_id` is set per session from JWT claims via `set_config`.
-- Drizzle inserts auto-inject `tenant_id` from `AsyncLocalStorage` context.
-- Super admin role bypasses RLS for operator actions.
+- Auth is first-party email/password with Argon2id and a 7-day HS256 JWT.
+- Runtime request context carries `{ userId }`.
+- User-owned tables scope by `user_id`.
+- There is no tenant table, tenant membership, tenant role, RLS policy layer, or
+  `tv_app` runtime role in the current model.
+- Signup creates a user directly; no workspace or super-admin bootstrap exists.
 
-## Auth
+## Data
 
-- Argon2id for password hashing.
-- JWT (HS256) for stateless sessions, 7-day TTL.
-- First signup becomes super admin automatically.
+- Market reference data (`exchanges`, `symbols`) is global.
+- Market history lives in Timescale-backed `bars`.
+- User-owned data includes watchlists, layouts, drawings, alerts, portfolios,
+  paper accounts, broker connections, user indicators, and backtests.
+- Discovery data includes news, earnings, dividends, economic events,
+  fundamentals, yield curves, and macro series.
 
-## Data sources
+## Charting
 
-- Native Binance REST/WS for klines, quote, and depth; CCXT remains the fallback adapter path for other crypto exchanges.
-- Plug-in adapters for stocks, forex, etc.
+- `/chart` and `/chart/:symbol` use KLineChart Pro through
+  `apps/web/src/chart/KLineProChart.tsx`.
+- `/chart-legacy` keeps the old lightweight-charts page reachable for
+  transition tests while `/layout` and Pine still depend on that stack.
+- The KLineChart Pro datafeed adapts existing API and WS endpoints:
+  `/api/symbols`, `/api/chart/history`, and `/ws`.
+- `/layout` and Pine preview still use the legacy lightweight-charts surface.
+  Do not remove `@tv/chart-engine`, `@tv/drawing-tools`, or
+  `lightweight-charts` until those surfaces have been migrated and tested.
 
-## Plan/quotas
+## Boundaries
 
-- Plan quotas live in `plans.quotas jsonb`.
-- `@tv/quotas` exposes `getPlanQuotas(db, planCode)` with a 30s cache.
-- `QuotaExceededError` (HTTP 402) on overflow.
+- Frontend calls only the API.
+- API provider access goes through packages/services, not ad hoc route code.
+- Broker credentials are encrypted at rest with libsodium using `CRED_ENC_KEY`.
+- API edges and external payloads should remain Zod-validated.
 
-## WebSocket protocol
+## Operational Commands
 
-See `packages/core/src/ws-protocol.ts`. Discriminated union schema with Zod for type safety.
-
-## Status
-
-This file started as the slice 1 architecture note. Current runtime status:
-
-- Multi-tenant DB with RLS
-- Signup/login with auto-provisioning
-- Plan/billing stub (Stripe scaffolded, free plan default)
-- Symbol catalog (seeded with crypto)
-- Chart history endpoint backed by BarStore/TimescaleDB and freshness-aware provider fallback
-- Live Binance bars, quote, and depth over WebSocket
-- Web UI: login, signup, dashboard, chart
-- tvctl operator CLI
-- Docker Compose for self-hosting
-
-Already delivered after slice 1:
-
-- Watchlists + portfolio + alerts CRUD
-- Indicator library
-- Drawing tools persistence
-- Symbol search via Meilisearch
-- Provider health monitoring
-- Real-time WebSocket bar updates and market quote/depth fanout
-- Stripe checkout flow end-to-end
+```bash
+pnpm dev:infra
+pnpm db:migrate
+pnpm db:seed
+pnpm dev:restart
+pnpm typecheck
+pnpm test
+```

@@ -1,205 +1,57 @@
 # Chart Drawings Agent Brief
 
-Use this brief when starting a new chat or assigning a new agent to the chart drawing rework.
-
-## Read Order
+Read order:
 
 1. `AGENTS.md`
 2. `docs/ROADMAP.md`
 3. `docs/CHART_DRAWINGS_REWORK.md`
-4. This file
+4. this file
 
-## Session Progress (last: 2026-06-27, commit `b6021b5` + object-tree follow-up)
+## Current Brief
 
-✅ **Phase 1-4 foundation and browser coverage delivered.** `lightweight-charts-drawing@0.1.1` passes the
-spike. We have a working native-primitive drawing system in `ChartPage` and `/layout`:
+KLineChart Pro is the primary chart direction. The previous
+lightweight-charts-drawing implementation is now transitional legacy code, not
+the target UX.
 
-- `packages/drawing-tools/src/` — `LwcDrawingManager` wrapper, format conversion,
-  public types
-- `apps/web/src/components/chart-surface/` — shared `ChartSurface` component
-- `apps/web/src/hooks/use-drawing-manager.ts` — hook with load/save + undo/redo
-- `apps/web/src/components/DrawingToolbar.tsx` — compact left drawing dock with
-  grouped flyouts for the registered drawing categories, keyboard shortcuts,
-  lock/hide/delete/clear, object tree, rename/group, duplicate, copy/paste,
-  z-order, style inspector, favorite/recent tools, and style templates
-- `apps/web/src/pages/ChartPage.tsx` — integrated with native primitive drawings
-- `apps/web/src/components/ChartPanel.tsx` — `/layout` panels use `ChartSurface`
-  with one drawing manager per `drawingScopeId`
+Working now:
 
-**Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck, web unit tests, server typecheck, and Playwright drawing E2E.**
+- `/chart` and `/chart/:symbol` use `ChartProPage`.
+- KLineChart Pro renders in browser with candles, moving averages, volume, period
+  controls, symbol search, and the native drawing toolbar.
+- Dashboard links to `/chart/BTCUSDT`.
+- Legacy drawing E2E runs against `/chart-legacy/BTCUSDT`.
 
-Browser E2E now covers cursor-mode pan/zoom, object-tree edit/reload/delete persistence,
-representative create/reload/clear flows across major drawing categories, and
-`/layout` drawing-scope isolation across two panels using the same symbol. It also
-covers edge creation/reload flows for single-anchor annotations, brush/highlighter
-strokes, marker tools, live preview after the first anchor, whole-object body drag,
-four-corner parallel-channel editing, and canvas-selection copy/paste.
+Still legacy:
 
-## Session Progress (2026-06-28 follow-up)
+- `/layout` uses `ChartPanel`, `ChartSurface`, `useDrawingManager`, and
+  `DrawingToolbar`.
+- Pine preview uses `@tv/chart-engine`.
+- Tests still cover legacy drawing behavior.
 
-✅ **Closed the previously-open gaps.** Text annotation workflow (round-trip +
-inline edit), multi-point placement for path/polyline/brush/highlighter, 3-anchor
-pitchfork/fib body+anchor drag coverage, interval-scoped visibility enforcement,
-and the sync-mode / interval-visibility / drawing-alert inspector UI are all
-implemented and covered by deterministic unit/component/hook tests plus browser
-E2E. A canvas-pixel visual check proves the selected drawing keeps rendering
-through pan and zoom. Full gate passes: `pnpm typecheck`, `pnpm test`
-(drawing-tools 11, web 25, server 63), and `pnpm e2e` (17 specs).
+## Rules
 
-## Where to Continue
+- Do not add more manual drawing-tool buttons.
+- Do not delete legacy chart packages until `/layout`, Pine preview, and tests
+  have been migrated.
+- Preserve `/layout` panel independence.
+- Keep raw crosshair behavior if crosshair sync is reintroduced.
+- Keep API payloads validated with Zod.
 
-1. **Cross-scope sync execution** — `extendData.syncMode` is persisted but not yet
-   acted on; load/save `symbol`/`global` drawings across matching charts and panels.
+## Next Implementation Task
 
-2. **Freehand brush gesture** — replace click-to-add vertices for brush/highlighter
-   with true drag sampling while suppressing chart pan.
+Migrate `/layout` one panel at a time to KLineChart Pro or klinecharts core:
 
-3. **Per-tool deep editing** — surface fib levels, pitchfork/Gann variants, and
-   long/short position risk-reward fields in the inspector.
+1. Build a reusable panel wrapper from `KLineProChart` that accepts symbol and
+   period props.
+2. Keep panel symbol/interval controls independent.
+3. Prove two same-symbol panels do not share mutable chart state.
+4. Only then remove old drawing toolbar tests or rewrite them around the new Pro
+   drawing contract.
 
-4. **Richer text styling + golden-screenshot visual regression** once visuals
-   stabilize.
-
-## Verification commands (copy-paste ready)
+## Verification
 
 ```bash
-# Quick checks
-pnpm --filter @tv/drawing-tools typecheck && pnpm --filter @tv/web typecheck && pnpm --filter @tv/server typecheck
-pnpm --filter @tv/web test && pnpm --filter @tv/server test
-pnpm e2e
-
-# Full gate
-pnpm lint && pnpm typecheck && pnpm test
-pnpm e2e
-
-# Manual smoke
-pnpm dev:restart
-curl -fsS http://localhost:3101/health
-# Open http://localhost:5187, test /chart/:symbol and /layout
-```
-
-## Product Goal
-
-Build a professional TradingView-grade drawing system. Do not polish the current overlay as if it were the final architecture.
-
-The target is a single chart surface shared by `/chart/:symbol` and `/layout`, using `lightweight-charts@5.2.x` plus native primitives or a proven primitive-based drawing manager. Cursor mode must behave like a trading chart: dragging empty chart space pans the chart, wheel/trackpad zoom still works, and drawing tools only capture input while placing/editing an object.
-
-## Non-Negotiable Decisions
-
-- Canonical web chart engine: `lightweight-charts@5.2.x`.
-- `klinecharts` is no longer a runtime dependency. Keep compatibility only at the persisted drawing schema/conversion layer.
-- Drawing schemas at API boundaries belong in `packages/core/src/drawing-schemas.ts`.
-- `packages/drawing-tools` owns drawing domain helpers: registry, geometry, hit testing, migrations, and final tool implementations.
-- `/layout` panels remain independent. Crosshair sync can stay raw; timeframe sync must not come back.
-- Do not add a drawing toolbar button unless the tool supports create, select, drag body, drag anchors, delete, persist, reload, and pan/zoom correctness.
-- No mandatory "Done" workflow. Esc cancels active placement; Esc again exits drawing mode if already on cursor.
-
-## Current Implementation Map
-
-- Single chart: `apps/web/src/pages/ChartPage.tsx`
-- Shared chart surface: `apps/web/src/components/chart-surface/ChartSurface.tsx`
-- Multi-chart panel: `apps/web/src/components/ChartPanel.tsx`
-- Drawing load/save manager hook: `apps/web/src/hooks/use-drawing-manager.ts`
-- Drawing API route: `apps/server/src/routes/drawings.ts`
-- Drawing row mapper: `apps/server/src/services/drawings.ts`
-- Shared drawing schemas: `packages/core/src/drawing-schemas.ts`
-- Drawing helper package: `packages/drawing-tools/src/index.ts`
-- Layout state contract: `packages/layout-sync/src/index.ts`
-
-## First Development Task
-
-Start with the drawing-manager spike and shared surface extraction. Do not start by adding more tool buttons.
-
-1. Audit `lightweight-charts-drawing@0.1.1` in a throwaway integration branch or isolated component.
-   - It must work with `lightweight-charts@5.2.x`.
-   - It must not require real network calls.
-   - It must expose enough control for import/export, selection, drag handles, lock/hide, custom toolbar state, and deterministic tests.
-   - It must render during pan/zoom through lightweight primitives, not by repositioning a React/SVG overlay after gestures.
-
-2. Record the verdict in `docs/CHART_DRAWINGS_REWORK.md`.
-   - If it passes, wrap it behind our own `DrawingManager` interface.
-   - If it fails, build the same interface internally using lightweight-charts primitives.
-   - Do not leak a third-party class shape into API schemas or persisted rows.
-
-3. Extract a shared `ChartSurface` for `lightweight-charts`.
-   - Target location: `apps/web/src/components/chart-surface/`.
-   - Keep `ChartPage` behavior stable while extracting.
-   - Only move `/layout` after the single-chart surface is proven with tests.
-
-## Target Interfaces
-
-Keep the implementation decision-complete around this shape:
-
-```ts
-export interface ChartSurfaceHandle {
-  readonly chart: unknown;
-  readonly mainSeries: unknown;
-  fitContent(): void;
-  setData(bars: readonly Bar[]): void;
-}
-
-export interface DrawingManager {
-  importDrawings(drawings: readonly Drawing[]): void;
-  exportDrawings(): Drawing[];
-  startTool(toolId: string): void;
-  cancelPlacement(): void;
-  select(id: string | null): void;
-  remove(id: string): void;
-  clear(): void;
-  setLocked(id: string, locked: boolean): void;
-  setVisible(id: string, visible: boolean): void;
-  onChange(callback: (drawings: Drawing[]) => void): () => void;
-}
-```
-
-Use real lightweight-charts types in implementation files. The `unknown` fields above only keep this brief decoupled from import details.
-
-## Testing Contract
-
-Focused checks while developing:
-
-```bash
-pnpm --filter @tv/core typecheck
-pnpm --filter @tv/drawing-tools typecheck
 pnpm --filter @tv/web typecheck
 pnpm --filter @tv/web test
-pnpm --filter @tv/server typecheck
-pnpm --filter @tv/server test
+pnpm e2e
 ```
-
-Full completion gate:
-
-```bash
-pnpm lint && pnpm typecheck && pnpm test
-```
-
-Manual smoke:
-
-```bash
-pnpm dev:restart
-curl -fsS http://localhost:3101/health
-```
-
-Then open `http://localhost:5187`, test `/chart/:symbol` and `/layout`.
-
-## Acceptance Scenarios
-
-Before marking any drawing rework slice done:
-
-- Empty chart drag in cursor mode pans the chart.
-- Wheel/trackpad zoom and axis drag work while drawing tools are available.
-- Active tool placement captures the chart only for placement/editing.
-- Existing saved drawings reload.
-- A drawing follows the chart continuously during pan and zoom.
-- Selected drawings can be deleted and undo/redo remains chart-local.
-- `/layout` panels keep separate symbols, intervals, drawings, and histories.
-- Raw crosshair sync in `/layout` remains raw and does not become magnetic.
-
-## Do Not Do
-
-- Do not implement a CSS-only imitation of native chart behavior.
-- Do not add more line-like aliases just to increase the tool count.
-- Do not persist third-party objects directly.
-- Do not reintroduce `Panel.drawings`; use stable drawing scopes.
-- Do not revive interval/timeframe sync in `/layout`.
-- Do not bypass Zod validation at API edges.

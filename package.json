@@ -2,8 +2,7 @@
   "name": "tradingviu",
   "version": "0.1.0",
   "private": true,
-  "description": "Self-hosted multi-tenant trading platform. TradingView, but OSS.",
-  "license": "AGPL-3.0",
+  "description": "Personal single-owner trading platform.",
   "engines": {
     "node": ">=22.0.0",
     "bun": ">=1.3.0",
@@ -27,7 +26,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\" --ignore-path .gitignore",
     "db:generate": "pnpm --filter @tv/db generate",
     "db:migrate": "pnpm --filter @tv/db migrate",
-    "db:seed": "pnpm --filter @tv/db seed",
+    "db:seed": "pnpm --filter @tv/db seed && pnpm --filter @tv/cli tvctl ensure-owner",
     "news:ingest": "bun run services/news-ingest/src/index.ts --once",
     "fundamentals:ingest": "bun run services/fundamentals-ingest/src/index.ts --once",
     "macro:ingest": "bun run services/macro-ingest/src/index.ts --once",

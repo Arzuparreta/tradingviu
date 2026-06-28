@@ -1,90 +1,71 @@
 # AGENTS.md
 
-Conventions for AI agents and humans working on `tradingviu`. Read this before editing anything.
+Conventions for AI agents and humans working on `tradingviu`.
 
-**Before you start, read [`docs/ROADMAP.md`](docs/ROADMAP.md)** — it tells you where the project is, what's done, what's next, and the locked architectural decisions. Without it you'll waste time rediscovering the gotchas.
+**Before editing, read [`docs/ROADMAP.md`](docs/ROADMAP.md).** It is the current
+state map and should beat older slice docs when they conflict.
 
-**If you touch chart drawing tools, also read [`docs/CHART_DRAWINGS_REWORK.md`](docs/CHART_DRAWINGS_REWORK.md) and [`docs/CHART_DRAWINGS_AGENT_BRIEF.md`](docs/CHART_DRAWINGS_AGENT_BRIEF.md).** The drawing system is under a foundation rework: do not add more tool buttons or patch the old overlay without following those docs.
+**If you touch chart drawing tools or chart surfaces, also read
+[`docs/CHART_DRAWINGS_REWORK.md`](docs/CHART_DRAWINGS_REWORK.md) and
+[`docs/CHART_DRAWINGS_AGENT_BRIEF.md`](docs/CHART_DRAWINGS_AGENT_BRIEF.md).**
 
-## Project shape
+## Current Product Direction
 
-- **Monorepo.** pnpm workspaces. `apps/*` are deployable; `packages/*` are libraries; `services/*` are background workers; `tools/*` are CLIs.
-- **TypeScript end-to-end.** Strict mode. No `any`. No `// @ts-ignore`. Prefer `unknown` + narrowing.
-- **No untyped boundaries.** Every API edge, DB row, and external payload passes through a Zod schema. Define schemas in `packages/core` and import everywhere.
+- Personal single-owner trading platform, not SaaS.
+- No billing, plans, quotas, paid spaces, public token API, tenants, or RLS.
+- Request context is user-scoped: `{ userId }`.
+- `/chart` uses KLineChart Pro. `/layout` and Pine preview still use the legacy
+  lightweight-charts stack until migrated.
 
-## Multi-tenant rules (non-negotiable)
+## Project Shape
 
-1. **Every data table has `tenant_id`** except global reference data (`exchanges`, `symbols`, `news_articles`, `economic_events`, `plans`).
-2. **RLS is enforced at the DB level.** Application code never queries cross-tenant.
-3. **Every request resolves `tenant_id` from the JWT** and stores it in `AsyncLocalStorage`. Workers receive it per-job.
-4. **Drizzle inserts auto-inject `tenant_id`.** Reads filter by it. No exceptions.
-5. **E2E tests verify isolation.** Two seeded tenants must never see each other's data.
-
-### Multi-tenant pitfalls (learned the hard way)
-
-- **Two Postgres roles are mandatory:** `tradingviu` (superuser, BYPASSRLS) for migrations/admin/signup, `tv_app` (no superuser, RLS-enforced) for runtime. The seed creates `tv_app` automatically. The app uses `DATABASE_URL` (tv_app) for all requests, and `DATABASE_URL_ADMIN` (tradingviu) only for auth bootstrap and admin operations.
-- **RLS context is per-connection.** `set_config('app.tenant_id', ...)` must run on the same connection as the queries. Always wrap multi-statement work in `db.transaction()` (Drizzle). Without this, you get intermittent cross-tenant leaks. See `apps/server/src/middleware/tenant.ts` for the pattern.
-- **First signup = super admin.** Every subsequent signup = regular user. The check is in `apps/server/src/routes/auth.ts`. Don't change it without a migration plan for existing users.
-- **Chicken-and-egg signup:** new users have no tenant yet, so they can't satisfy tenant_id RLS. Signup uses the admin connection with `withSuperAdminRls(txDb, ...)` inside a transaction, then commits. The user record is then readable.
-
-## Code style
-
+- Monorepo with pnpm workspaces.
+- `apps/*` are deployables, `packages/*` are libraries, `services/*` are workers,
+  `tools/*` are CLIs.
+- TypeScript strict mode end to end. No `any`, no `// @ts-ignore`.
 - ESM everywhere. No CommonJS.
-- `import type { Foo } from '...'` for type-only imports.
+- Prefer `import type { Foo } from '...'` for type-only imports.
+
+## Data And API Rules
+
+- Frontend never talks to DB, only to API.
+- API edges, DB rows, and external payloads should pass through Zod schemas.
+- User-owned reads/writes must scope by `user_id` from request context.
+- Global reference data is explicitly global: exchanges, symbols, news,
+  calendars, fundamentals, macro data.
+- Broker credentials stay encrypted at rest with libsodium (`CRED_ENC_KEY`).
+
+## Code Style
+
 - Async/await over `.then()`.
-- Prefer `readonly` on objects exposed from libraries.
+- Prefer readonly surfaces for exported objects.
 - Zod schemas named `FooSchema`, inferred type `Foo`.
-- Errors as typed classes in `packages/core/errors.ts`. Never throw `Error` directly.
-
-## Boundaries
-
-- Frontend never talks to DB. Only to API.
-- API never talks to external services directly. Goes through `packages/data-adapters`.
-- Workers are independent processes, communicate via Redis Streams or NATS, never share memory with API.
-- Broker credentials encrypted at rest with libsodium (key from env).
-
-## File layout conventions
-
-```
-src/
-  index.ts          # entrypoint, exports only public API
-  internal/         # private helpers
-  schema.ts         # Zod schemas
-  types.ts          # inferred types, re-exports
-  errors.ts         # typed error classes
-  *.test.ts         # co-located tests
-```
-
-## Naming
-
-- `kebab-case` for files and dirs.
-- `PascalCase` for types/classes/components.
-- `camelCase` for functions, vars, hooks.
-- `SCREAMING_SNAKE` for env vars and constants.
-- DB columns: `snake_case`. TypeScript fields: `camelCase` mapped via Drizzle.
+- Errors as typed classes in `packages/core/errors.ts`; do not throw raw `Error`
+  from application code.
 
 ## Dependencies
 
-- **No adding deps without checking if it's already in the workspace.** `pnpm ls` first.
-- Prefer Node-native APIs (fetch, streams, WebSocket).
-- Avoid heavy ORMs. Drizzle for SQL, Kysely for type-safe query building.
-- No Lodash. Use native methods or `es-toolkit` if absolutely needed.
+- Do not add deps without checking workspace packages first (`pnpm ls`).
+- Prefer Node-native APIs.
+- No Lodash.
 
-## Git
+## Git And Verification
 
 - Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
-- `pnpm lint && pnpm typecheck && pnpm test` must pass before work is considered done.
+- Before considering work done, run the focused checks that match the change.
+- Full gate: `pnpm lint && pnpm typecheck && pnpm test`.
+- Browser work should be smoke-tested with Playwright or a local browser.
 
 ## Testing
 
-- Unit tests with `bun test` (Bun native, fast).
-- E2E with `playwright` (browser) + `bun test` (API).
-- Tests must be deterministic. No real network. Mock CCXT, Stripe, etc.
+- Unit tests use Bun.
+- Browser E2E uses Playwright.
+- Tests must be deterministic. No real network in automated tests; mock external
+  providers.
 
-## LLM/AI notes
+## LLM Notes
 
-- When generating code, follow this doc strictly.
-- Never invent endpoints, env vars, or table names — they must exist in the schema.
-- If a task is ambiguous, ask. Don't guess.
-- If a change touches DB schema, generate a migration via `pnpm db:generate`.
-- Pine Script: subset v5 only. Check `packages/pine-parser/GRAMMAR.md` before adding syntax.
+- Never invent endpoints, env vars, or table names.
+- If a DB schema changes, generate a migration via `pnpm db:generate`.
+- Pine Script support is subset v5; check `packages/pine-parser/GRAMMAR.md`
+  before adding syntax.
