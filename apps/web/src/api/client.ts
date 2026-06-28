@@ -100,6 +100,7 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(path, {
     ...init,
     signal,
+    credentials: 'include',
     headers: { ...headers(), ...(init?.headers ?? {}) },
   });
   if (!res.ok) {

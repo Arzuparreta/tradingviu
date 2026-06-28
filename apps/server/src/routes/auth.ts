@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { setCookie, deleteCookie } from 'hono/cookie';
+import { setCookie, deleteCookie, getCookie } from 'hono/cookie';
 import { eq } from 'drizzle-orm';
 import { createDb } from '@tv/db';
 import { users } from '@tv/db/schema';
@@ -98,7 +98,8 @@ export const authRoutes = new Hono()
     return c.json({ ok: true });
   })
   .get('/me', async (c) => {
-    const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
+    const token =
+      c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? getCookie(c, 'tv_session') ?? '';
     if (!token) return c.json({ user: null, reason: 'no_token' });
     try {
       const claims = await verifyAccessToken(token, env.JWT_SECRET);

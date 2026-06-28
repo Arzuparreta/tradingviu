@@ -7,7 +7,6 @@ export function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [tenantName, setTenantName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const signup = useAuth((s) => s.signup);
@@ -18,9 +17,8 @@ export function SignupPage() {
     setError(null);
     setLoading(true);
     try {
-      const body: { email: string; password: string; displayName?: string; tenantName?: string } = { email, password };
+      const body: { email: string; password: string; displayName?: string } = { email, password };
       if (displayName) body.displayName = displayName;
-      if (tenantName) body.tenantName = tenantName;
       await signup(body);
       navigate('/');
     } catch (e) {
@@ -33,8 +31,7 @@ export function SignupPage() {
   return (
     <div className="auth-page">
       <div className="card auth-card">
-        <h1>Create your tradingviu</h1>
-        <p className="muted small">First account becomes super admin. Free plan by default.</p>
+        <h1>Create user</h1>
         <form onSubmit={submit}>
           <div>
             <label>Email</label>
@@ -43,10 +40,6 @@ export function SignupPage() {
           <div>
             <label>Display name</label>
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
-          </div>
-          <div>
-            <label>Workspace name</label>
-            <input value={tenantName} onChange={(e) => setTenantName(e.target.value)} placeholder="My trading desk" />
           </div>
           <div>
             <label>Password (10+ chars)</label>

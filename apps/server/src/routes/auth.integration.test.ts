@@ -1,6 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
+import { inArray } from 'drizzle-orm';
 import { createDb } from '@tv/db';
+import { users } from '@tv/db/schema';
 import { ensureOwner } from '@tv/auth';
 import { loadEnv } from '@tv/core';
 import { authRoutes } from './auth.js';
@@ -17,19 +19,27 @@ const postJson = async (path: string, body: unknown): Promise<Response> =>
     body: JSON.stringify(body),
   });
 
+const db = createDb({ url: loadEnv().DATABASE_URL });
+let cleanupEmails: string[] = [];
+
+const rememberUser = (email: string): string => {
+  cleanupEmails.push(email.toLowerCase());
+  return email;
+};
+
+afterEach(async () => {
+  if (cleanupEmails.length === 0) return;
+  await db.delete(users).where(inArray(users.email, cleanupEmails));
+  cleanupEmails = [];
+});
+
 describe('auth routes integration', () => {
-  test('an existing signed-up account can log in with normalized email input', async () => {
+  test('an existing owner account can log in with normalized email input', async () => {
     const unique = Date.now().toString(36);
-    const email = `auth-login-${unique}@example.com`;
+    const email = rememberUser(`auth-login-${unique}@example.com`);
     const password = 'CorrectHorse123!';
 
-    const signup = await postJson('/auth/signup', {
-      email: `  ${email.toUpperCase()}  `,
-      password,
-    });
-    expect(signup.status).toBe(200);
-    const signupBody = (await signup.json()) as { user: { email: string } };
-    expect(signupBody.user.email).toBe(email);
+    await ensureOwner(db, { email, password, displayName: 'Owner' });
 
     const login = await postJson('/auth/login', {
       email: `  ${email.toUpperCase()}  `,
@@ -44,10 +54,44 @@ describe('auth routes integration', () => {
     expect(loginBody.user.email).toBe(email);
   });
 
-  test('seeded owner credentials are repaired for an existing account before login', async () => {
-    const db = createDb({ url: loadEnv().DATABASE_URL });
+  test('signup is limited to creating the single owner account', async () => {
     const unique = Date.now().toString(36);
-    const email = `seeded-owner-${unique}@example.com`;
+    await ensureOwner(db, {
+      email: rememberUser(`existing-owner-${unique}@example.com`),
+      password: 'CorrectHorse123!',
+    });
+
+    const signup = await postJson('/auth/signup', {
+      email: rememberUser(`another-owner-${unique}@example.com`),
+      password: 'CorrectHorse123!',
+    });
+    expect(signup.status).toBe(409);
+    const body = (await signup.json()) as { error: { message: string } };
+    expect(body.error.message).toBe('A user account already exists');
+  });
+
+  test('me restores the browser session from the session cookie', async () => {
+    const unique = Date.now().toString(36);
+    const email = rememberUser(`cookie-session-${unique}@example.com`);
+    const password = 'CorrectHorse123!';
+    await ensureOwner(db, { email, password });
+
+    const login = await postJson('/auth/login', { email, password });
+    expect(login.status).toBe(200);
+    const cookie = login.headers.get('set-cookie')?.split(';')[0];
+    expect(cookie).toStartWith('tv_session=');
+
+    const me = await app.request('/auth/me', {
+      headers: { cookie: cookie ?? '' },
+    });
+    expect(me.status).toBe(200);
+    const body = (await me.json()) as { user: { email: string } | null };
+    expect(body.user?.email).toBe(email);
+  });
+
+  test('seeded owner credentials are repaired for an existing account before login', async () => {
+    const unique = Date.now().toString(36);
+    const email = rememberUser(`seeded-owner-${unique}@example.com`);
     const oldPassword = 'OldOwnerPassword123!';
     const newPassword = 'NewOwnerPassword123!';
 
@@ -79,7 +123,8 @@ describe('auth routes integration', () => {
   });
 
   test('development owner login bootstraps the configured owner without a typed password', async () => {
-    process.env.OWNER_EMAIL = 'dev-owner@example.com';
+    const unique = Date.now().toString(36);
+    process.env.OWNER_EMAIL = rememberUser(`dev-owner-${unique}@example.com`);
     process.env.OWNER_PASSWORD = 'DevOwnerPassword123!';
 
     const login = await postJson('/auth/dev-owner', {});
@@ -89,26 +134,25 @@ describe('auth routes integration', () => {
       user: { email: string; displayName: string };
     };
     expect(loginBody.token.length).toBeGreaterThan(20);
-    expect(loginBody.user.email).toBe('dev-owner@example.com');
+    expect(loginBody.user.email).toBe(process.env.OWNER_EMAIL);
     expect(loginBody.user.displayName).toBe('Owner');
   });
 
   test('invalid credentials stay rejected even when development owner login is configured', async () => {
-    process.env.OWNER_EMAIL = 'form-owner@example.com';
-    process.env.OWNER_PASSWORD = 'FormOwnerPassword123!';
     const unique = Date.now().toString(36);
+    process.env.OWNER_EMAIL = rememberUser(`form-owner-${unique}@example.com`);
+    process.env.OWNER_PASSWORD = 'FormOwnerPassword123!';
 
     const login = await postJson('/auth/login', {
-      email: 'form-owner@example.com',
+      email: process.env.OWNER_EMAIL,
       password: 'whatever-was-typed',
     });
     expect(login.status).toBe(401);
 
-    const normalUser = await postJson('/auth/signup', {
-      email: `normal-login-failure-${unique}@example.com`,
+    await ensureOwner(db, {
+      email: rememberUser(`normal-login-failure-${unique}@example.com`),
       password: 'CorrectHorse123!',
     });
-    expect(normalUser.status).toBe(200);
     const fallbackLogin = await postJson('/auth/login', {
       email: `normal-login-failure-${unique}@example.com`,
       password: 'wrong',

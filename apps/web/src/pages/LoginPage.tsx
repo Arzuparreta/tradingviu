@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../stores/auth';
 import { ApiError } from '../api/client';
 
@@ -73,9 +73,9 @@ export function LoginPage() {
               Local owner
             </button>
           )}
-          <p className="muted small" style={{ textAlign: 'center' }}>
-            No account? <Link to="/signup">Create one</Link>
-          </p>
+          <button type="button" disabled={loading} onClick={() => navigate('/signup')}>
+            Create user
+          </button>
         </form>
       </div>
     </div>

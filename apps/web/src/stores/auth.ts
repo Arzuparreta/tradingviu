@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, getToken, setToken, clearToken } from '../api/client';
+import { api, setToken, clearToken } from '../api/client';
 import type { User } from '../api/types';
 
 interface AuthState {
@@ -16,10 +16,6 @@ export const useAuth = create<AuthState>((set) => ({
   user: null,
   loading: true,
   bootstrap: async () => {
-    if (!getToken()) {
-      set({ user: null, loading: false });
-      return;
-    }
     try {
       const me = await api.me();
       if ('user' in me && me.user) {
