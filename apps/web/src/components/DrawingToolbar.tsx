@@ -31,6 +31,7 @@ import {
   Rows3,
   Ruler,
   Save,
+  Search,
   Slash,
   Spline,
   Square,
@@ -156,7 +157,9 @@ const HOTKEY_MAP: Record<string, DrawingTool> = {
 
 const TOOL_LABELS = new Map<string, string>(KLINE_TOOL_LABELS.map(([tool, label]) => [tool, label]));
 const FAVORITE_TOOLS_KEY = 'tv.drawing.favoriteTools';
+const RECENT_TOOLS_KEY = 'tv.drawing.recentTools';
 const STYLE_TEMPLATES_KEY = 'tv.drawing.styleTemplates';
+const MAX_RECENT_TOOLS = 8;
 
 interface StyleTemplate {
   readonly id: string;
@@ -204,6 +207,27 @@ const drawingStyleValue = (
 
 const colorInputValue = (value: string, fallback: string): string =>
   /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+
+const toolGroupIcon = (groupId: string): LucideIcon => {
+  switch (groupId) {
+    case 'lines':
+      return TrendingUp;
+    case 'channels':
+      return GitBranch;
+    case 'fibonacci':
+      return ChartSpline;
+    case 'pitchfork-gann':
+      return SquareArrowUpRight;
+    case 'measure':
+      return Ruler;
+    case 'shapes':
+      return Square;
+    case 'annotations':
+      return Type;
+    default:
+      return PenLine;
+  }
+};
 
 // ── Props ───────────────────────────────────────────────────────────────
 
@@ -261,8 +285,13 @@ export function DrawingToolbar({
   onRedo,
 }: DrawingToolbarProps) {
   const [objectsOpen, setObjectsOpen] = useState(false);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [toolQuery, setToolQuery] = useState('');
+  const [recentTools, setRecentTools] = useState<DrawingTool[]>(() => readJsonArray<DrawingTool>(RECENT_TOOLS_KEY));
   const [favoriteTools, setFavoriteTools] = useState<DrawingTool[]>(() => readJsonArray<DrawingTool>(FAVORITE_TOOLS_KEY));
   const [styleTemplates, setStyleTemplates] = useState<StyleTemplate[]>(() => readJsonArray<StyleTemplate>(STYLE_TEMPLATES_KEY));
+  const [magnetMode, setMagnetMode] = useState(false);
+  const [stayMode, setStayMode] = useState(false);
   const selected = drawings.find((d) => d.id === selectedId) ?? null;
   const selectedLocked = selected?.lock ?? false;
   const selectedVisible = selected?.visible !== false;
@@ -278,6 +307,34 @@ export function DrawingToolbar({
   const canFavoriteActiveTool = activeTool !== null && activeTool !== 'cursor';
   const activeToolFavorite = canFavoriteActiveTool && favoriteTools.includes(activeTool as DrawingTool);
   const favoriteToolEntries = KLINE_TOOL_LABELS.filter(([tool]) => favoriteTools.includes(tool));
+  const recentToolEntries = KLINE_TOOL_LABELS.filter(([tool]) => recentTools.includes(tool));
+  const openGroup = KLINE_TOOL_GROUPS.find((group) => group.id === openGroupId) ?? null;
+  const flyoutTools = (openGroup?.tools ?? []).filter(([, label]) => {
+    const q = toolQuery.trim().toLowerCase();
+    return q.length === 0 || label.toLowerCase().includes(q);
+  });
+  const quickTools = [...favoriteToolEntries, ...recentToolEntries.filter(([tool]) => !favoriteTools.includes(tool))].slice(0, 10);
+
+  const rememberRecentTool = (tool: DrawingTool) => {
+    if (tool === 'cursor') return;
+    setRecentTools((current) => {
+      const next = [tool, ...current.filter((item) => item !== tool)].slice(0, MAX_RECENT_TOOLS);
+      writeJsonArray(RECENT_TOOLS_KEY, next);
+      return next;
+    });
+  };
+
+  const startDockTool = (tool: DrawingTool) => {
+    if (tool === 'cursor') {
+      onCancelPlacement();
+      setOpenGroupId(null);
+      return;
+    }
+    rememberRecentTool(tool);
+    onStartTool(tool);
+    setOpenGroupId(null);
+    setObjectsOpen(false);
+  };
 
   const toggleFavoriteActiveTool = () => {
     if (!canFavoriteActiveTool) return;
@@ -289,6 +346,18 @@ export function DrawingToolbar({
       writeJsonArray(FAVORITE_TOOLS_KEY, next);
       return next;
     });
+  };
+
+  const toggleMagnetMode = () => {
+    const next = !magnetMode;
+    setMagnetMode(next);
+    manager?.setMagnetMode?.(next ? 'strong' : 'off');
+  };
+
+  const toggleStayMode = () => {
+    const next = !stayMode;
+    setStayMode(next);
+    manager?.setStayInDrawingMode?.(next);
   };
 
   const saveSelectedStyleTemplate = () => {
@@ -362,13 +431,22 @@ export function DrawingToolbar({
   return (
     <Fragment>
       <div
-        className="lwc-drawing-toolbar"
+        className="lwc-drawing-toolbar lwc-drawing-dock"
         style={{ pointerEvents: 'auto' }}
         onMouseDown={(e) => e.stopPropagation()}
         onMouseMove={(e) => e.stopPropagation()}
         onMouseUp={(e) => e.stopPropagation()}
       >
         <div className="lwc-drawing-toolbar-group">
+          <button
+            className={!activeTool ? 'primary icon' : 'ghost icon'}
+            type="button"
+            onClick={() => startDockTool('cursor')}
+            title="Cursor (Esc)"
+            aria-label="Cursor"
+          >
+            <MousePointer2 size={15} />
+          </button>
           <button
             className="ghost icon" type="button"
             onClick={onUndo} disabled={!canUndo}
@@ -385,10 +463,27 @@ export function DrawingToolbar({
           </button>
           <button
             className={objectsOpen ? 'primary icon' : 'ghost icon'} type="button"
-            onClick={() => setObjectsOpen((open) => !open)}
+            onClick={() => {
+              setObjectsOpen((open) => !open);
+              setOpenGroupId(null);
+            }}
             title="Objects" aria-label="Objects"
           >
             <Layers3 size={15} />
+          </button>
+          <button
+            className={magnetMode ? 'primary icon' : 'ghost icon'} type="button"
+            onClick={toggleMagnetMode}
+            title="Magnet mode" aria-label="Magnet mode"
+          >
+            <MoveVertical size={15} />
+          </button>
+          <button
+            className={stayMode ? 'primary icon' : 'ghost icon'} type="button"
+            onClick={toggleStayMode}
+            title="Stay in drawing mode" aria-label="Stay in drawing mode"
+          >
+            <PenLine size={15} />
           </button>
           <button
             className={activeToolFavorite ? 'primary icon' : 'ghost icon'} type="button"
@@ -400,9 +495,9 @@ export function DrawingToolbar({
           </button>
         </div>
 
-        {favoriteToolEntries.length > 0 && (
-          <div className="lwc-drawing-toolbar-group" aria-label="Favorite tools">
-            {favoriteToolEntries.map(([value, label]) => {
+        {quickTools.length > 0 && (
+          <div className="lwc-drawing-toolbar-group" aria-label="Favorite and recent tools">
+            {quickTools.map(([value, label]) => {
               const Icon = TOOL_ICONS[value] ?? MousePointer2;
               const isActive = activeTool === value;
               return (
@@ -410,7 +505,7 @@ export function DrawingToolbar({
                   key={value}
                   className={isActive ? 'primary icon' : 'ghost icon'}
                   type="button"
-                  onClick={() => onStartTool(value)}
+                  onClick={() => startDockTool(value)}
                   title={label}
                   aria-label={label}
                 >
@@ -421,32 +516,28 @@ export function DrawingToolbar({
           </div>
         )}
 
-        {KLINE_TOOL_GROUPS.map((group) => (
-          <div className="lwc-drawing-toolbar-group" key={group.id} aria-label={group.label}>
-            {group.tools.map(([value, label]) => {
-              const Icon = TOOL_ICONS[value] ?? MousePointer2;
-              const isActive = value === 'cursor' ? !activeTool : activeTool === value;
-              return (
-                <button
-                  key={value}
-                  className={isActive ? 'primary icon' : 'ghost icon'}
-                  type="button"
-                  onClick={() => {
-                    if (value === 'cursor') {
-                      onCancelPlacement();
-                    } else {
-                      onStartTool(value);
-                    }
-                  }}
-                  title={`${label}${TOOL_SHORTCUTS[value] ? ` (${TOOL_SHORTCUTS[value]})` : ''}`}
-                  aria-label={label}
-                >
-                  <Icon size={15} />
-                </button>
-              );
-            })}
-          </div>
-        ))}
+        <div className="lwc-drawing-toolbar-group" aria-label="Tool categories">
+          {KLINE_TOOL_GROUPS.filter((group) => group.id !== 'cursor').map((group) => {
+            const Icon = toolGroupIcon(group.id);
+            const groupActive = group.tools.some(([value]) => activeTool === value);
+            return (
+              <button
+                key={group.id}
+                className={openGroupId === group.id || groupActive ? 'primary icon' : 'ghost icon'}
+                type="button"
+                onClick={() => {
+                  setOpenGroupId((current) => current === group.id ? null : group.id);
+                  setObjectsOpen(false);
+                  setToolQuery('');
+                }}
+                title={group.label}
+                aria-label={group.label}
+              >
+                <Icon size={15} />
+              </button>
+            );
+          })}
+        </div>
 
         <div className="lwc-drawing-toolbar-group">
           <button
@@ -498,6 +589,49 @@ export function DrawingToolbar({
           </button>
         </div>
       </div>
+
+      {openGroup && (
+        <div
+          className="lwc-drawing-dock-flyout"
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseMove={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+        >
+          <div className="lwc-drawing-dock-flyout-head">
+            <span>{openGroup.label}</span>
+            <span className="muted mono">{flyoutTools.length}</span>
+          </div>
+          <label className="lwc-drawing-tool-search">
+            <Search size={13} />
+            <input
+              value={toolQuery}
+              onChange={(e) => setToolQuery(e.currentTarget.value)}
+              placeholder="Search"
+              aria-label="Search drawing tools"
+            />
+          </label>
+          <div className="lwc-drawing-tool-list">
+            {flyoutTools.map(([value, label]) => {
+              const Icon = TOOL_ICONS[value] ?? MousePointer2;
+              const isActive = activeTool === value;
+              return (
+                <button
+                  key={value}
+                  className={isActive ? 'lwc-drawing-tool-row active' : 'lwc-drawing-tool-row'}
+                  type="button"
+                  onClick={() => startDockTool(value)}
+                  title={label}
+                  aria-label={label}
+                >
+                  <Icon size={15} />
+                  <span>{label}</span>
+                  {TOOL_SHORTCUTS[value] && <span className="mono muted">{TOOL_SHORTCUTS[value]}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {objectsOpen && (
         <div

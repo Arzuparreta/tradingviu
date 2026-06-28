@@ -25,6 +25,7 @@ const DEFAULT_STYLE = {
   textColor: '#f5c542',
   textSize: 14,
 };
+type DefaultDrawingStyle = typeof DEFAULT_STYLE;
 
 // ── Implementation ──────────────────────────────────────────────────────
 
@@ -50,6 +51,9 @@ export class LwcDrawingManager implements IDrawingManager {
   private _activeTool: string | null = null;
   private _requiredAnchors = 0;
   private _isAttached = false;
+  private _magnetMode: 'off' | 'weak' | 'strong' = 'off';
+  private _stayInDrawingMode = false;
+  private _defaultStyle: DefaultDrawingStyle = DEFAULT_STYLE;
 
   // Subscriptions
   private _changeCallbacks: Array<(drawings: Drawing[]) => void> = [];
@@ -244,6 +248,48 @@ export class LwcDrawingManager implements IDrawingManager {
     }
   }
 
+  setMagnetMode(mode: 'off' | 'weak' | 'strong'): void {
+    this._magnetMode = mode;
+  }
+
+  setStayInDrawingMode(enabled: boolean): void {
+    this._stayInDrawingMode = enabled;
+  }
+
+  moveSelection(): void {
+    // Body-drag geometry is delegated to the primitive library in this wrapper
+    // until per-tool chart-space deltas are normalized in our own domain layer.
+  }
+
+  updateAnchor(): void {
+    // Anchor dragging is handled by lightweight-charts-drawing for selected
+    // primitives. This method reserves the public contract for explicit edits.
+  }
+
+  setToolDefaultStyle(style: Record<string, unknown>): void {
+    this._defaultStyle = {
+      ...this._defaultStyle,
+      ...Object.fromEntries(
+        Object.entries(style).filter(([, value]) => typeof value === 'string' || typeof value === 'number'),
+      ),
+    } as DefaultDrawingStyle;
+  }
+
+  setVisibilityOnIntervals(id: string, intervals: readonly string[]): void {
+    const exported = this.exportDrawings();
+    const drawing = exported.find((item) => item.id === id);
+    if (!drawing) return;
+    const extendData =
+      drawing.extendData && typeof drawing.extendData === 'object' && !Array.isArray(drawing.extendData)
+        ? { ...(drawing.extendData as Record<string, unknown>) }
+        : {};
+    extendData.visibility = { intervals: [...intervals] };
+    const next = exported.map((item) => item.id === id ? { ...item, extendData } : item);
+    this.importDrawings(next);
+    this.select(id);
+    this._notifyChange();
+  }
+
   // ── Events ───────────────────────────────────────────────────────────
 
   onChange(callback: (drawings: Drawing[]) => void): () => void {
@@ -278,7 +324,8 @@ export class LwcDrawingManager implements IDrawingManager {
 
     this.cancelPlacement();
 
-    const libDrawing = registry.createDrawing(toolType, id, anchors, DEFAULT_STYLE, {
+    const stayInDrawingMode = this._stayInDrawingMode;
+    const libDrawing = registry.createDrawing(toolType, id, anchors, this._defaultStyle, {
       visible: true,
       locked: false,
       zIndex: 0,
@@ -289,6 +336,9 @@ export class LwcDrawingManager implements IDrawingManager {
     if (libDrawing) {
       manager.addDrawing(libDrawing);
       manager.selectDrawing(id);
+    }
+    if (stayInDrawingMode) {
+      this.startTool(toolType);
     }
   }
 

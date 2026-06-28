@@ -121,7 +121,7 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Focused checks pass: drawing-tools typecheck + 6 tests, web typecheck + 15 tests, server typecheck + 60 tests.
 ✅ Expanded typed drawing tool catalog and toolbar across lines, channels, Fibonacci, pitchforks/Gann, measurement, shapes, annotations, and markers.
 ✅ Added drawing-tools tests that prove every toolbar tool maps to a registered `lightweight-charts-drawing` tool and round-trips through the persisted drawing shape.
-✅ Added object tree and inspector controls: list/select/rename, lock/hide, group labels, duplicate, copy/paste, z-order, delete/clear, and line/fill/text style editing.
+✅ Replaced the full-width tool wall with a compact left drawing dock, grouped flyouts, favorite/recent tools, object tree, magnet/stay toggles, and inspector controls: list/select/rename, lock/hide, group labels, duplicate, copy/paste, z-order, delete/clear, and line/fill/text style editing.
 ✅ Added local favorite drawing tools and reusable style templates.
 ✅ Added deterministic web acceptance coverage for object management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel drawing-scope independence.
 ✅ Added Playwright infrastructure plus browser E2E coverage for cursor-mode pan/zoom with drawings mounted and object-tree edit/reload/delete persistence.
@@ -150,7 +150,7 @@ Use TradingView's drawing taxonomy as the product target:
    - [x] Remove `LwcDrawingOverlay`.
 
 4. Expand suite:
-   - [x] Ship broad tool categories through the typed catalog and toolbar.
+   - [x] Ship broad tool categories through the typed catalog and dock flyouts.
    - [x] Guard toolbar tools with registry + round-trip tests.
    - [x] Add deterministic acceptance coverage for category-level management, keyboard shortcuts, persistence, undo/redo, z-order, and multi-panel independence.
    - [x] Add browser-level E2E coverage for native pan/zoom and object-tree persistence.

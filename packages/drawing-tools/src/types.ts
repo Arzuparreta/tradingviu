@@ -63,6 +63,24 @@ export interface DrawingManager {
   /** Show or hide a drawing. */
   setVisible(id: string, visible: boolean): void;
 
+  /** Configure magnet snapping mode for placement/edit interactions. */
+  setMagnetMode?(mode: 'off' | 'weak' | 'strong'): void;
+
+  /** Keep the active tool armed after a drawing is completed. */
+  setStayInDrawingMode?(enabled: boolean): void;
+
+  /** Move the selected drawing by a chart-space delta when supported. */
+  moveSelection?(delta: { readonly time: number; readonly price: number }): void;
+
+  /** Update one anchor of a drawing when supported. */
+  updateAnchor?(id: string, index: number, anchor: { readonly time: unknown; readonly price: number }): void;
+
+  /** Update the default style for newly created drawings. */
+  setToolDefaultStyle?(style: Record<string, unknown>): void;
+
+  /** Persist interval visibility preferences for a drawing when supported. */
+  setVisibilityOnIntervals?(id: string, intervals: readonly string[]): void;
+
   /** Subscribe to drawing changes. Returns an unsubscribe function. */
   onChange(callback: (drawings: Drawing[]) => void): () => void;
 

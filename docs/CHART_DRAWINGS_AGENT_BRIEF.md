@@ -18,10 +18,10 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
   public types
 - `apps/web/src/components/chart-surface/` — shared `ChartSurface` component
 - `apps/web/src/hooks/use-drawing-manager.ts` — hook with load/save + undo/redo
-- `apps/web/src/components/DrawingToolbar.tsx` — grouped toolbar covering the
-  registered drawing categories, keyboard shortcuts, lock/hide/delete/clear,
-  object tree, rename/group, duplicate, copy/paste, z-order, style inspector,
-  favorite tools, and style templates
+- `apps/web/src/components/DrawingToolbar.tsx` — compact left drawing dock with
+  grouped flyouts for the registered drawing categories, keyboard shortcuts,
+  lock/hide/delete/clear, object tree, rename/group, duplicate, copy/paste,
+  z-order, style inspector, favorite/recent tools, and style templates
 - `apps/web/src/pages/ChartPage.tsx` — integrated with native primitive drawings
 - `apps/web/src/components/ChartPanel.tsx` — `/layout` panels use `ChartSurface`
   with one drawing manager per `drawingScopeId`

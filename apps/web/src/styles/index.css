@@ -379,14 +379,14 @@ label {
   position: absolute;
   top: 6px;
   left: 6px;
-  right: 6px;
   z-index: 11;
   display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 4px;
-  min-width: 0;
-  overflow-x: auto;
+  width: 36px;
+  max-height: calc(100% - 12px);
+  overflow-y: auto;
   pointer-events: auto;
   scrollbar-width: none;
 }
@@ -394,7 +394,8 @@ label {
   display: none;
 }
 .lwc-drawing-toolbar-group {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
   padding: 2px;
@@ -402,12 +403,12 @@ label {
   border-radius: 6px;
   background: rgba(14, 14, 14, 0.78);
   backdrop-filter: blur(6px);
-  flex: 0 0 auto;
+  min-width: 0;
 }
 .lwc-drawing-toolbar button {
   min-width: 30px;
-  height: 28px;
-  padding: 3px 8px;
+  min-height: 28px;
+  padding: 3px 6px;
   font-size: 11px;
   background: rgba(14, 14, 14, 0.82);
 }
@@ -430,10 +431,90 @@ label {
   font-size: 11px;
   background: rgba(14, 14, 14, 0.86);
 }
+.lwc-drawing-dock-flyout {
+  position: absolute;
+  top: 6px;
+  left: 48px;
+  z-index: 12;
+  width: 250px;
+  max-height: min(520px, calc(100% - 12px));
+  display: grid;
+  grid-template-rows: auto auto minmax(80px, 1fr);
+  gap: 8px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(42, 46, 57, 0.92);
+  border-radius: 6px;
+  background: rgba(14, 14, 14, 0.92);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+.lwc-drawing-dock-flyout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lwc-drawing-tool-search {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(42, 46, 57, 0.9);
+  border-radius: 6px;
+  background: rgba(8, 8, 8, 0.78);
+}
+.lwc-drawing-tool-search input {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.lwc-drawing-tool-list {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.lwc-drawing-tool-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+}
+.lwc-drawing-tool-row.active {
+  border-color: rgba(41, 98, 255, 0.75);
+  background: rgba(41, 98, 255, 0.18);
+}
+.lwc-drawing-tool-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .lwc-drawing-objects {
   position: absolute;
-  top: 42px;
-  left: 6px;
+  top: 6px;
+  left: 48px;
   z-index: 12;
   width: min(320px, calc(100% - 12px));
   max-height: min(520px, calc(100% - 54px));

@@ -387,7 +387,23 @@ const drawTool = async (
   points: readonly { readonly x: number; readonly y: number }[],
   root = page.locator('body'),
 ) => {
-  await root.getByRole('button', { name: toolLabel, exact: true }).click();
+  const directButton = root.getByRole('button', { name: toolLabel, exact: true });
+  if (await directButton.isVisible().catch(() => false)) {
+    await directButton.click();
+  } else {
+    const groups = ['Lines', 'Channels', 'Fibonacci', 'Pitchfork / Gann', 'Measure', 'Shapes', 'Annotations'];
+    let clicked = false;
+    for (const group of groups) {
+      await root.getByRole('button', { name: group, exact: true }).click();
+      const toolButton = root.getByRole('button', { name: toolLabel, exact: true });
+      if (await toolButton.isVisible().catch(() => false)) {
+        await toolButton.click();
+        clicked = true;
+        break;
+      }
+    }
+    expect(clicked, `drawing tool ${toolLabel} is available in the dock`).toBe(true);
+  }
   const surface = root.getByTestId('chart-surface');
   const box = await surface.boundingBox();
   expect(box).not.toBeNull();
