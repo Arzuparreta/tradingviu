@@ -30,16 +30,17 @@ spike. We have a working native-primitive drawing system in `ChartPage` and `/la
 
 Browser E2E now covers cursor-mode pan/zoom, object-tree edit/reload/delete persistence,
 representative create/reload/clear flows across major drawing categories, and
-`/layout` drawing-scope isolation across two panels using the same symbol.
+`/layout` drawing-scope isolation across two panels using the same symbol. It also
+covers edge creation/reload flows for single-anchor annotations, brush/highlighter
+strokes, and marker tools.
 
 ## Where to Continue
 
-1. **More per-tool browser acceptance** — expand from representative categories
-   to edge tools with different anchor counts and editing behaviors, especially
-   single-anchor annotations, brush/highlighter paths, and marker tools.
-
-2. **Visual regression coverage** — add targeted screenshots or canvas checks for
+1. **Visual regression coverage** — add targeted screenshots or canvas checks for
    selected drawings/handles after pan and zoom once the object visuals stabilize.
+
+2. **Deeper per-tool edit coverage** — expand beyond create/reload into body drag
+   and anchor drag acceptance for higher-risk tools with unusual geometry.
 
 ## Verification commands (copy-paste ready)
 

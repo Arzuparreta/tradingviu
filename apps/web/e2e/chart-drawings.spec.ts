@@ -518,6 +518,85 @@ test('creates representative drawing categories and reloads them', async ({ page
   await expect(page.getByText('No drawings')).toBeVisible();
 });
 
+test('creates edge drawing tools and preserves them through reload', async ({ page }) => {
+  const mockState = await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+  await expect(page.getByTestId('chart-surface')).toBeVisible();
+
+  const scenarios = [
+    {
+      label: 'Text',
+      name: 'text',
+      points: [{ x: 0.26, y: 0.34 }],
+    },
+    {
+      label: 'Note',
+      name: 'note',
+      points: [{ x: 0.36, y: 0.45 }],
+    },
+    {
+      label: 'Price label',
+      name: 'priceLabel',
+      points: [{ x: 0.46, y: 0.56 }],
+    },
+    {
+      label: 'Flag',
+      name: 'flag',
+      points: [{ x: 0.56, y: 0.38 }],
+    },
+    {
+      label: 'Brush',
+      name: 'brush',
+      points: [
+        { x: 0.22, y: 0.7 },
+        { x: 0.4, y: 0.58 },
+      ],
+    },
+    {
+      label: 'Highlighter',
+      name: 'highlighter',
+      points: [
+        { x: 0.46, y: 0.72 },
+        { x: 0.64, y: 0.6 },
+      ],
+    },
+    {
+      label: 'Arrow marker',
+      name: 'arrowMarker',
+      points: [{ x: 0.66, y: 0.34 }],
+    },
+    {
+      label: 'Arrow up',
+      name: 'arrowUp',
+      points: [{ x: 0.72, y: 0.48 }],
+    },
+    {
+      label: 'Arrow down',
+      name: 'arrowDown',
+      points: [{ x: 0.78, y: 0.62 }],
+    },
+  ] as const;
+
+  for (const [index, scenario] of scenarios.entries()) {
+    await drawTool(page, scenario.label, scenario.points);
+    await expect.poll(() => mockState.drawings().length).toBe(index + 1);
+    await expect.poll(() => mockState.drawings().at(-1)?.name).toBe(scenario.name);
+    await expect.poll(() => mockState.drawings().at(-1)?.points.length).toBe(scenario.points.length);
+    await expect
+      .poll(() => page.getByRole('button', { name: 'Cursor' }).getAttribute('class'))
+      .toContain('primary');
+  }
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Objects' }).click();
+  const objectsPanel = page.locator('.lwc-drawing-objects');
+  for (const scenario of scenarios) {
+    await expect(
+      objectsPanel.getByRole('button', { name: scenario.label, exact: true }),
+    ).toBeVisible();
+  }
+});
+
 test('object tree edits persist through reload and deletion', async ({ page }) => {
   const mockState = await installAppMocks(page, [seededDrawing()]);
   await page.goto('/chart/BTCUSDT');

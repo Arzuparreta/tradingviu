@@ -127,6 +127,7 @@ Use TradingView's drawing taxonomy as the product target:
 ✅ Added Playwright infrastructure plus browser E2E coverage for cursor-mode pan/zoom with drawings mounted and object-tree edit/reload/delete persistence.
 ✅ Broadened browser E2E coverage for representative drawing creation/reload/clear flows across lines, channels, Fibonacci, measurement, shapes, and annotations.
 ✅ Added browser E2E coverage for `/layout` drawing-scope isolation across two panels using the same symbol.
+✅ Added browser E2E coverage for edge drawing tools: single-anchor annotations, brush/highlighter strokes, and marker tools.
 
 ### 1. Stabilize foundation:
 
@@ -157,12 +158,11 @@ Use TradingView's drawing taxonomy as the product target:
 
 ## Where to Continue (next session)
 
-1. **More per-tool browser acceptance** — expand from representative categories
-   to edge tools with different anchor counts and editing behaviors, especially
-   single-anchor annotations, brush/highlighter paths, and marker tools.
-
-2. **Visual regression coverage** — add targeted screenshots or canvas checks for
+1. **Visual regression coverage** — add targeted screenshots or canvas checks for
    selected drawings/handles after pan and zoom once the object visuals stabilize.
+
+2. **Deeper per-tool edit coverage** — expand beyond create/reload into body drag
+   and anchor drag acceptance for higher-risk tools with unusual geometry.
 
 ## Acceptance Criteria
 

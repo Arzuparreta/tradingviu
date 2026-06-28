@@ -48,6 +48,7 @@ export class LwcDrawingManager implements IDrawingManager {
   // Interaction state
   private _interaction: InteractionHandler | null = null;
   private _activeTool: string | null = null;
+  private _requiredAnchors = 0;
   private _isAttached = false;
 
   // Subscriptions
@@ -141,6 +142,7 @@ export class LwcDrawingManager implements IDrawingManager {
     }
 
     this._activeTool = libraryToolType;
+    this._requiredAnchors = toolDef.requiredAnchors;
     this._libManager.setActiveTool(libraryToolType);
 
     // Create an InteractionHandler for this tool
@@ -178,6 +180,7 @@ export class LwcDrawingManager implements IDrawingManager {
 
     this._activeTool = null;
     this._interaction = null;
+    this._requiredAnchors = 0;
     if (this._libManager) {
       this._libManager.setActiveTool(null);
     }
@@ -289,6 +292,16 @@ export class LwcDrawingManager implements IDrawingManager {
     }
   }
 
+  private _finishPlacementIfReady(): void {
+    if (!this._interaction) return;
+    if (
+      this._interaction.isComplete() ||
+      (this._requiredAnchors > 0 && this._interaction.getAnchors().length >= this._requiredAnchors)
+    ) {
+      this._finishPlacement();
+    }
+  }
+
   // ── DOM event handlers for placement ─────────────────────────────────
   // These are arrow functions so `this` is captured.
 
@@ -302,6 +315,7 @@ export class LwcDrawingManager implements IDrawingManager {
       srcEvent: e,
     };
     this._interaction.onMouseDown(data);
+    this._finishPlacementIfReady();
   };
 
   private _handlePlacementMouseMove = (e: MouseEvent): void => {
@@ -331,11 +345,7 @@ export class LwcDrawingManager implements IDrawingManager {
       srcEvent: e,
     });
 
-    // After placement completes for 2-point tools (on mouse up),
-    // check if the tool is complete and finish.
-    if (this._interaction.isComplete()) {
-      this._finishPlacement();
-    }
+    this._finishPlacementIfReady();
   };
 
   private _handlePlacementKeyDown = (e: KeyboardEvent): void => {
