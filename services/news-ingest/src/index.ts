@@ -17,6 +17,7 @@ const NewsIngestEnvSchema = EnvSchema.pick({
   NEWS_INGEST_INTERVAL_SECONDS: true,
   NEWSAPI_KEY: true,
   FINNHUB_KEY: true,
+  BENZINGA_KEY: true,
 });
 
 export interface NewsIngestResult {
@@ -99,6 +100,7 @@ const run = async (): Promise<void> => {
   const provider = createNewsProvider(env.NEWS_PROVIDER, {
     ...(env.NEWSAPI_KEY ? { newsApiKey: env.NEWSAPI_KEY } : {}),
     ...(env.FINNHUB_KEY ? { finnhubKey: env.FINNHUB_KEY } : {}),
+    ...(env.BENZINGA_KEY ? { benzingaKey: env.BENZINGA_KEY } : {}),
   });
   const adminUrl = env.DATABASE_URL_ADMIN ?? env.DATABASE_URL;
   const db = createDb({ url: adminUrl, max: 1 });

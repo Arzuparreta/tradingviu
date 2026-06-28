@@ -192,7 +192,11 @@ export class NewsApiProvider implements NewsProvider {
     const byUrl = new Map<string, NewsProviderArticle>();
 
     if (symbols.length === 0) {
-      for (const article of await this.fetchEverything('stocks OR markets OR earnings', [], query)) {
+      for (const article of await this.fetchEverything(
+        'stocks OR markets OR earnings',
+        [],
+        query,
+      )) {
         byUrl.set(article.url, article);
       }
     } else {
@@ -360,14 +364,118 @@ export class FinnhubNewsProvider implements NewsProvider {
   }
 }
 
-export type NewsProviderId = 'mock' | 'newsapi' | 'finnhub';
+const parseBenzingaArticle = (
+  value: unknown,
+  symbols: readonly string[],
+): NewsProviderArticle | undefined => {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const url = textOrUndefined(record.url);
+  const title = textOrUndefined(record.title);
+  const publishedAtRaw = textOrUndefined(record.created) ?? textOrUndefined(record.updated);
+  if (!url || !title || !publishedAtRaw) return undefined;
+  const publishedAt = new Date(publishedAtRaw);
+  if (Number.isNaN(publishedAt.getTime())) return undefined;
+  const body = textOrUndefined(record.teaser) ?? textOrUndefined(record.body);
+  const stocks = Array.isArray(record.stocks) ? record.stocks : [];
+  const stockSymbols = stocks
+    .map((stock) => {
+      const stockRecord = asRecord(stock);
+      if (!stockRecord) return undefined;
+      return (
+        textOrUndefined(stockRecord.name) ??
+        textOrUndefined(stockRecord.symbol) ??
+        textOrUndefined(stockRecord.ticker)
+      );
+    })
+    .filter((symbol): symbol is string => symbol !== undefined);
+
+  return {
+    url,
+    title,
+    symbols: stockSymbols.length > 0 ? uniqueSymbols(stockSymbols) : uniqueSymbols(symbols),
+    publishedAt,
+    source: 'Benzinga',
+    ...(body ? { body } : {}),
+  };
+};
+
+export class BenzingaNewsProvider implements NewsProvider {
+  public readonly id = 'benzinga';
+  public readonly displayName = 'Benzinga';
+
+  public constructor(
+    private readonly apiKey: string,
+    private readonly baseUrl = 'https://api.benzinga.com',
+    private readonly fetcher: Fetcher = fetch,
+  ) {
+    if (!apiKey.trim()) throw new NewsProviderError(this.id, 'BENZINGA_KEY is required');
+  }
+
+  public async fetchNews(queryInput: NewsIngestQuery): Promise<readonly NewsProviderArticle[]> {
+    const query = NewsIngestQuerySchema.parse(queryInput);
+    const symbols = uniqueSymbols(query.symbols);
+    const articles = await this.fetchNewsItems(symbols, query);
+    const byUrl = new Map<string, NewsProviderArticle>();
+
+    for (const article of articles) {
+      const existing = byUrl.get(article.url);
+      byUrl.set(
+        article.url,
+        existing
+          ? { ...existing, symbols: uniqueSymbols([...existing.symbols, ...article.symbols]) }
+          : article,
+      );
+    }
+
+    return [...byUrl.values()]
+      .filter((article) => hasSymbolIntersection(article.symbols, symbols))
+      .filter((article) => (query.from ? article.publishedAt >= query.from : true))
+      .filter((article) => (query.to ? article.publishedAt <= query.to : true))
+      .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+      .slice(0, query.limit);
+  }
+
+  public async healthCheck(): Promise<NewsProviderHealth> {
+    return { ok: true, checkedAt: new Date() };
+  }
+
+  private async fetchNewsItems(
+    symbols: readonly string[],
+    query: NewsIngestQuery,
+  ): Promise<readonly NewsProviderArticle[]> {
+    const url = new URL('/api/v2/news', this.baseUrl);
+    url.searchParams.set('token', this.apiKey);
+    url.searchParams.set('pageSize', String(Math.min(query.limit, 100)));
+    if (symbols.length > 0) url.searchParams.set('tickers', symbols.join(','));
+    if (query.from) url.searchParams.set('dateFrom', toYmd(query.from));
+    if (query.to) url.searchParams.set('dateTo', toYmd(query.to));
+
+    const response = await this.fetcher(url);
+    if (!response.ok) {
+      throw new NewsProviderError(this.id, `HTTP ${response.status} for /api/v2/news`);
+    }
+    const payload = (await response.json()) as unknown;
+    const articles = Array.isArray(payload) ? payload : [];
+    return articles
+      .map((article) => parseBenzingaArticle(article, symbols))
+      .filter((article): article is NewsProviderArticle => article !== undefined);
+  }
+}
+
+export type NewsProviderId = 'mock' | 'newsapi' | 'finnhub' | 'benzinga';
 
 export const createNewsProvider = (
   providerId: string,
-  options: { readonly newsApiKey?: string; readonly finnhubKey?: string } = {},
+  options: {
+    readonly newsApiKey?: string;
+    readonly finnhubKey?: string;
+    readonly benzingaKey?: string;
+  } = {},
 ): NewsProvider => {
   if (providerId === 'mock') return new MockNewsProvider();
   if (providerId === 'newsapi') return new NewsApiProvider(options.newsApiKey ?? '');
   if (providerId === 'finnhub') return new FinnhubNewsProvider(options.finnhubKey ?? '');
+  if (providerId === 'benzinga') return new BenzingaNewsProvider(options.benzingaKey ?? '');
   throw new NewsProviderError(providerId, 'Unsupported news provider');
 };

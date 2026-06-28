@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, freshness-aware history, native Binance REST/WS market data, live quote/depth fanout, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, Ichimoku cloud, and pivot points — only per-candle footprint is deferred (needs a trade tape). Slice 10 is in progress with public tokens, `/v1` read/write endpoints, rate limiting, scoped watchlist writes, and public WebSocket market streaming delivered. Slice 11 (strategy backtesting) is in progress: deterministic built-in and Pine-signal backtests, optimization, walk-forward analysis, and a dedicated report page are delivered. This doc maps the full scope so you can keep building.
+`tradingviu` is a self-hosted, multi-tenant TradingView clone. AGPL-3.0. Monorepo. TypeScript end-to-end. **Slice 1 (foundation), Slice 2.5 (real-time market data infrastructure), Slice 3 (Pine Script + multi-chart + search), Slice 4 (alerts + portfolios + paper trading), and Slice 5 (trading desk) are done and committed.** Slice 2.5 supersedes the broken live-bars polling from slice 2 with a single-upstream BarStore, TimescaleDB persistence, freshness-aware history, native Binance REST/WS market data, live quote/depth fanout, and a status-aware WS protocol. Slice 6 is in progress with news (mock + NewsAPI + Finnhub + Benzinga), earnings/economic/dividend calendars, screener presets, fundamentals storage + ingestion, yield curves, macro series ingestion, calendar provider ingestion, and an expanded screener (catalog of ~90 metrics, generic filter builder, auto-refresh) delivered. Slice 9 (advanced TA) is done (9a–9g): candlestick pattern recognition, auto chart-pattern detection, volume profile, TPO/Market profile, single- and multi-chart bar replay, Ichimoku cloud, and pivot points — only per-candle footprint is deferred (needs a trade tape). Slice 10 is in progress with public tokens, `/v1` read/write endpoints, rate limiting, scoped watchlist writes, and public WebSocket market streaming delivered. Slice 11 (strategy backtesting) is in progress: deterministic built-in and Pine-signal backtests, optimization, walk-forward analysis, and a dedicated report page are delivered. This doc maps the full scope so you can keep building.
 
 ## Status
 
@@ -248,7 +248,11 @@ tradingviu/
   /api/screener` + `GET /api/screener/metrics`, and a Discovery **filter builder
   + column picker + click-to-sort + auto-refresh**. Metadata-backed metrics scale
   the catalog toward 400+ with no migration. See `docs/SLICE-6.md`.
-- Additional news providers (Benzinga)
+- **6m (done) — Benzinga news provider:** `BenzingaNewsProvider` in
+  `packages/news` over `/api/v2/news` with `tickers`, `dateFrom`/`dateTo`,
+  `pageSize` capped to 100, `stocks` tag normalization, `NEWS_PROVIDER=benzinga`,
+  and `BENZINGA_KEY` wired through `services/news-ingest`. See `docs/SLICE-6.md`.
+- Additional news provider coverage and richer sentiment
 - Additional fundamentals providers and broader metric coverage
 - Additional macro providers and non-US country mappings
 

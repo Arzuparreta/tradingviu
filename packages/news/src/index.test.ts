@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  BenzingaNewsProvider,
   FinnhubNewsProvider,
   MockNewsProvider,
   NewsApiProvider,
@@ -98,8 +99,12 @@ describe('news provider normalization', () => {
   });
 
   test('Finnhub provider fetches company news per symbol and parses unix timestamps', async () => {
-    const calls: Array<{ path: string; symbol: string | null; from: string | null; token: string | null }> =
-      [];
+    const calls: Array<{
+      path: string;
+      symbol: string | null;
+      from: string | null;
+      token: string | null;
+    }> = [];
     const fetcher = async (input: URL | RequestInfo): Promise<Response> => {
       const url = new URL(String(input));
       calls.push({
@@ -188,9 +193,94 @@ describe('news provider normalization', () => {
     expect(articles[0]?.source).toBe('Finnhub');
   });
 
-  test('createNewsProvider builds the finnhub provider', () => {
+  test('Benzinga provider fetches news with token, tickers, date window, and capped page size', async () => {
+    const calls: Array<{
+      path: string;
+      token: string | null;
+      tickers: string | null;
+      dateFrom: string | null;
+      dateTo: string | null;
+      pageSize: string | null;
+    }> = [];
+    const fetcher = async (input: URL | RequestInfo): Promise<Response> => {
+      const url = new URL(String(input));
+      calls.push({
+        path: url.pathname,
+        token: url.searchParams.get('token'),
+        tickers: url.searchParams.get('tickers'),
+        dateFrom: url.searchParams.get('dateFrom'),
+        dateTo: url.searchParams.get('dateTo'),
+        pageSize: url.searchParams.get('pageSize'),
+      });
+      return jsonResponse([
+        {
+          id: 1,
+          created: '2026-06-24T14:00:00.000Z',
+          title: 'Apple and Microsoft move with megacap tape',
+          teaser: 'Desk flow tracked the large-cap technology basket.',
+          url: 'https://example.com/benzinga/megacap',
+          stocks: [{ name: 'AAPL' }, { name: 'MSFT' }],
+        },
+        {
+          id: 2,
+          created: '2026-06-24T13:00:00.000Z',
+          title: 'Unrelated energy note',
+          url: 'https://example.com/benzinga/energy',
+          stocks: [{ name: 'XOM' }],
+        },
+      ]);
+    };
+
+    const provider = new BenzingaNewsProvider('demo-key', 'https://benzinga.example.test', fetcher);
+    const articles = await fetchNormalizedNews(provider, {
+      symbols: ['msft', 'AAPL'],
+      from: '2026-06-24T00:00:00.000Z',
+      to: '2026-06-25T00:00:00.000Z',
+      limit: 250,
+    });
+
+    expect(calls).toEqual([
+      {
+        path: '/api/v2/news',
+        token: 'demo-key',
+        tickers: 'AAPL,MSFT',
+        dateFrom: '2026-06-24',
+        dateTo: '2026-06-25',
+        pageSize: '100',
+      },
+    ]);
+    expect(articles).toHaveLength(1);
+    expect(articles[0]?.url).toBe('https://example.com/benzinga/megacap');
+    expect(articles[0]?.symbols).toEqual(['AAPL', 'MSFT']);
+    expect(articles[0]?.body).toBe('Desk flow tracked the large-cap technology basket.');
+    expect(articles[0]?.source).toBe('Benzinga');
+  });
+
+  test('Benzinga provider parses general news symbols from stock tags', async () => {
+    const fetcher = async (): Promise<Response> =>
+      jsonResponse([
+        {
+          created: '2026-06-24T12:00:00.000Z',
+          title: 'Market open note',
+          body: 'Breadth improved into the open.',
+          url: 'https://example.com/benzinga/general',
+          stocks: [{ name: 'SPY' }, { symbol: 'QQQ' }],
+        },
+      ]);
+
+    const provider = new BenzingaNewsProvider('demo-key', 'https://benzinga.example.test', fetcher);
+    const articles = await fetchNormalizedNews(provider, { limit: 10 });
+
+    expect(articles).toHaveLength(1);
+    expect(articles[0]?.symbols).toEqual(['QQQ', 'SPY']);
+  });
+
+  test('createNewsProvider builds real news providers', () => {
     const provider = createNewsProvider('finnhub', { finnhubKey: 'demo-key' });
     expect(provider.id).toBe('finnhub');
     expect(provider.displayName).toBe('Finnhub');
+    const benzinga = createNewsProvider('benzinga', { benzingaKey: 'demo-key' });
+    expect(benzinga.id).toBe('benzinga');
+    expect(benzinga.displayName).toBe('Benzinga');
   });
 });

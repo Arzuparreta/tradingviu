@@ -236,9 +236,36 @@ Notes:
 - Metadata-backed filters/sorts are not indexed; for very large universes a
   GIN/expression index on the hot metadata keys would be the next step.
 
+## 6m — Benzinga News Provider
+
+Status: done.
+
+Delivered:
+
+- `BenzingaNewsProvider` in `packages/news`: a real Benzinga adapter over
+  `/api/v2/news` with an injectable fetcher, authenticating via the `token`
+  query parameter.
+- Symbol-filtered ingestion through Benzinga's `tickers` query parameter,
+  `dateFrom`/`dateTo` windowing, and `pageSize` capped at Benzinga's documented
+  100-item page size.
+- Normalization from Benzinga `created` timestamps, `teaser`/`body` text, URL,
+  title, and `stocks` tags into the shared news provider article shape. When a
+  symbol-filtered payload omits stock tags, the queried symbols are used as a
+  fallback association.
+- `createNewsProvider` supports `benzinga` via a `benzingaKey` option;
+  `NEWS_PROVIDER` accepts `mock | newsapi | finnhub | benzinga`; and
+  `services/news-ingest` passes `BENZINGA_KEY` through.
+- `BENZINGA_KEY` is validated in `EnvSchema` and documented next to the news
+  block in `.env.example`.
+
+Notes:
+
+- `benzinga` requires `BENZINGA_KEY`; the shared `news_articles` upsert path is
+  unchanged, so no DB migration was required.
+
 ## Remaining Slice 6 Work
 
-- Additional news providers (Benzinga) and richer sentiment.
+- Additional news provider coverage and richer sentiment.
 - Additional fundamentals providers and broader metric coverage (fills more of
   the metadata-backed catalog with real data).
 - Additional macro providers and non-US country mappings.
