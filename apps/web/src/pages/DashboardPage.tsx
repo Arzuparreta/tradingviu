@@ -1,22 +1,318 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Bell,
+  CalendarDays,
+  CandlestickChart,
+  LogOut,
+  Newspaper,
+  PieChart,
+  Star,
+} from 'lucide-react';
+import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
+import type { Bar, WatchlistItem } from '../api/types';
+
+const money = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
+const pct = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const compact = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 2,
+});
+
+const dateFmt = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const dayFmt = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+});
+
+const asIsoDate = (offsetDays: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+};
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <div className="dashboard-empty">{children}</div>;
+}
+
+function Panel({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="dashboard-panel">
+      <div className="dashboard-panel-head">
+        <div className="row">
+          {icon}
+          <h2>{title}</h2>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Sparkline({ bars }: { bars: readonly Bar[] }) {
+  const closes = bars.slice(-48).map((b) => b.close);
+  if (closes.length < 2) return <div className="dashboard-sparkline muted">No data</div>;
+
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const span = max - min || 1;
+  const points = closes
+    .map((v, i) => {
+      const x = (i / (closes.length - 1)) * 100;
+      const y = 28 - ((v - min) / span) * 24;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+  const up = closes[closes.length - 1]! >= closes[0]!;
+
+  return (
+    <svg className="dashboard-sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={points} fill="none" stroke={up ? 'var(--up)' : 'var(--down)'} strokeWidth="2" />
+    </svg>
+  );
+}
+
+function WatchlistRow({ item }: { item: WatchlistItem }) {
+  const historyQ = useQuery({
+    queryKey: ['dashboard-history', item.symbol.id],
+    queryFn: () => api.history(item.symbol.id, '1d', 80),
+    staleTime: 30_000,
+  });
+  const bars = historyQ.data?.bars ?? [];
+  const first = bars[0]?.close;
+  const last = bars[bars.length - 1]?.close;
+  const change = first && last ? (last - first) / first : null;
+
+  return (
+    <Link className="dashboard-watch-row" to={`/chart/${item.symbol.ticker}`}>
+      <div>
+        <strong>{item.symbol.ticker}</strong>
+        <span>{item.symbol.exchange}</span>
+      </div>
+      <Sparkline bars={bars} />
+      <div className="dashboard-watch-price">
+        <strong>{last ? compact.format(last) : historyQ.isLoading ? '...' : '-'}</strong>
+        {change != null && <span className={change >= 0 ? 'up' : 'down'}>{pct.format(change)}</span>}
+      </div>
+    </Link>
+  );
+}
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
+  const watchlistsQ = useQuery({ queryKey: ['watchlists'], queryFn: () => api.watchlists() });
+  const selectedWatchlist = watchlistsQ.data?.watchlists[0] ?? null;
+  const watchlistItemsQ = useQuery({
+    queryKey: ['watchlist-items', selectedWatchlist?.id],
+    queryFn: () => api.watchlistItems(selectedWatchlist!.id),
+    enabled: !!selectedWatchlist,
+  });
+  const portfoliosQ = useQuery({ queryKey: ['portfolios'], queryFn: () => api.portfolios() });
+  const selectedPortfolio = portfoliosQ.data?.portfolios[0] ?? null;
+  const analyticsQ = useQuery({
+    queryKey: ['portfolio-analytics', selectedPortfolio?.id],
+    queryFn: () => api.portfolioAnalytics(selectedPortfolio!.id),
+    enabled: !!selectedPortfolio,
+  });
+  const alertsQ = useQuery({ queryKey: ['alerts'], queryFn: () => api.alerts() });
+  const newsQ = useQuery({ queryKey: ['dashboard-news'], queryFn: () => api.news({ limit: 5 }) });
+  const earningsQ = useQuery({
+    queryKey: ['dashboard-earnings'],
+    queryFn: () => api.earningsCalendar({ from: asIsoDate(0), to: asIsoDate(21), limit: 5 }),
+  });
+  const dividendsQ = useQuery({
+    queryKey: ['dashboard-dividends'],
+    queryFn: () => api.dividendCalendar({ from: asIsoDate(0), to: asIsoDate(21), limit: 5 }),
+  });
+  const economicQ = useQuery({
+    queryKey: ['dashboard-economic'],
+    queryFn: () => api.economicCalendar({ from: asIsoDate(0), to: asIsoDate(14), limit: 5 }),
+  });
+
+  const activeAlerts = useMemo(
+    () => (alertsQ.data?.alerts ?? []).filter((a) => a.active).slice(0, 6),
+    [alertsQ.data?.alerts],
+  );
+
+  const events = useMemo(() => {
+    const earnings =
+      earningsQ.data?.events.map((e) => ({
+        key: `earnings-${e.id}`,
+        at: e.date,
+        label: `${e.symbol.ticker} earnings`,
+        meta: e.epsEstimate ? `EPS est ${e.epsEstimate}` : e.symbol.exchange,
+      })) ?? [];
+    const dividends =
+      dividendsQ.data?.events.map((e) => ({
+        key: `dividend-${e.id}`,
+        at: e.exDate,
+        label: `${e.symbol.ticker} ex-dividend`,
+        meta: `${e.amount} ${e.currency}`,
+      })) ?? [];
+    const macro =
+      economicQ.data?.events.map((e) => ({
+        key: `economic-${e.id}`,
+        at: e.eventAt,
+        label: e.name,
+        meta: `${e.country} ${e.importance}`,
+      })) ?? [];
+    return [...earnings, ...dividends, ...macro]
+      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+      .slice(0, 8);
+  }, [dividendsQ.data?.events, earningsQ.data?.events, economicQ.data?.events]);
+
+  const watchItems = (watchlistItemsQ.data?.items ?? []).slice(0, 6);
+  const analytics = analyticsQ.data?.analytics;
 
   return (
-    <div className="page">
-      <h1>Welcome{user?.displayName ? `, ${user.displayName}` : ''}</h1>
-      <div className="row" style={{ marginBottom: 24 }}>
-        <Link
-          to="/chart"
-          className="primary"
-          style={{ background: 'var(--accent)', padding: '8px 14px', borderRadius: 6, color: 'white' }}
+    <div className="page dashboard-page">
+      <div className="dashboard-top">
+        <div>
+          <h1>{user?.displayName ? `${user.displayName}'s trading desk` : 'Trading desk'}</h1>
+          <p className="muted">Single-user market command center</p>
+        </div>
+        <div className="row">
+          <Link to="/chart/BTCUSDT" className="dashboard-action">
+            <CandlestickChart size={16} />
+            Open chart
+          </Link>
+          <button onClick={logout} className="ghost dashboard-icon-action" title="Sign out" aria-label="Sign out">
+            <LogOut size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="dashboard-grid">
+        <Panel
+          icon={<Star size={16} />}
+          title={selectedWatchlist?.name ?? 'Watchlist'}
+          action={<Link to="/watchlists">Manage</Link>}
         >
-          Open chart →
-        </Link>
-        <span className="grow" />
-        <button onClick={logout} className="ghost">Sign out</button>
+          {watchItems.length > 0 ? (
+            <div className="dashboard-watchlist">
+              {watchItems.map((item) => (
+                <WatchlistRow key={item.id} item={item} />
+              ))}
+            </div>
+          ) : (
+            <Empty>{watchlistItemsQ.isLoading || watchlistsQ.isLoading ? 'Loading watchlist...' : 'No symbols in your watchlist yet.'}</Empty>
+          )}
+        </Panel>
+
+        <Panel icon={<PieChart size={16} />} title="Portfolio" action={<Link to="/portfolios">Open</Link>}>
+          {analytics ? (
+            <div className="dashboard-portfolio">
+              <div className="dashboard-metric-main">
+                <span>Market value</span>
+                <strong>{money.format(analytics.marketValue)}</strong>
+              </div>
+              <div className="dashboard-metric-row">
+                <span>Unrealized P&L</span>
+                <strong className={analytics.unrealizedPnl >= 0 ? 'up' : 'down'}>
+                  {money.format(analytics.unrealizedPnl)} ({pct.format(analytics.unrealizedPnlPct / 100)})
+                </strong>
+              </div>
+              <div className="dashboard-metric-row">
+                <span>Positions</span>
+                <strong>{analytics.positionsCount}</strong>
+              </div>
+              <div className="dashboard-metric-row">
+                <span>Top weight</span>
+                <strong>{pct.format(analytics.concentration.topWeight)}</strong>
+              </div>
+              <div className="dashboard-position-list">
+                {analytics.positions.slice(0, 4).map((p) => (
+                  <Link key={p.symbolId} to={`/chart/${p.ticker}`}>
+                    <span>{p.ticker}</span>
+                    <strong className={p.unrealizedPnl >= 0 ? 'up' : 'down'}>{money.format(p.unrealizedPnl)}</strong>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Empty>{portfoliosQ.isLoading || analyticsQ.isLoading ? 'Loading portfolio...' : 'No portfolio data yet.'}</Empty>
+          )}
+        </Panel>
+
+        <Panel icon={<Bell size={16} />} title="Active alerts" action={<Link to="/alerts">Review</Link>}>
+          {activeAlerts.length > 0 ? (
+            <div className="dashboard-list">
+              {activeAlerts.map((a) => (
+                <Link key={a.id} to="/alerts" className="dashboard-list-row">
+                  <strong>{a.name}</strong>
+                  <span>{a.symbol.ticker}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <Empty>{alertsQ.isLoading ? 'Loading alerts...' : 'No active alerts.'}</Empty>
+          )}
+        </Panel>
+
+        <Panel icon={<CalendarDays size={16} />} title="Upcoming events" action={<Link to="/discovery">Discovery</Link>}>
+          {events.length > 0 ? (
+            <div className="dashboard-list">
+              {events.map((e) => (
+                <div key={e.key} className="dashboard-list-row">
+                  <strong>{e.label}</strong>
+                  <span>
+                    {e.at.includes('T') ? dateFmt.format(new Date(e.at)) : dayFmt.format(new Date(`${e.at}T00:00:00`))}
+                    {' · '}
+                    {e.meta}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty>{earningsQ.isLoading || dividendsQ.isLoading || economicQ.isLoading ? 'Loading events...' : 'No upcoming events.'}</Empty>
+          )}
+        </Panel>
+
+        <Panel icon={<Newspaper size={16} />} title="Market news" action={<Link to="/discovery">More</Link>}>
+          {(newsQ.data?.articles ?? []).length > 0 ? (
+            <div className="dashboard-news-list">
+              {newsQ.data!.articles.map((n) => (
+                <a key={n.id} href={n.url} target="_blank" rel="noreferrer" className="dashboard-news-row">
+                  <strong>{n.title}</strong>
+                  <span>
+                    {n.source} · {dateFmt.format(new Date(n.publishedAt))}
+                  </span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <Empty>{newsQ.isLoading ? 'Loading news...' : 'No news available.'}</Empty>
+          )}
+        </Panel>
       </div>
     </div>
   );
