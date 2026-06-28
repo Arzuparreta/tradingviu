@@ -45,6 +45,25 @@ interface ActiveDrag {
 }
 
 const CHANNEL_TOOLS = new Set(['priceChannelLine', 'parallelStraightLine', 'regressionTrend', 'flatTopBottom', 'disjointChannel', 'fibChannel']);
+const BOUNDED_TOOLS = new Set([
+  'rect',
+  'rotatedRectangle',
+  'circle',
+  'ellipse',
+  'triangle',
+  'arc',
+  'priceRange',
+  'dateRange',
+  'datePriceRange',
+  'longPosition',
+  'shortPosition',
+  'projection',
+  'forecast',
+  'barsPattern',
+  'gannBox',
+  'gannSquare',
+  'gannSquareFixed',
+]);
 // Library tool types that accept an open-ended number of anchors: the user keeps
 // clicking to add vertices and finishes with Enter or a double-click.
 const MULTI_POINT_TOOLS = new Set(['path', 'polyline', 'brush', 'highlighter']);
@@ -623,7 +642,7 @@ export class LwcDrawingManager implements IDrawingManager {
         ) return drawing;
         continue;
       }
-      if (drawing.name === 'rect' && pixels.length >= 2) {
+      if (BOUNDED_TOOLS.has(drawing.name) && pixels.length >= 2) {
         if (isInsidePolygonBounds(point, [pixels[0]!, pixels[1]!])) return drawing;
         continue;
       }
@@ -815,9 +834,15 @@ export class LwcDrawingManager implements IDrawingManager {
     if (libDrawing) {
       const persisted = this._expandPlacedDrawing(libraryToOurDrawing(libDrawing.toJSON()));
       this._drawingCache = [...this._drawingCache, persisted];
-      manager.addDrawing(libDrawing);
+      this._suppressLibEvents = true;
+      try {
+        manager.addDrawing(libDrawing);
+      } finally {
+        this._suppressLibEvents = false;
+      }
       manager.selectDrawing(id);
       this._notifySelectionChange(id);
+      this._notifyChange();
     }
     if (stayInDrawingMode) {
       this.startTool(toolType);

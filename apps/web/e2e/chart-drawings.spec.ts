@@ -1170,3 +1170,18 @@ test('REPRO select on canvas then Delete', async ({ page }) => {
   await page.keyboard.press('Delete');
   await expect.poll(() => mockState.drawings().length).toBe(0);
 });
+
+test('deletes bounded drawings after selecting their body on the canvas', async ({ page }) => {
+  const mockState = await installAppMocks(page);
+  await page.goto('/chart-legacy/BTCUSDT');
+  await expect(page.getByTestId('chart-surface')).toBeVisible();
+
+  await drawTool(page, 'Circle', [{ x: 0.32, y: 0.35 }, { x: 0.52, y: 0.62 }]);
+  await expect.poll(() => mockState.drawings().length).toBe(1);
+
+  const center = await surfacePoint(page.locator('body'), 0.42, 0.48);
+  await page.mouse.click(center.x, center.y);
+  await page.keyboard.press('Delete');
+
+  await expect.poll(() => mockState.drawings().length).toBe(0);
+});
