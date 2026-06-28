@@ -57,7 +57,8 @@ export class TradingviuDatafeed implements Datafeed {
   private sockets = new Map<string, LiveSocket>();
 
   async searchSymbols(search?: string): Promise<SymbolInfo[]> {
-    const res = await api.symbols(search ?? '');
+    const query = search?.trim() ?? '';
+    const res = query ? await api.symbols(query) : await api.allSymbols();
     return res.results.map(
       (r): TvSymbolInfo => ({
         id: r.id,

@@ -491,9 +491,19 @@ const countDrawingPixels = async (page: Page): Promise<number> =>
     return count;
   });
 
-test('shows live placement preview after the first anchor', async ({ page }) => {
+test('main chart route renders KLineChart Pro', async ({ page }) => {
   await installAppMocks(page);
   await page.goto('/chart/BTCUSDT');
+
+  await expect(page.getByText('Bitcoin / Tether')).toBeVisible();
+  await expect(page.getByText('Indicator')).toBeVisible();
+  await expect(page.getByText('Screenshot')).toBeVisible();
+  await expect.poll(() => page.locator('canvas').count()).toBeGreaterThan(0);
+});
+
+test('shows live placement preview after the first anchor', async ({ page }) => {
+  await installAppMocks(page);
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await startDrawingTool(page, 'Trend line');
@@ -507,7 +517,7 @@ test('shows live placement preview after the first anchor', async ({ page }) => 
 
 test('drags whole drawings from the body and keeps chart pan separate', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Trend line', [
@@ -541,7 +551,7 @@ test('drags whole drawings from the body and keeps chart pan separate', async ({
 
 test('parallel channel has four draggable corners', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Parallel channel', [
@@ -574,7 +584,7 @@ test('parallel channel has four draggable corners', async ({ page }) => {
 
 test('copy paste works after selecting a drawing directly on the canvas', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Rectangle', [
@@ -594,7 +604,7 @@ test('copy paste works after selecting a drawing directly on the canvas', async 
 
 test('edits a 3-anchor pitchfork by dragging an anchor and reloads', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Andrews pitchfork', [
@@ -635,7 +645,7 @@ test('edits a 3-anchor pitchfork by dragging an anchor and reloads', async ({ pa
 
 test('moves a 3-anchor fib extension by dragging its body', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Fib extension', [
@@ -669,7 +679,7 @@ test('moves a 3-anchor fib extension by dragging its body', async ({ page }) => 
 
 test('builds multi-vertex polyline and finishes with Enter', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await startDrawingTool(page, 'Polyline');
@@ -693,7 +703,7 @@ test('builds multi-vertex polyline and finishes with Enter', async ({ page }) =>
 
 test('builds a path and finishes with a double-click', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await startDrawingTool(page, 'Path');
@@ -716,7 +726,7 @@ test('builds a path and finishes with a double-click', async ({ page }) => {
 
 test('edits text-annotation content and preserves it through reload', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Text', [{ x: 0.3, y: 0.35 }]);
@@ -742,7 +752,7 @@ test('edits text-annotation content and preserves it through reload', async ({ p
 
 test('configures sync mode and interval visibility from the inspector', async ({ page }) => {
   const mockState = await installAppMocks(page, [seededDrawing()]);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await page.getByRole('button', { name: 'Objects' }).click();
@@ -769,7 +779,7 @@ test('configures sync mode and interval visibility from the inspector', async ({
 
 test('creates a drawing alert with the configured operator and target', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Trend line', [
@@ -794,7 +804,7 @@ test('creates a drawing alert with the configured operator and target', async ({
 
 test('selected drawing keeps rendering on the chart surface through pan and zoom', async ({ page }) => {
   await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   await drawTool(page, 'Trend line', [
@@ -829,7 +839,7 @@ test('selected drawing keeps rendering on the chart surface through pan and zoom
 
 test('cursor mode keeps native chart pan and zoom while drawings are mounted', async ({ page }) => {
   await installAppMocks(page, [seededDrawing()]);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
 
   await expect(page.getByTestId('chart-surface')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Objects' })).toBeVisible();
@@ -867,7 +877,7 @@ test('cursor mode keeps native chart pan and zoom while drawings are mounted', a
 
 test('creates representative drawing categories and reloads them', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   const scenarios = [
@@ -951,7 +961,7 @@ test('creates representative drawing categories and reloads them', async ({ page
 
 test('creates edge drawing tools and preserves them through reload', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
 
   const scenarios = [
@@ -1035,7 +1045,7 @@ test('creates edge drawing tools and preserves them through reload', async ({ pa
 
 test('object tree edits persist through reload and deletion', async ({ page }) => {
   const mockState = await installAppMocks(page, [seededDrawing()]);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
 
   await page.getByRole('button', { name: 'Objects' }).click();
   await expect(page.getByRole('button', { name: /Seed trend/ })).toBeVisible();
@@ -1141,7 +1151,7 @@ test('layout panels isolate drawing scopes for the same symbol', async ({ page }
 
 test('REPRO undo Ctrl+Z after drawing', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
   await drawTool(page, 'Trend line', [{ x: 0.3, y: 0.62 }, { x: 0.6, y: 0.4 }]);
   await expect.poll(() => mockState.drawings().length).toBe(1);
@@ -1151,7 +1161,7 @@ test('REPRO undo Ctrl+Z after drawing', async ({ page }) => {
 
 test('REPRO select on canvas then Delete', async ({ page }) => {
   const mockState = await installAppMocks(page);
-  await page.goto('/chart/BTCUSDT');
+  await page.goto('/chart-legacy/BTCUSDT');
   await expect(page.getByTestId('chart-surface')).toBeVisible();
   await drawTool(page, 'Trend line', [{ x: 0.3, y: 0.62 }, { x: 0.6, y: 0.4 }]);
   await expect.poll(() => mockState.drawings().length).toBe(1);

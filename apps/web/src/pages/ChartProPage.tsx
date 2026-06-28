@@ -12,10 +12,13 @@ import type { TvSymbolInfo } from '../chart/klinepro-datafeed';
 export function ChartProPage() {
   const params = useParams<{ symbol?: string }>();
   const routedId = params.symbol;
-  const symbolsQ = useQuery({ queryKey: ['symbols-all'], queryFn: () => api.symbols('') });
+  const symbolsQ = useQuery({ queryKey: ['symbols-all'], queryFn: () => api.allSymbols() });
 
   const rows = symbolsQ.data?.results ?? [];
-  const chosen = (routedId ? rows.find((r) => r.id === routedId) : undefined) ?? rows[0];
+  const chosen =
+    (routedId ? rows.find((r) => r.id === routedId || r.ticker === routedId) : undefined) ??
+    rows.find((r) => r.ticker === 'BTCUSDT') ??
+    rows[0];
 
   if (!chosen) {
     return <div className="page">{symbolsQ.isLoading ? 'Loading chart…' : 'No symbols available.'}</div>;

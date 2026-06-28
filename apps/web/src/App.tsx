@@ -125,7 +125,7 @@ export function App() {
           path="/chart"
           element={
             <RequireAuth>
-              <ChartPage />
+              <ChartProPage />
             </RequireAuth>
           }
         />
@@ -133,7 +133,7 @@ export function App() {
           path="/chart/:symbol"
           element={
             <RequireAuth>
-              <ChartPage />
+              <ChartProPage />
             </RequireAuth>
           }
         />
@@ -150,6 +150,22 @@ export function App() {
           element={
             <RequireAuth>
               <ChartProPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/chart-legacy"
+          element={
+            <RequireAuth>
+              <ChartPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/chart-legacy/:symbol"
+          element={
+            <RequireAuth>
+              <ChartPage />
             </RequireAuth>
           }
         />
