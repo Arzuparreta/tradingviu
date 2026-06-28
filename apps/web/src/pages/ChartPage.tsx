@@ -81,7 +81,7 @@ export function ChartPage() {
   const backtestMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, tenant } = useAuth();
+  const { user } = useAuth();
   const params = useParams<{ symbol?: string }>();
   const symbolId = params.symbol;
   const [interval, setInterval] = useState<Interval>('1h');

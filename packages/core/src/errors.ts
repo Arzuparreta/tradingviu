@@ -45,12 +45,6 @@ export class ForbiddenError extends TvError {
   }
 }
 
-export class QuotaExceededError extends TvError {
-  constructor(message: string, meta?: Record<string, unknown>) {
-    super({ name: 'QuotaExceededError', code: 'QUOTA_EXCEEDED', status: 402, message, meta });
-  }
-}
-
 export class ConflictError extends TvError {
   constructor(message: string, meta?: Record<string, unknown>) {
     super({ name: 'ConflictError', code: 'CONFLICT', status: 409, message, meta });

@@ -53,7 +53,7 @@ export const alertRoutes = new Hono()
       .from(alerts)
       .innerJoin(symbols, eq(symbols.id, alerts.symbolId))
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(and(eq(alerts.tenantId, tenant.tenantId), eq(alerts.userId, tenant.userId)))
+      .where(and(eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)))
       .orderBy(desc(alerts.updatedAt));
     return c.json({ alerts: rows });
   })
@@ -67,7 +67,6 @@ export const alertRoutes = new Hono()
     const id = ulid();
     await db.insert(alerts).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       symbolId: body.symbolId,
       name: body.name,
@@ -99,7 +98,7 @@ export const alertRoutes = new Hono()
     const rows = await db
       .update(alerts)
       .set(patch)
-      .where(and(eq(alerts.id, id), eq(alerts.tenantId, tenant.tenantId), eq(alerts.userId, tenant.userId)))
+      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)))
       .returning({ id: alerts.id });
     if (rows.length === 0) throw new NotFoundError('Alert not found');
     return c.json({ ok: true });
@@ -110,7 +109,7 @@ export const alertRoutes = new Hono()
     const id = c.req.param('id');
     await db
       .delete(alerts)
-      .where(and(eq(alerts.id, id), eq(alerts.tenantId, tenant.tenantId), eq(alerts.userId, tenant.userId)));
+      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .get('/alerts/:id/history', async (c) => {
@@ -120,7 +119,7 @@ export const alertRoutes = new Hono()
     const rows = await db
       .select()
       .from(alertHistory)
-      .where(and(eq(alertHistory.alertId, id), eq(alertHistory.tenantId, tenant.tenantId)))
+      .where(and(eq(alertHistory.alertId, id)))
       .orderBy(desc(alertHistory.firedAt));
     return c.json({ history: rows });
   })
@@ -144,7 +143,7 @@ export const alertRoutes = new Hono()
       .from(alerts)
       .innerJoin(symbols, eq(symbols.id, alerts.symbolId))
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(and(eq(alerts.id, id), eq(alerts.tenantId, tenant.tenantId), eq(alerts.userId, tenant.userId)))
+      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)))
       .limit(1);
     if (!row) throw new NotFoundError('Alert not found');
     if (!row.active) throw new ValidationError('Cannot evaluate inactive alert');
@@ -194,7 +193,6 @@ export const alertRoutes = new Hono()
       }
       await db.insert(alertHistory).values({
         alertId: row.id,
-        tenantId: tenant.tenantId,
         firedAt: new Date(),
         price: String(price),
         payload: result,

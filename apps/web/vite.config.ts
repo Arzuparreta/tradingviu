@@ -29,8 +29,6 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target: apiTarget, changeOrigin: true, timeout: 8_000 },
         '/auth': { target: apiTarget, changeOrigin: true, timeout: 8_000 },
-        '/billing': { target: apiTarget, changeOrigin: true, timeout: 8_000 },
-        '/webhooks': { target: apiTarget, changeOrigin: true, timeout: 8_000 },
         '/admin': { target: apiTarget, changeOrigin: true, timeout: 8_000 },
         '/health': { target: apiTarget, changeOrigin: true, timeout: 8_000 },
         '/ws': { target: wsTarget, ws: true },

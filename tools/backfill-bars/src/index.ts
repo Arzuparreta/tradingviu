@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 import { loadEnv } from '@tv/core';
-import { createDb, withSuperAdminRls, clearRls } from '@tv/db';
+import { createDb } from '@tv/db';
 import { bars } from '@tv/db/schema';
 import { IntervalSchema } from '@tv/core';
 import { sql } from 'drizzle-orm';
@@ -109,7 +109,6 @@ const main = async (): Promise<void> => {
           continue;
         }
         await db.transaction(async (tx) => {
-          await withSuperAdminRls(tx as never, env.SYSTEM_USER_ID);
           for (const bar of barsList) {
             const res = await tx
               .insert(bars)
@@ -140,7 +139,6 @@ const main = async (): Promise<void> => {
             written += 1;
             void res;
           }
-          await clearRls(tx as never);
         });
         totalWritten += written;
         console.log(`wrote ${written} (range ${barsList[0]!.time} → ${barsList[barsList.length - 1]!.time})`);

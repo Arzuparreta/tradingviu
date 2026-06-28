@@ -7,7 +7,7 @@ import {
   type NormalizedMacroSeriesObservation,
   type NormalizedYieldCurvePoint,
 } from '@tv/core';
-import { clearRls, createDb, withSuperAdminRls, type Database } from '@tv/db';
+import { createDb, type Database } from '@tv/db';
 import { macroSeriesObservations, yieldCurves } from '@tv/db/schema';
 import { createMacroProvider, fetchNormalizedMacro, type MacroProvider } from '@tv/macro';
 
@@ -69,7 +69,6 @@ export const ingestMacroOnce = async (
   const macroRows = toMacroRows(normalized.macroObservations);
 
   const result = await db.transaction(async (txDb) => {
-    await withSuperAdminRls(txDb as never, 'macro-ingest');
     try {
       const upsertedYield =
         yieldRows.length === 0
@@ -117,7 +116,6 @@ export const ingestMacroOnce = async (
 
       return { upsertedYield: upsertedYield.length, upsertedMacro: upsertedMacro.length };
     } finally {
-      await clearRls(txDb as never);
     }
   });
 

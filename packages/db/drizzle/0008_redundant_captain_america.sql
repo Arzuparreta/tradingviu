@@ -1,1 +1,0 @@
-ALTER TABLE "alerts" ADD COLUMN "webhook_url" text;

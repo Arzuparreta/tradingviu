@@ -26,7 +26,7 @@ export const layoutRoutes = new Hono()
     const rows = await db
       .select()
       .from(layouts)
-      .where(and(eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)))
+      .where(and(eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)))
       .orderBy(desc(layouts.isDefault), desc(layouts.updatedAt));
     return c.json({ layouts: rows.map((row) => ({ ...row, config: parseLayoutConfig(row.config) })) });
   })
@@ -37,7 +37,7 @@ export const layoutRoutes = new Hono()
     const [row] = await db
       .select()
       .from(layouts)
-      .where(and(eq(layouts.id, id), eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
+      .where(and(eq(layouts.id, id), eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)));
     if (!row) throw new NotFoundError('Layout not found');
     return c.json({ layout: { ...row, config: parseLayoutConfig(row.config) } });
   })
@@ -51,11 +51,10 @@ export const layoutRoutes = new Hono()
       await db
         .update(layouts)
         .set({ isDefault: false, updatedAt: new Date() })
-        .where(and(eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
+        .where(and(eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)));
     }
     await db.insert(layouts).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       name: body.name,
       config,
@@ -72,14 +71,14 @@ export const layoutRoutes = new Hono()
     const [existing] = await db
       .select()
       .from(layouts)
-      .where(and(eq(layouts.id, id), eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
+      .where(and(eq(layouts.id, id), eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)));
     if (!existing) throw new NotFoundError('Layout not found');
 
     if (body.isDefault) {
       await db
         .update(layouts)
         .set({ isDefault: false, updatedAt: new Date() })
-        .where(and(eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
+        .where(and(eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)));
     }
 
     const patch: Partial<typeof layouts.$inferInsert> = { updatedAt: new Date() };
@@ -90,7 +89,7 @@ export const layoutRoutes = new Hono()
     await db
       .update(layouts)
       .set(patch)
-      .where(and(eq(layouts.id, id), eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
+      .where(and(eq(layouts.id, id), eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .delete('/layouts/:id', async (c) => {
@@ -99,6 +98,6 @@ export const layoutRoutes = new Hono()
     const id = c.req.param('id');
     await db
       .delete(layouts)
-      .where(and(eq(layouts.id, id), eq(layouts.tenantId, tenant.tenantId), eq(layouts.userId, tenant.userId)));
+      .where(and(eq(layouts.id, id), eq(layouts.userId, tenant.userId), eq(layouts.userId, tenant.userId)));
     return c.json({ ok: true });
   });

@@ -23,10 +23,8 @@ import type {
   PivotPeriod,
   PivotPoints,
   LayoutRow,
-  Plan,
   Symbol,
   User,
-  Tenant,
   Watchlist,
   WatchlistItem,
   AlertRow,
@@ -49,7 +47,6 @@ import type {
   EconomicEvent,
   FundamentalSnapshot,
   MacroSeriesObservation,
-  AccessToken,
   ScreenerPreset,
   ScreenerQuery,
   ScreenerResult,
@@ -59,20 +56,6 @@ import type {
   OptionPriceResult,
   StrategyAnalysis,
   StrategyTemplate,
-  IdeaRow,
-  IdeaDirection,
-  IdeaVisibility,
-  CommentRow,
-  FollowUser,
-  ScriptRow,
-  ScriptDetail,
-  ScriptVisibility,
-  ScriptsSort,
-  SpaceRow,
-  SpaceDetail,
-  SpacePost,
-  SpaceVisibility,
-  SpacesSort,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { Drawing } from '@tv/drawing-tools';
@@ -153,13 +136,11 @@ export const api = {
     email: string;
     password: string;
     displayName?: string;
-    tenantName?: string;
-    tenantSlug?: string;
   }) => request<AuthResponse>('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   login: (body: { email: string; password: string }) =>
     request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   logout: () => request<{ ok: true }>('/auth/logout', { method: 'POST' }),
-  me: () => request<{ user: User; tenant: Tenant } | { user: null }>('/auth/me'),
+  me: () => request<{ user: User } | { user: null }>('/auth/me'),
   symbols: (q: string) =>
     request<{ results: Symbol[] }>(`/api/symbols/search?q=${encodeURIComponent(q)}&limit=20`),
   allSymbols: (limit = 100) => request<{ results: Symbol[] }>(`/api/symbols?limit=${limit}`),
@@ -192,17 +173,6 @@ export const api = {
       book: DomBook;
       source?: string;
     }>(`/api/chart/dom?symbol=${encodeURIComponent(symbol)}&levels=${levels}`),
-  plans: () => request<{ plans: Plan[] }>('/api/billing/plans'),
-  quotas: () =>
-    request<{ planCode: string; quotas: Record<string, unknown> }>('/api/billing/quotas'),
-  checkout: (planCode: string, cycle: 'monthly' | 'yearly' = 'monthly') =>
-    request<{ url: string }>('/api/billing/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ planCode, cycle }),
-    }),
-  portal: () => request<{ url: string }>('/api/billing/portal', { method: 'POST' }),
-  adminStats: () =>
-    request<{ tenants: number; users: number; exchanges: number; symbols: number }>('/admin/stats'),
   indicators: () => request<{ indicators: IndicatorDef[] }>('/api/indicators'),
   computeIndicator: (
     id: string,
@@ -648,14 +618,6 @@ export const api = {
     } = {},
   ) =>
     request<{ observations: MacroSeriesObservation[] }>(`/api/macro/series${queryString(params)}`),
-  accessTokens: () => request<{ tokens: AccessToken[] }>('/api/access-tokens'),
-  createAccessToken: (body: { name: string; scopes?: string[]; expiresAt?: string }) =>
-    request<{ id: string; prefix: string; key: string }>('/api/access-tokens', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  revokeAccessToken: (id: string) =>
-    request<{ ok: true }>(`/api/access-tokens/${id}`, { method: 'DELETE' }),
   screener: (params: ScreenerQuery = {}) =>
     request<{ results: ScreenerResult[] }>('/api/screener', {
       method: 'POST',
@@ -677,134 +639,6 @@ export const api = {
     }),
   deleteScreenerPreset: (id: string) =>
     request<{ ok: true }>(`/api/screener/presets/${id}`, { method: 'DELETE' }),
-  ideas: (
-    params: {
-      symbol?: string;
-      author?: string;
-      direction?: IdeaDirection;
-      visibility?: IdeaVisibility;
-      limit?: number;
-    } = {},
-  ) => request<{ ideas: IdeaRow[] }>(`/api/ideas${queryString(params)}`),
-  idea: (id: string) => request<{ idea: IdeaRow }>(`/api/ideas/${id}`),
-  createIdea: (body: {
-    title: string;
-    body?: string;
-    symbol?: string;
-    direction?: IdeaDirection;
-    visibility?: IdeaVisibility;
-    snapshotUrl?: string;
-  }) => request<{ id: string }>('/api/ideas', { method: 'POST', body: JSON.stringify(body) }),
-  updateIdea: (
-    id: string,
-    body: {
-      title?: string;
-      body?: string;
-      direction?: IdeaDirection;
-      visibility?: IdeaVisibility;
-      snapshotUrl?: string;
-    },
-  ) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  deleteIdea: (id: string) => request<{ ok: true }>(`/api/ideas/${id}`, { method: 'DELETE' }),
-  ideaComments: (id: string) => request<{ comments: CommentRow[] }>(`/api/ideas/${id}/comments`),
-  addIdeaComment: (id: string, body: { body: string; parentId?: string }) =>
-    request<{ id: string }>(`/api/ideas/${id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  deleteIdeaComment: (id: string, commentId: string) =>
-    request<{ ok: true }>(`/api/ideas/${id}/comments/${commentId}`, { method: 'DELETE' }),
-  likeIdea: (id: string) =>
-    request<{ liked: boolean }>(`/api/ideas/${id}/like`, { method: 'POST' }),
-  unlikeIdea: (id: string) =>
-    request<{ liked: boolean }>(`/api/ideas/${id}/like`, { method: 'DELETE' }),
-  following: () => request<{ users: FollowUser[] }>('/api/follows/following'),
-  followers: () => request<{ users: FollowUser[] }>('/api/follows/followers'),
-  followSuggestions: () => request<{ users: FollowUser[] }>('/api/follows/suggestions'),
-  followUser: (userId: string) =>
-    request<{ following: boolean }>(`/api/follows/${userId}`, { method: 'POST' }),
-  unfollowUser: (userId: string) =>
-    request<{ following: boolean }>(`/api/follows/${userId}`, { method: 'DELETE' }),
-  scripts: (
-    params: {
-      q?: string;
-      author?: string;
-      visibility?: ScriptVisibility;
-      free?: boolean;
-      sort?: ScriptsSort;
-      limit?: number;
-    } = {},
-  ) => request<{ scripts: ScriptRow[] }>(`/api/scripts${queryString(params)}`),
-  script: (id: string) => request<{ script: ScriptDetail }>(`/api/scripts/${id}`),
-  publishScript: (body: {
-    name: string;
-    description?: string;
-    source: string;
-    visibility?: ScriptVisibility;
-    license?: string;
-    priceCents?: number;
-  }) => request<{ id: string }>('/api/scripts', { method: 'POST', body: JSON.stringify(body) }),
-  updateScript: (
-    id: string,
-    body: {
-      name?: string;
-      description?: string;
-      source?: string;
-      visibility?: ScriptVisibility;
-      license?: string;
-      priceCents?: number;
-    },
-  ) => request<{ ok: true }>(`/api/scripts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  deleteScript: (id: string) => request<{ ok: true }>(`/api/scripts/${id}`, { method: 'DELETE' }),
-  installScript: (id: string) =>
-    request<{ downloads: number; source: string | null; locked: boolean }>(
-      `/api/scripts/${id}/install`,
-      { method: 'POST' },
-    ),
-  favoriteScript: (id: string) =>
-    request<{ favorited: boolean }>(`/api/scripts/${id}/favorite`, { method: 'POST' }),
-  unfavoriteScript: (id: string) =>
-    request<{ favorited: boolean }>(`/api/scripts/${id}/favorite`, { method: 'DELETE' }),
-  spaces: (
-    params: {
-      q?: string;
-      owner?: string;
-      free?: boolean;
-      subscribed?: boolean;
-      sort?: SpacesSort;
-      limit?: number;
-    } = {},
-  ) => request<{ spaces: SpaceRow[] }>(`/api/spaces${queryString(params)}`),
-  space: (id: string) => request<{ space: SpaceDetail }>(`/api/spaces/${id}`),
-  createSpace: (body: {
-    name: string;
-    description?: string;
-    visibility?: SpaceVisibility;
-    priceCents?: number;
-    currency?: string;
-  }) => request<{ id: string }>('/api/spaces', { method: 'POST', body: JSON.stringify(body) }),
-  updateSpace: (
-    id: string,
-    body: {
-      name?: string;
-      description?: string;
-      visibility?: SpaceVisibility;
-      priceCents?: number;
-    },
-  ) => request<{ ok: true }>(`/api/spaces/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  deleteSpace: (id: string) => request<{ ok: true }>(`/api/spaces/${id}`, { method: 'DELETE' }),
-  subscribeSpace: (id: string) =>
-    request<{ subscribed: boolean }>(`/api/spaces/${id}/subscribe`, { method: 'POST' }),
-  unsubscribeSpace: (id: string) =>
-    request<{ subscribed: boolean }>(`/api/spaces/${id}/subscribe`, { method: 'DELETE' }),
-  spacePosts: (id: string) => request<{ posts: SpacePost[] }>(`/api/spaces/${id}/posts`),
-  addSpacePost: (id: string, body: { title?: string; body: string }) =>
-    request<{ id: string }>(`/api/spaces/${id}/posts`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  deleteSpacePost: (id: string, postId: string) =>
-    request<{ ok: true }>(`/api/spaces/${id}/posts/${postId}`, { method: 'DELETE' }),
 };
 
 export type {
@@ -814,7 +648,6 @@ export type {
   IndicatorOutput,
   Watchlist,
   WatchlistItem,
-  Plan,
   AlertRow,
   PortfolioRow,
   PaperAccount,
@@ -829,7 +662,6 @@ export type {
   ScreenerResult,
   ScreenerMetricDef,
   YieldCurvePoint,
-  IdeaRow,
 };
 
 export { ApiError };

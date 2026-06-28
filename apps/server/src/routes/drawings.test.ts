@@ -43,11 +43,7 @@ class FakeDb {
 }
 
 const tenant: TenantContext = {
-  tenantId: 'tenant_1' as TenantContext['tenantId'],
-  userId: 'user_1' as TenantContext['userId'],
-  tenantRole: 'admin',
-  planCode: 'free',
-  isSuperAdmin: false,
+  userId: 'user_1',
 };
 
 const drawingPayload = {

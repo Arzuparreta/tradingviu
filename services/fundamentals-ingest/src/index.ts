@@ -6,7 +6,7 @@ import {
   type FundamentalsIngestQuery,
   type NormalizedFundamentalSnapshot,
 } from '@tv/core';
-import { clearRls, createDb, withSuperAdminRls, type Database } from '@tv/db';
+import { createDb, type Database } from '@tv/db';
 import { fundamentalSnapshots, symbols } from '@tv/db/schema';
 import {
   createFundamentalsProvider,
@@ -117,7 +117,6 @@ export const ingestFundamentalsOnce = async (
   }
 
   const upserted = await db.transaction(async (txDb) => {
-    await withSuperAdminRls(txDb as never, 'fundamentals-ingest');
     try {
       const latestRows = rows.filter((row) => row.isLatest);
       const latestSymbolIds = [...new Set(latestRows.map((row) => row.symbolId))];
@@ -164,7 +163,6 @@ export const ingestFundamentalsOnce = async (
         })
         .returning({ id: fundamentalSnapshots.id });
     } finally {
-      await clearRls(txDb as never);
     }
   });
 

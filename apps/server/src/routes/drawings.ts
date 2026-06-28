@@ -33,7 +33,7 @@ export const drawingRoutes = new Hono()
       .from(drawingsTable)
       .where(
         and(
-          eq(drawingsTable.tenantId, tenant.tenantId),
+          eq(drawingsTable.userId, tenant.userId),
           eq(drawingsTable.userId, tenant.userId),
           eq(drawingsTable.symbolId, symbol),
           eq(drawingsTable.interval, interval),
@@ -60,7 +60,7 @@ export const drawingRoutes = new Hono()
       .delete(drawingsTable)
       .where(
         and(
-          eq(drawingsTable.tenantId, tenant.tenantId),
+          eq(drawingsTable.userId, tenant.userId),
           eq(drawingsTable.userId, tenant.userId),
           eq(drawingsTable.symbolId, symbol),
           eq(drawingsTable.interval, interval),
@@ -74,7 +74,6 @@ export const drawingRoutes = new Hono()
           const cols = drawingToColumns(d);
           return {
             id: cols.id,
-            tenantId: tenant.tenantId,
             userId: tenant.userId,
             symbolId: symbol,
             interval,
@@ -103,7 +102,7 @@ export const drawingRoutes = new Hono()
         .delete(drawingsTable)
         .where(
           and(
-            eq(drawingsTable.tenantId, tenant.tenantId),
+            eq(drawingsTable.userId, tenant.userId),
             eq(drawingsTable.userId, tenant.userId),
             eq(drawingsTable.symbolId, symbol),
             eq(drawingsTable.interval, interval),
@@ -121,7 +120,6 @@ export const drawingRoutes = new Hono()
             const cols = drawingToColumns(d);
             return {
               id: cols.id,
-              tenantId: tenant.tenantId,
               userId: tenant.userId,
               symbolId: symbol,
               interval,

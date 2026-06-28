@@ -55,8 +55,6 @@ export const EnvSchema = z.object({
   /** Public API: max requests per token per window, and the window length. */
   API_RATE_LIMIT: z.coerce.number().int().positive().max(100000).default(120),
   API_RATE_WINDOW_SEC: z.coerce.number().int().positive().max(86400).default(60),
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
   CRED_ENC_KEY: z
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'CRED_ENC_KEY must be 64 hex chars (32 bytes)'),

@@ -1,5 +1,4 @@
 export * from './password.js';
 export * from './tokens.js';
 export * from './signup.js';
-export * from './api-keys.js';
 export * from './email.js';

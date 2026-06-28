@@ -22,7 +22,7 @@ const assertAccount = async (
   const [account] = await db
     .select()
     .from(paperAccounts)
-    .where(and(eq(paperAccounts.id, accountId), eq(paperAccounts.tenantId, tenant.tenantId), eq(paperAccounts.userId, tenant.userId)))
+    .where(and(eq(paperAccounts.id, accountId), eq(paperAccounts.userId, tenant.userId), eq(paperAccounts.userId, tenant.userId)))
     .limit(1);
   if (!account) throw new NotFoundError('Paper account not found');
   return account;
@@ -35,7 +35,7 @@ export const paperRoutes = new Hono()
     const rows = await db
       .select()
       .from(paperAccounts)
-      .where(and(eq(paperAccounts.tenantId, tenant.tenantId), eq(paperAccounts.userId, tenant.userId)))
+      .where(and(eq(paperAccounts.userId, tenant.userId), eq(paperAccounts.userId, tenant.userId)))
       .orderBy(desc(paperAccounts.createdAt));
     return c.json({ accounts: rows });
   })
@@ -46,7 +46,6 @@ export const paperRoutes = new Hono()
     const id = ulid();
     await db.insert(paperAccounts).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       name: body.name,
       balance: toDecimalText(body.balance),
@@ -83,7 +82,7 @@ export const paperRoutes = new Hono()
       .from(paperOrders)
       .innerJoin(symbols, eq(symbols.id, paperOrders.symbolId))
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(and(eq(paperOrders.tenantId, tenant.tenantId), eq(paperOrders.accountId, id)))
+      .where(and(eq(paperOrders.accountId, id)))
       .orderBy(desc(paperOrders.createdAt));
     return c.json({ account, orders });
   })
@@ -109,7 +108,6 @@ export const paperRoutes = new Hono()
     const id = ulid();
     await db.insert(paperOrders).values({
       id,
-      tenantId: tenant.tenantId,
       accountId,
       symbolId: body.symbolId,
       side: body.side,
@@ -124,7 +122,7 @@ export const paperRoutes = new Hono()
       await db
         .update(paperAccounts)
         .set({ balance: toDecimalText(currentBalance + fill.cashDelta) })
-        .where(and(eq(paperAccounts.id, accountId), eq(paperAccounts.tenantId, tenant.tenantId)));
+        .where(and(eq(paperAccounts.id, accountId), eq(paperAccounts.userId, tenant.userId)));
     }
     return c.json({ id, fill });
   });

@@ -6,9 +6,7 @@ import { getMarketStore, type MarketChannel } from './market-store.js';
 
 type WsData = {
   userId?: string;
-  tenantId?: string;
-  auth?: 'session' | 'apiKey';
-  apiTokenPrefix?: string;
+  auth?: 'session';
 };
 type Ws = ServerWebSocket<WsData>;
 

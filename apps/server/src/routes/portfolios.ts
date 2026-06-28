@@ -38,7 +38,7 @@ const assertPortfolio = async (
   const [portfolio] = await db
     .select()
     .from(portfolios)
-    .where(and(eq(portfolios.id, portfolioId), eq(portfolios.tenantId, tenant.tenantId), eq(portfolios.userId, tenant.userId)))
+    .where(and(eq(portfolios.id, portfolioId), eq(portfolios.userId, tenant.userId), eq(portfolios.userId, tenant.userId)))
     .limit(1);
   if (!portfolio) throw new NotFoundError('Portfolio not found');
   return portfolio;
@@ -52,16 +52,15 @@ const rebuildHoldings = async (
   const rows = await db
     .select()
     .from(transactions)
-    .where(and(eq(transactions.tenantId, tenant.tenantId), eq(transactions.portfolioId, portfolioId)))
+    .where(and(eq(transactions.portfolioId, portfolioId)))
     .orderBy(asc(transactions.occurredAt));
   const computed = computeHoldings(rows);
   await db
     .delete(holdings)
-    .where(and(eq(holdings.tenantId, tenant.tenantId), eq(holdings.portfolioId, portfolioId)));
+    .where(and(eq(holdings.portfolioId, portfolioId)));
   if (computed.holdings.length > 0) {
     await db.insert(holdings).values(
       computed.holdings.map((holding) => ({
-        tenantId: tenant.tenantId,
         portfolioId,
         symbolId: holding.symbolId,
         quantity: toDecimalText(holding.quantity),
@@ -80,7 +79,7 @@ export const portfolioRoutes = new Hono()
     const rows = await db
       .select()
       .from(portfolios)
-      .where(and(eq(portfolios.tenantId, tenant.tenantId), eq(portfolios.userId, tenant.userId)))
+      .where(and(eq(portfolios.userId, tenant.userId), eq(portfolios.userId, tenant.userId)))
       .orderBy(asc(portfolios.name));
     return c.json({ portfolios: rows });
   })
@@ -91,7 +90,6 @@ export const portfolioRoutes = new Hono()
     const id = ulid();
     await db.insert(portfolios).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       name: body.name,
       baseCurrency: body.baseCurrency,
@@ -120,11 +118,11 @@ export const portfolioRoutes = new Hono()
       .from(holdings)
       .innerJoin(symbols, eq(symbols.id, holdings.symbolId))
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(and(eq(holdings.tenantId, tenant.tenantId), eq(holdings.portfolioId, id)));
+      .where(and(eq(holdings.portfolioId, id)));
     const txRows = await db
       .select()
       .from(transactions)
-      .where(and(eq(transactions.tenantId, tenant.tenantId), eq(transactions.portfolioId, id)))
+      .where(and(eq(transactions.portfolioId, id)))
       .orderBy(asc(transactions.occurredAt));
     const metrics = computeHoldings(txRows).metrics;
     return c.json({ portfolio, holdings: holdingRows, transactions: txRows, metrics });
@@ -147,7 +145,7 @@ export const portfolioRoutes = new Hono()
       .from(holdings)
       .innerJoin(symbols, eq(symbols.id, holdings.symbolId))
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(and(eq(holdings.tenantId, tenant.tenantId), eq(holdings.portfolioId, id)));
+      .where(and(eq(holdings.portfolioId, id)));
 
     const positions: AnalyticsPosition[] = await Promise.all(
       rows.map(async (r): Promise<AnalyticsPosition> => {
@@ -180,7 +178,7 @@ export const portfolioRoutes = new Hono()
     await db
       .update(portfolios)
       .set(patch)
-      .where(and(eq(portfolios.id, id), eq(portfolios.tenantId, tenant.tenantId), eq(portfolios.userId, tenant.userId)));
+      .where(and(eq(portfolios.id, id), eq(portfolios.userId, tenant.userId), eq(portfolios.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .delete('/portfolios/:id', async (c) => {
@@ -189,7 +187,7 @@ export const portfolioRoutes = new Hono()
     const id = c.req.param('id');
     await db
       .delete(portfolios)
-      .where(and(eq(portfolios.id, id), eq(portfolios.tenantId, tenant.tenantId), eq(portfolios.userId, tenant.userId)));
+      .where(and(eq(portfolios.id, id), eq(portfolios.userId, tenant.userId), eq(portfolios.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .post('/portfolios/:id/transactions', zValidator('json', CreatePortfolioTransactionSchema), async (c) => {
@@ -204,7 +202,6 @@ export const portfolioRoutes = new Hono()
     const id = ulid();
     await db.insert(transactions).values({
       id,
-      tenantId: tenant.tenantId,
       portfolioId,
       symbolId: body.symbolId,
       side: body.side,

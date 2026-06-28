@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, boolean, bigint, doublePrecision, index, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
 import { ulid } from 'ulid';
 import { exchanges, symbols } from './symbols';
-import { users, tenants } from './tenants';
+import { users } from './tenants';
 
 const id = () => text('id').primaryKey().$defaultFn(() => ulid());
 const ts = (name: string) =>
@@ -11,7 +11,6 @@ export const dataSubscriptions = pgTable(
   'data_subscriptions',
   {
     id: id(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     symbolId: text('symbol_id').notNull().references(() => symbols.id, { onDelete: 'cascade' }),
     intervals: jsonb('intervals').$type<string[]>().notNull().default([]),
@@ -20,8 +19,8 @@ export const dataSubscriptions = pgTable(
     createdAt: ts('created_at'),
   },
   (t) => ({
-    tenantSymbolIdx: uniqueIndex('data_subs_tenant_symbol_uq').on(t.tenantId, t.symbolId),
-    tenantUserIdx: index('data_subs_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantSymbolIdx: uniqueIndex('data_subs_tenant_symbol_uq').on(t.symbolId),
+    tenantUserIdx: index('data_subs_tenant_user_idx').on(t.userId),
   }),
 );
 

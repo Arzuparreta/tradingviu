@@ -86,7 +86,6 @@ export const chartRoutes = new Hono()
     await db
       .insert(dataSubscriptions)
       .values({
-        tenantId: tenant.tenantId,
         userId: tenant.userId,
         symbolId: result.symbol.id,
         intervals: [q.interval],

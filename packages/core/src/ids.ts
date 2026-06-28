@@ -7,9 +7,6 @@ const ULIDLike = z
   .regex(ULID_REGEX, 'invalid ULID')
   .describe('26-char Crockford ULID');
 
-export const TenantIdSchema = ULIDLike.brand<'TenantId'>();
-export type TenantId = z.infer<typeof TenantIdSchema>;
-
 export const UserIdSchema = ULIDLike.brand<'UserId'>();
 export type UserId = z.infer<typeof UserIdSchema>;
 
@@ -38,7 +35,6 @@ const ulid = (): string => {
   return time + rand;
 };
 
-export const newTenantId = (): TenantId => TenantIdSchema.parse(ulid());
 export const newUserId = (): UserId => UserIdSchema.parse(ulid());
 export const newSymbolId = (): SymbolId => SymbolIdSchema.parse(ulid());
 

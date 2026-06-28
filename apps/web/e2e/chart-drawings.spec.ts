@@ -223,14 +223,6 @@ const installAppMocks = async (page: Page, options: readonly Drawing[] | MockOpt
           id: 'usr_e2e',
           email: 'e2e@example.com',
           displayName: 'E2E User',
-          globalRole: 'user',
-          createdAt: '2026-06-27T00:00:00.000Z',
-        },
-        tenant: {
-          id: 'ten_e2e',
-          name: 'E2E Tenant',
-          slug: 'e2e',
-          planCode: 'free',
           createdAt: '2026-06-27T00:00:00.000Z',
         },
       });
@@ -1145,4 +1137,26 @@ test('layout panels isolate drawing scopes for the same symbol', async ({ page }
   await expect(reloadedRightObjects.getByRole('button', { name: /Left scope line/ })).toHaveCount(
     0,
   );
+});
+
+test('REPRO undo Ctrl+Z after drawing', async ({ page }) => {
+  const mockState = await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+  await expect(page.getByTestId('chart-surface')).toBeVisible();
+  await drawTool(page, 'Trend line', [{ x: 0.3, y: 0.62 }, { x: 0.6, y: 0.4 }]);
+  await expect.poll(() => mockState.drawings().length).toBe(1);
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => mockState.drawings().length).toBe(0);
+});
+
+test('REPRO select on canvas then Delete', async ({ page }) => {
+  const mockState = await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+  await expect(page.getByTestId('chart-surface')).toBeVisible();
+  await drawTool(page, 'Trend line', [{ x: 0.3, y: 0.62 }, { x: 0.6, y: 0.4 }]);
+  await expect.poll(() => mockState.drawings().length).toBe(1);
+  const mid = await surfacePoint(page.locator('body'), 0.45, 0.51);
+  await page.mouse.click(mid.x, mid.y);
+  await page.keyboard.press('Delete');
+  await expect.poll(() => mockState.drawings().length).toBe(0);
 });

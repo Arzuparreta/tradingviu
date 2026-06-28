@@ -8,7 +8,7 @@ import {
   type NormalizedEarningsEvent,
   type NormalizedEconomicEvent,
 } from '@tv/core';
-import { clearRls, createDb, withSuperAdminRls, type Database } from '@tv/db';
+import { createDb, type Database } from '@tv/db';
 import { dividendCalendar, earningsCalendar, economicEvents, symbols } from '@tv/db/schema';
 import {
   createCalendarProvider,
@@ -136,7 +136,6 @@ export const ingestCalendarOnce = async (
   const skipped = symbolEventsTotal - (earningsRows.length + dividendRows.length);
 
   const result = await db.transaction(async (txDb) => {
-    await withSuperAdminRls(txDb as never, 'calendar-ingest');
     try {
       const upsertedEarnings =
         earningsRows.length === 0
@@ -197,7 +196,6 @@ export const ingestCalendarOnce = async (
         economic: upsertedEconomic.length,
       };
     } finally {
-      await clearRls(txDb as never);
     }
   });
 

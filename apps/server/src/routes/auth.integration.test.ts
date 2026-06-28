@@ -23,7 +23,6 @@ describe('auth routes integration', () => {
     const signup = await postJson('/auth/signup', {
       email: `  ${email.toUpperCase()}  `,
       password,
-      tenantName: `Auth Login ${unique}`,
     });
     expect(signup.status).toBe(200);
     const signupBody = (await signup.json()) as { user: { email: string } };
@@ -37,10 +36,8 @@ describe('auth routes integration', () => {
     const loginBody = (await login.json()) as {
       token: string;
       user: { email: string };
-      tenant: { id: string };
     };
     expect(loginBody.token.length).toBeGreaterThan(20);
     expect(loginBody.user.email).toBe(email);
-    expect(loginBody.tenant.id.length).toBeGreaterThan(0);
   });
 });

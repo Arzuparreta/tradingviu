@@ -25,7 +25,7 @@ export const watchlistRoutes = new Hono()
   .get('/watchlists', async (c) => {
     const db = c.get('db');
     const tenant = tryGetTenant() as TenantContext;
-    const lists = await db.select().from(watchlists).where(eq(watchlists.tenantId, tenant.tenantId));
+    const lists = await db.select().from(watchlists).where(eq(watchlists.userId, tenant.userId));
     return c.json({ watchlists: lists });
   })
   .post('/watchlists', zValidator('json', CreateBody), async (c) => {
@@ -35,7 +35,6 @@ export const watchlistRoutes = new Hono()
     const id = ulid();
     await db.insert(watchlists).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       name: body.name,
     });
@@ -47,7 +46,7 @@ export const watchlistRoutes = new Hono()
     const id = c.req.param('id');
     await db
       .delete(watchlists)
-      .where(and(eq(watchlists.id, id), eq(watchlists.tenantId, tenant.tenantId)));
+      .where(and(eq(watchlists.id, id), eq(watchlists.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .get('/watchlists/:id/items', async (c) => {
@@ -84,7 +83,7 @@ export const watchlistRoutes = new Hono()
     const [list] = await db
       .select()
       .from(watchlists)
-      .where(and(eq(watchlists.id, id), eq(watchlists.tenantId, tenant.tenantId)));
+      .where(and(eq(watchlists.id, id), eq(watchlists.userId, tenant.userId)));
     if (!list) throw new NotFoundError('Watchlist not found');
 
     const [sym] = await db.select().from(symbols).where(eq(symbols.id, body.symbol));
@@ -101,7 +100,6 @@ export const watchlistRoutes = new Hono()
     const itemId = ulid();
     const insertValues: typeof watchlistItems.$inferInsert = {
       id: itemId,
-      tenantId: tenant.tenantId,
       watchlistId: id,
       symbolId: body.symbol,
       sortOrder: count.length,
@@ -123,7 +121,7 @@ export const watchlistRoutes = new Hono()
     await db
       .update(watchlistItems)
       .set({ ...(body.color !== undefined ? { color: body.color } : {}), ...(body.note !== undefined ? { note: body.note } : {}) })
-      .where(and(eq(watchlistItems.id, itemId), eq(watchlistItems.tenantId, tenant.tenantId)));
+      .where(and(eq(watchlistItems.id, itemId)));
     return c.json({ ok: true });
   })
   .delete('/watchlists/:id/items/:itemId', async (c) => {
@@ -132,6 +130,6 @@ export const watchlistRoutes = new Hono()
     const itemId = c.req.param('itemId');
     await db
       .delete(watchlistItems)
-      .where(and(eq(watchlistItems.id, itemId), eq(watchlistItems.tenantId, tenant.tenantId)));
+      .where(and(eq(watchlistItems.id, itemId)));
     return c.json({ ok: true });
   });

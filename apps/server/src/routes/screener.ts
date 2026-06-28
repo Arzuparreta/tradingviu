@@ -108,14 +108,13 @@ export const screenerRoutes = new Hono()
     const db = c.get('db');
     const tenant = tryGetTenant() as TenantContext;
     const filters = [
-      or(eq(screenerPresets.tenantId, tenant.tenantId), eq(screenerPresets.isPublic, true))!,
+      or(eq(screenerPresets.userId, tenant.userId), eq(screenerPresets.isPublic, true))!,
     ];
     if (q.assetClass) filters.push(eq(screenerPresets.assetClass, q.assetClass));
 
     const rows = await db
       .select({
         id: screenerPresets.id,
-        tenantId: screenerPresets.tenantId,
         userId: screenerPresets.userId,
         name: screenerPresets.name,
         assetClass: screenerPresets.assetClass,
@@ -138,7 +137,6 @@ export const screenerRoutes = new Hono()
 
     await db.insert(screenerPresets).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       name: body.name,
       assetClass: body.assetClass,
@@ -163,7 +161,7 @@ export const screenerRoutes = new Hono()
         ...(body.isPublic !== undefined ? { isPublic: body.isPublic } : {}),
         updatedAt: new Date(),
       })
-      .where(and(eq(screenerPresets.id, id), eq(screenerPresets.tenantId, tenant.tenantId)));
+      .where(and(eq(screenerPresets.id, id), eq(screenerPresets.userId, tenant.userId)));
 
     return c.json({ ok: true });
   })
@@ -174,7 +172,7 @@ export const screenerRoutes = new Hono()
 
     await db
       .delete(screenerPresets)
-      .where(and(eq(screenerPresets.id, id), eq(screenerPresets.tenantId, tenant.tenantId)));
+      .where(and(eq(screenerPresets.id, id), eq(screenerPresets.userId, tenant.userId)));
 
     return c.json({ ok: true });
   });

@@ -42,7 +42,7 @@ const loadConnection = async (
     .where(
       and(
         eq(brokerConnections.id, id),
-        eq(brokerConnections.tenantId, tenant.tenantId),
+        eq(brokerConnections.userId, tenant.userId),
         eq(brokerConnections.userId, tenant.userId),
       ),
     )
@@ -65,7 +65,7 @@ export const brokerRoutes = new Hono()
       .from(brokerConnections)
       .where(
         and(
-          eq(brokerConnections.tenantId, tenant.tenantId),
+          eq(brokerConnections.userId, tenant.userId),
           eq(brokerConnections.userId, tenant.userId),
         ),
       )
@@ -83,7 +83,6 @@ export const brokerRoutes = new Hono()
     );
     await db.insert(brokerConnections).values({
       id,
-      tenantId: tenant.tenantId,
       userId: tenant.userId,
       broker: body.broker,
       label: body.label ?? `${body.broker} ${body.environment}`,
@@ -109,7 +108,7 @@ export const brokerRoutes = new Hono()
           ...(body.label !== undefined ? { label: body.label } : {}),
           ...(body.status !== undefined ? { status: body.status } : {}),
         })
-        .where(and(eq(brokerConnections.id, id), eq(brokerConnections.tenantId, tenant.tenantId)));
+        .where(and(eq(brokerConnections.id, id), eq(brokerConnections.userId, tenant.userId)));
       return c.json({ ok: true });
     },
   )
@@ -120,7 +119,7 @@ export const brokerRoutes = new Hono()
     await loadConnection(db, tenant, id);
     await db
       .delete(brokerConnections)
-      .where(and(eq(brokerConnections.id, id), eq(brokerConnections.tenantId, tenant.tenantId)));
+      .where(and(eq(brokerConnections.id, id), eq(brokerConnections.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .post('/brokers/connections/:id/test', async (c) => {
@@ -133,7 +132,7 @@ export const brokerRoutes = new Hono()
     await db
       .update(brokerConnections)
       .set({ status: health.ok ? 'connected' : 'error', lastSyncAt: new Date() })
-      .where(and(eq(brokerConnections.id, id), eq(brokerConnections.tenantId, tenant.tenantId)));
+      .where(and(eq(brokerConnections.id, id), eq(brokerConnections.userId, tenant.userId)));
     return c.json({ health });
   })
   .get('/brokers/connections/:id/accounts', async (c) => {
@@ -146,7 +145,7 @@ export const brokerRoutes = new Hono()
     await db
       .update(brokerConnections)
       .set({ lastSyncAt: new Date(), status: 'connected' })
-      .where(and(eq(brokerConnections.id, id), eq(brokerConnections.tenantId, tenant.tenantId)));
+      .where(and(eq(brokerConnections.id, id), eq(brokerConnections.userId, tenant.userId)));
     return c.json({ accounts });
   })
   .get('/brokers/connections/:id/positions', async (c) => {

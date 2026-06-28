@@ -5,9 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ChartPage } from './pages/ChartPage';
-import { AdminPage } from './pages/AdminPage';
 import { WatchlistsPage } from './pages/WatchlistsPage';
-import { ApiKeysPage } from './pages/ApiKeysPage';
 import { LayoutPage } from './pages/LayoutPage';
 import { PineEditorPage } from './pages/PineEditorPage';
 import { AlertsPage } from './pages/AlertsPage';
@@ -16,14 +14,11 @@ import { PaperTradingPage } from './pages/PaperTradingPage';
 import { OptionsPage } from './pages/OptionsPage';
 import { BrokersPage } from './pages/BrokersPage';
 import { DiscoveryPage } from './pages/DiscoveryPage';
-import { IdeasPage } from './pages/IdeasPage';
-import { ScriptsPage } from './pages/ScriptsPage';
-import { SpacesPage } from './pages/SpacesPage';
 import { BacktestsPage } from './pages/BacktestsPage';
 import { SymbolSearch } from './components/SymbolSearch';
 
 function TopBar() {
-  const { user, tenant } = useAuth();
+  const { user } = useAuth();
   const loc = useLocation();
   return (
     <header className="topbar">
@@ -69,32 +64,14 @@ function TopBar() {
             <Link to="/discovery" className={loc.pathname.startsWith('/discovery') ? 'active' : ''}>
               Discovery
             </Link>
-            <Link to="/ideas" className={loc.pathname.startsWith('/ideas') ? 'active' : ''}>
-              Ideas
-            </Link>
-            <Link to="/scripts" className={loc.pathname.startsWith('/scripts') ? 'active' : ''}>
-              Scripts
-            </Link>
-            <Link to="/spaces" className={loc.pathname.startsWith('/spaces') ? 'active' : ''}>
-              Spaces
-            </Link>
             <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>
               Watchlists
             </Link>
-            <Link to="/api-keys" className={loc.pathname === '/api-keys' ? 'active' : ''}>
-              API
-            </Link>
-            {user.globalRole === 'super_admin' && (
-              <Link to="/admin" className={loc.pathname === '/admin' ? 'active' : ''}>
-                Admin
-              </Link>
-            )}
           </nav>
         )}
       </div>
       <div className="row" style={{ gap: 12 }}>
         {user && <SymbolSearch />}
-        {tenant && <span className="muted small mono">{tenant.slug}</span>}
         {user && <span className="muted small">{user.email}</span>}
       </div>
     </header>
@@ -222,50 +199,10 @@ export function App() {
           }
         />
         <Route
-          path="/api-keys"
-          element={
-            <RequireAuth>
-              <ApiKeysPage />
-            </RequireAuth>
-          }
-        />
-        <Route
           path="/discovery"
           element={
             <RequireAuth>
               <DiscoveryPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/ideas"
-          element={
-            <RequireAuth>
-              <IdeasPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/scripts"
-          element={
-            <RequireAuth>
-              <ScriptsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/spaces"
-          element={
-            <RequireAuth>
-              <SpacesPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <RequireAuth>
-              <AdminPage />
             </RequireAuth>
           }
         />

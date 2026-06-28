@@ -14,20 +14,11 @@ export interface User {
   id: string;
   email: string;
   displayName: string | null;
-  globalRole: 'super_admin' | 'user';
-}
-
-export interface Tenant {
-  id: string;
-  slug: string;
-  name: string;
-  planCode: string;
 }
 
 export interface AuthResponse {
   token: string;
   user: User;
-  tenant: Tenant;
 }
 
 export interface Symbol {
@@ -388,17 +379,6 @@ export interface PivotPoints {
   latest: PivotSet | null;
 }
 
-export interface AccessToken {
-  id: string;
-  name: string;
-  prefix: string;
-  scopes: string[];
-  lastUsedAt: string | null;
-  expiresAt: string | null;
-  revokedAt: string | null;
-  createdAt: string;
-}
-
 export interface Watchlist {
   id: string;
   name: string;
@@ -418,20 +398,6 @@ export interface WatchlistItem {
     name: string;
     exchange: string;
   };
-}
-
-export interface Plan {
-  code: string;
-  name: string;
-  description: string | null;
-  priceMonthlyCents: number;
-  priceYearlyCents: number;
-  currency: string;
-  quotas: Record<string, unknown>;
-  features: string[];
-  sortOrder: number;
-  isPublic: boolean;
-  isDefault: boolean;
 }
 
 export type AlertOperator = 'above' | 'below' | 'crosses_above' | 'crosses_below' | 'equals';
@@ -476,7 +442,6 @@ export interface AlertRow {
 export interface AlertHistoryRow {
   id: string;
   alertId: string;
-  tenantId: string;
   firedAt: string;
   price: string | null;
   payload: unknown;
@@ -507,7 +472,6 @@ export interface PortfolioHolding {
 
 export interface PortfolioTransaction {
   id: string;
-  tenantId: string;
   portfolioId: string;
   symbolId: string;
   side: 'buy' | 'sell' | 'dividend';
@@ -796,7 +760,6 @@ export interface ScreenerResult {
 
 export interface ScreenerPreset {
   id: string;
-  tenantId: string;
   userId: string;
   name: string;
   assetClass: string;
@@ -863,111 +826,4 @@ export interface StrategyAnalysis {
   unlimitedProfit: boolean;
   unlimitedLoss: boolean;
   breakevens: number[];
-}
-
-export type IdeaDirection = 'long' | 'short' | 'neutral';
-export type IdeaVisibility = 'public' | 'private';
-
-export interface IdeaAuthor {
-  id: string;
-  displayName: string | null;
-  email: string;
-  following?: boolean;
-}
-
-export interface FollowUser {
-  id: string;
-  displayName: string | null;
-  email: string;
-  ideasCount: number;
-  followedAt?: string;
-}
-
-export interface IdeaSymbol {
-  id: string;
-  ticker: string;
-  name: string;
-  exchange: string;
-}
-
-export interface IdeaRow {
-  id: string;
-  title: string;
-  body: string | null;
-  direction: IdeaDirection | null;
-  visibility: IdeaVisibility;
-  snapshotUrl: string | null;
-  likesCount: number;
-  commentsCount: number;
-  liked: boolean;
-  createdAt: string;
-  updatedAt: string;
-  author: IdeaAuthor;
-  symbol: IdeaSymbol | null;
-}
-
-export interface CommentRow {
-  id: string;
-  body: string;
-  parentId: string | null;
-  createdAt: string;
-  author: IdeaAuthor;
-}
-
-export type ScriptVisibility = 'public' | 'protected' | 'private';
-export type ScriptsSort = 'recent' | 'popular';
-
-export interface ScriptRow {
-  id: string;
-  name: string;
-  description: string | null;
-  visibility: ScriptVisibility;
-  license: string;
-  priceCents: number;
-  downloads: number;
-  favoritesCount: number;
-  favorited: boolean;
-  createdAt: string;
-  updatedAt: string;
-  author: IdeaAuthor;
-}
-
-export interface ScriptDetail extends ScriptRow {
-  source: string | null;
-  locked: boolean;
-}
-
-export type SpaceVisibility = 'public' | 'private';
-export type SpacesSort = 'recent' | 'popular';
-
-export interface SpaceOwner {
-  id: string;
-  displayName: string | null;
-  email: string;
-}
-
-export interface SpaceRow {
-  id: string;
-  name: string;
-  description: string | null;
-  visibility: SpaceVisibility;
-  priceCents: number;
-  currency: string;
-  subscribersCount: number;
-  subscribed: boolean;
-  createdAt: string;
-  updatedAt: string;
-  owner: SpaceOwner;
-}
-
-export interface SpaceDetail extends SpaceRow {
-  isOwner: boolean;
-}
-
-export interface SpacePost {
-  id: string;
-  title: string | null;
-  body: string;
-  createdAt: string;
-  author: SpaceOwner;
 }

@@ -6,7 +6,7 @@ import {
   type NewsIngestQuery,
   type NormalizedNewsArticle,
 } from '@tv/core';
-import { createDb, clearRls, withSuperAdminRls, type Database } from '@tv/db';
+import { createDb, type Database } from '@tv/db';
 import { newsArticles } from '@tv/db/schema';
 import { createNewsProvider, fetchNormalizedNews, type NewsProvider } from '@tv/news';
 
@@ -66,7 +66,6 @@ export const ingestNewsOnce = async (
 
   const rows = toInsertRows(articles);
   const upserted = await db.transaction(async (txDb) => {
-    await withSuperAdminRls(txDb as never, 'news-ingest');
     try {
       return await txDb
         .insert(newsArticles)
@@ -85,7 +84,6 @@ export const ingestNewsOnce = async (
         })
         .returning({ id: newsArticles.id });
     } finally {
-      await clearRls(txDb as never);
     }
   });
 

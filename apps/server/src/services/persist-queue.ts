@@ -1,6 +1,6 @@
 import { sql, and, eq, gte, lte, asc } from 'drizzle-orm';
 import { bars } from '@tv/db/schema';
-import { withSuperAdminRls, clearRls, type Database } from '@tv/db';
+import { type Database } from '@tv/db';
 import type { Bar } from '@tv/data-types';
 import type { Interval } from '@tv/core';
 
@@ -84,7 +84,6 @@ export class PersistQueue {
   private async writeBatch(batch: PersistItem[]): Promise<void> {
     if (batch.length === 0) return;
     await this.db.transaction(async (tx) => {
-      await withSuperAdminRls(tx as never, this.opts.systemUserId);
       for (const item of batch) {
         await tx
           .insert(bars)
@@ -111,7 +110,6 @@ export class PersistQueue {
             },
           });
       }
-      await clearRls(tx as never);
     });
   }
 }

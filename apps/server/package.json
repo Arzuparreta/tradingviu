@@ -15,7 +15,6 @@
     "@hono/zod-validator": "^0.4.2",
     "@tv/auth": "workspace:*",
     "@tv/backtest-engine": "workspace:*",
-    "@tv/billing": "workspace:*",
     "@tv/broker-adapters": "workspace:*",
     "@tv/candlestick-patterns": "workspace:*",
     "@tv/chart-patterns": "workspace:*",
@@ -32,7 +31,6 @@
     "@tv/pine-runtime": "workspace:*",
     "@tv/pivot-points": "workspace:*",
     "@tv/portfolio-analytics": "workspace:*",
-    "@tv/quotas": "workspace:*",
     "@tv/screener-engine": "workspace:*",
     "@tv/ta-lib": "workspace:*",
     "@tv/tpo-profile": "workspace:*",
@@ -42,7 +40,6 @@
     "libsodium-wrappers": "^0.8.4",
     "meilisearch": "^0.45.0",
     "redis": "^4.7.0",
-    "stripe": "^17.5.0",
     "ulid": "^2.3.0",
     "zod": "^3.24.1"
   },

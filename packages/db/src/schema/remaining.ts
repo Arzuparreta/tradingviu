@@ -10,7 +10,7 @@ import {
   doublePrecision,
 } from 'drizzle-orm/pg-core';
 import { ulid } from 'ulid';
-import { tenants, users } from './tenants';
+import { users } from './tenants';
 import { symbols } from './symbols';
 
 const id = () =>
@@ -26,9 +26,6 @@ export const layouts = pgTable(
   'layouts',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -39,7 +36,7 @@ export const layouts = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantUserIdx: index('layouts_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('layouts_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -47,9 +44,6 @@ export const drawings = pgTable(
   'drawings',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -65,8 +59,8 @@ export const drawings = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantSymbolIdx: index('drawings_tenant_symbol_idx').on(t.tenantId, t.symbolId),
-    tenantScopeIdx: index('drawings_tenant_scope_idx').on(t.tenantId, t.userId, t.scopeId),
+    tenantSymbolIdx: index('drawings_tenant_symbol_idx').on(t.symbolId),
+    tenantScopeIdx: index('drawings_tenant_scope_idx').on(t.userId, t.scopeId),
   }),
 );
 
@@ -74,9 +68,6 @@ export const alerts = pgTable(
   'alerts',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -95,36 +86,9 @@ export const alerts = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantUserIdx: index('alerts_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('alerts_tenant_user_idx').on(t.userId),
     symbolIdx: index('alerts_symbol_idx').on(t.symbolId),
     activeIdx: index('alerts_active_idx').on(t.active),
-  }),
-);
-
-// Personal access tokens for the public API (distinct from `api_keys`, which
-// stores *external* provider credentials). Only a hash + lookup prefix are kept.
-export const accessTokens = pgTable(
-  'access_tokens',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),
-    prefix: text('prefix').notNull(),
-    hash: text('hash').notNull(),
-    scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
-    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
-    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
-    revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
-    createdAt: ts('created_at'),
-  },
-  (t) => ({
-    prefixIdx: uniqueIndex('access_tokens_prefix_uq').on(t.prefix),
-    tenantUserIdx: index('access_tokens_tenant_user_idx').on(t.tenantId, t.userId),
   }),
 );
 
@@ -135,9 +99,6 @@ export const alertHistory = pgTable(
     alertId: text('alert_id')
       .notNull()
       .references(() => alerts.id, { onDelete: 'cascade' }),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     firedAt: timestamp('fired_at', { withTimezone: true, mode: 'date' }).notNull(),
     price: text('price'),
     payload: jsonb('payload').$type<unknown>(),
@@ -145,7 +106,6 @@ export const alertHistory = pgTable(
   },
   (t) => ({
     alertIdx: index('alert_history_alert_idx').on(t.alertId),
-    tenantIdx: index('alert_history_tenant_idx').on(t.tenantId),
   }),
 );
 
@@ -153,9 +113,6 @@ export const screenerPresets = pgTable(
   'screener_presets',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -167,7 +124,7 @@ export const screenerPresets = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantUserIdx: index('screener_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('screener_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -175,9 +132,6 @@ export const userIndicators = pgTable(
   'user_indicators',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -190,7 +144,7 @@ export const userIndicators = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantUserIdx: index('user_indicators_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('user_indicators_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -198,9 +152,6 @@ export const backtests = pgTable(
   'backtests',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -220,199 +171,7 @@ export const backtests = pgTable(
     completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
   },
   (t) => ({
-    tenantUserIdx: index('backtests_tenant_user_idx').on(t.tenantId, t.userId),
-  }),
-);
-
-export const ideas = pgTable(
-  'ideas',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    symbolId: text('symbol_id').references(() => symbols.id, { onDelete: 'set null' }),
-    title: text('title').notNull(),
-    body: text('body'),
-    snapshotUrl: text('snapshot_url'),
-    direction: text('direction'),
-    visibility: text('visibility').notNull().default('public'),
-    likesCount: integer('likes_count').notNull().default(0),
-    commentsCount: integer('comments_count').notNull().default(0),
-    createdAt: ts('created_at'),
-    updatedAt: ts('updated_at'),
-  },
-  (t) => ({
-    tenantIdx: index('ideas_tenant_idx').on(t.tenantId, t.createdAt),
-    userIdx: index('ideas_user_idx').on(t.userId),
-  }),
-);
-
-export const comments = pgTable(
-  'comments',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    targetType: text('target_type').notNull(),
-    targetId: text('target_id').notNull(),
-    parentId: text('parent_id'),
-    body: text('body').notNull(),
-    createdAt: ts('created_at'),
-  },
-  (t) => ({
-    targetIdx: index('comments_target_idx').on(t.targetType, t.targetId),
-  }),
-);
-
-export const likes = pgTable(
-  'likes',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    targetType: text('target_type').notNull(),
-    targetId: text('target_id').notNull(),
-    createdAt: ts('created_at'),
-  },
-  (t) => ({
-    targetIdx: index('likes_target_idx').on(t.targetType, t.targetId),
-    userTargetUq: uniqueIndex('likes_user_target_uq').on(t.userId, t.targetType, t.targetId),
-  }),
-);
-
-export const follows = pgTable(
-  'follows',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    followerId: text('follower_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    followedId: text('followed_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    createdAt: ts('created_at'),
-  },
-  (t) => ({
-    pairIdx: uniqueIndex('follows_pair_uq').on(t.followerId, t.followedId),
-  }),
-);
-
-export const publishedScripts = pgTable(
-  'published_scripts',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),
-    description: text('description'),
-    source: text('source').notNull(),
-    visibility: text('visibility').notNull().default('public'),
-    license: text('license').notNull().default('AGPL-3.0'),
-    priceCents: integer('price_cents').notNull().default(0),
-    downloads: integer('downloads').notNull().default(0),
-    createdAt: ts('created_at'),
-    updatedAt: ts('updated_at'),
-  },
-  (t) => ({
-    tenantIdx: index('published_scripts_tenant_idx').on(t.tenantId, t.createdAt),
-    userIdx: index('published_scripts_user_idx').on(t.userId),
-  }),
-);
-
-// Subscription channels: a creator-owned space (free or paid) whose posts are
-// gated behind an active subscription or ownership.
-export const spaces = pgTable(
-  'spaces',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    ownerId: text('owner_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),
-    description: text('description'),
-    // public → listed in the tenant feed; private → unlisted (invite/id only)
-    visibility: text('visibility').notNull().default('public'),
-    priceCents: integer('price_cents').notNull().default(0),
-    currency: text('currency').notNull().default('USD'),
-    subscribersCount: integer('subscribers_count').notNull().default(0),
-    createdAt: ts('created_at'),
-    updatedAt: ts('updated_at'),
-  },
-  (t) => ({
-    tenantIdx: index('spaces_tenant_idx').on(t.tenantId, t.createdAt),
-    ownerIdx: index('spaces_owner_idx').on(t.ownerId),
-  }),
-);
-
-export const spaceSubscriptions = pgTable(
-  'space_subscriptions',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    spaceId: text('space_id')
-      .notNull()
-      .references(() => spaces.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    // active → entitled; canceled → kept for history, not entitled
-    status: text('status').notNull().default('active'),
-    priceCents: integer('price_cents').notNull().default(0),
-    startedAt: ts('started_at'),
-    canceledAt: timestamp('canceled_at', { withTimezone: true, mode: 'date' }),
-    createdAt: ts('created_at'),
-  },
-  (t) => ({
-    pairUq: uniqueIndex('space_subscriptions_pair_uq').on(t.spaceId, t.userId),
-    spaceIdx: index('space_subscriptions_space_idx').on(t.spaceId),
-    userIdx: index('space_subscriptions_user_idx').on(t.userId),
-  }),
-);
-
-export const spacePosts = pgTable(
-  'space_posts',
-  {
-    id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    spaceId: text('space_id')
-      .notNull()
-      .references(() => spaces.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    title: text('title'),
-    body: text('body').notNull(),
-    createdAt: ts('created_at'),
-    updatedAt: ts('updated_at'),
-  },
-  (t) => ({
-    spaceIdx: index('space_posts_space_idx').on(t.spaceId, t.createdAt),
+    tenantUserIdx: index('backtests_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -420,9 +179,6 @@ export const portfolios = pgTable(
   'portfolios',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -432,7 +188,7 @@ export const portfolios = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantUserIdx: index('portfolios_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('portfolios_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -440,9 +196,6 @@ export const holdings = pgTable(
   'holdings',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     portfolioId: text('portfolio_id')
       .notNull()
       .references(() => portfolios.id, { onDelete: 'cascade' }),
@@ -462,9 +215,6 @@ export const transactions = pgTable(
   'transactions',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     portfolioId: text('portfolio_id')
       .notNull()
       .references(() => portfolios.id, { onDelete: 'cascade' }),
@@ -487,9 +237,6 @@ export const watchlists = pgTable(
   'watchlists',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -498,7 +245,7 @@ export const watchlists = pgTable(
     updatedAt: ts('updated_at'),
   },
   (t) => ({
-    tenantUserIdx: index('watchlists_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('watchlists_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -506,9 +253,6 @@ export const watchlistItems = pgTable(
   'watchlist_items',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     watchlistId: text('watchlist_id')
       .notNull()
       .references(() => watchlists.id, { onDelete: 'cascade' }),
@@ -528,9 +272,6 @@ export const paperAccounts = pgTable(
   'paper_accounts',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -541,7 +282,7 @@ export const paperAccounts = pgTable(
     createdAt: ts('created_at'),
   },
   (t) => ({
-    tenantUserIdx: index('paper_accounts_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('paper_accounts_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -549,9 +290,6 @@ export const paperOrders = pgTable(
   'paper_orders',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     accountId: text('account_id')
       .notNull()
       .references(() => paperAccounts.id, { onDelete: 'cascade' }),
@@ -577,9 +315,6 @@ export const brokerConnections = pgTable(
   'broker_connections',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -592,7 +327,7 @@ export const brokerConnections = pgTable(
     createdAt: ts('created_at'),
   },
   (t) => ({
-    tenantUserIdx: index('broker_connections_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdx: index('broker_connections_tenant_user_idx').on(t.userId),
   }),
 );
 
@@ -777,9 +512,6 @@ export const auditLog = pgTable(
   'audit_log',
   {
     id: id(),
-    tenantId: text('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
     action: text('action').notNull(),
     targetType: text('target_type'),
@@ -790,6 +522,6 @@ export const auditLog = pgTable(
     at: timestamp('at', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (t) => ({
-    tenantAtIdx: index('audit_log_tenant_at_idx').on(t.tenantId, t.at),
+    tenantAtIdx: index('audit_log_tenant_at_idx').on(t.at),
   }),
 );
