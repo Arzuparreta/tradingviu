@@ -521,7 +521,8 @@ label {
   display: grid;
   grid-template-rows: 44px 1fr;
   height: 100%;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
 }
 .layout-toolbar {
   display: flex;
@@ -567,15 +568,17 @@ label {
 }
 .chart-panel {
   display: grid;
-  grid-template-rows: 30px 1fr;
+  grid-template-rows: 1fr;
   min-width: 0;
   min-height: 0;
   background: var(--bg);
   border: 1px solid transparent;
   position: relative;
+  overflow: hidden;
 }
 .chart-panel.active {
   border-color: var(--accent);
+  z-index: 1;
 }
 .chart-panel-head {
   display: flex;
@@ -600,8 +603,37 @@ label {
 }
 .chart-panel-chart {
   position: relative;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+/* KLineChart Pro hardcodes `height: 80vh` on its root widget, so each chart
+   ignores its container and overflows grid cells (and leaves a gap on the
+   single-chart page). Force it to fill whatever box we give it. */
+.klinecharts-pro {
+  height: 100% !important;
+}
+
+/* In compact layout cells the Pro period bar is narrow, so the symbol label
+   wraps to a second line and spills over the chart. Keep the bar to one tidy
+   row: the symbol truncates with an ellipsis and the bar clips its overflow
+   instead of reflowing. Scoped to layout panels so the full chart page (which
+   has room) is untouched. */
+.chart-panel .klinecharts-pro-period-bar {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.chart-panel .klinecharts-pro-period-bar .symbol {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Stay wide enough to identify the symbol; the lowest-priority tools on the
+     right clip first in the tightest cells. */
+  flex: 0 1 auto;
+  min-width: 84px;
 }
 .lwc-drawing-toolbar {
   position: absolute;

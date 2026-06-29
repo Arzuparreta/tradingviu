@@ -34,7 +34,7 @@ export function ChartProPage() {
   };
 
   return (
-    <div style={{ height: 'calc(100vh - 56px)' }}>
+    <div style={{ height: '100%', minHeight: 0 }}>
       <KLineProChart symbol={symbol} />
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { KLineChartPro, type ChartProOptions, type SymbolInfo, type Period } from '@klinecharts/pro';
-import type { Chart } from 'klinecharts';
+import { init, type Chart } from 'klinecharts';
 import '@klinecharts/pro/dist/klinecharts-pro.css';
 import { TradingviuDatafeed } from './klinepro-datafeed';
 
@@ -38,9 +38,26 @@ export const KLineProChart = forwardRef<KLineProChartHandle, KLineProChartProps>
     const containerRef = useRef<HTMLDivElement | null>(null);
     const chartProRef = useRef<KLineChartPro | null>(null);
     const datafeedRef = useRef<TradingviuDatafeed | null>(null);
+    const coreChartRef = useRef<Chart | null>(null);
+
+    // @klinecharts/pro keeps the underlying klinecharts `Chart` private (its
+    // public `_chartApi` ref only exposes theme/symbol/period setters). Recover
+    // the real instance from klinecharts' registry: the Pro widget div carries a
+    // `k-line-chart-id` attribute that is the registry key, and `init(dom)`
+    // returns the existing instance when `dom.id` matches that key.
+    const resolveCoreChart = (): Chart | null => {
+      if (coreChartRef.current) return coreChartRef.current;
+      const widget = containerRef.current?.querySelector<HTMLElement>('.klinecharts-pro-widget');
+      if (!widget) return null;
+      const id = widget.getAttribute('k-line-chart-id');
+      if (!id) return null;
+      if (!widget.id) widget.id = id;
+      coreChartRef.current = init(widget) ?? null;
+      return coreChartRef.current;
+    };
 
     useImperativeHandle(ref, () => ({
-      getChartApi: () => (chartProRef.current as Record<string, unknown> | null)?._chartApi as Chart | null ?? null,
+      getChartApi: () => resolveCoreChart(),
       getChartPro: () => chartProRef.current,
       getDatafeed: () => datafeedRef.current,
     }), []);
@@ -67,6 +84,7 @@ export const KLineProChart = forwardRef<KLineProChartHandle, KLineProChartProps>
         if (!datafeed) df.reset();
         chartProRef.current = null;
         datafeedRef.current = null;
+        coreChartRef.current = null;
         container.innerHTML = '';
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
