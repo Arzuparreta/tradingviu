@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Database } from '@tv/db';
 import { exchanges, symbols } from '@tv/db/schema';
-import { intervalToMs, NotFoundError, type Interval } from '@tv/core';
+import { intervalToMs, NotFoundError, UpstreamError, type Interval } from '@tv/core';
 import type { Bar } from '@tv/data-types';
 import { ccxt } from '@tv/data-adapters';
 import { getBarStore, getProvider } from './data.js';
@@ -62,6 +62,20 @@ const isFreshEnough = (bars: readonly Bar[], interval: Interval): boolean => {
   return last.time >= nowSec - intervalSec * 2;
 };
 
+const HISTORY_FETCH_TIMEOUT_MS = 7_000;
+
+const withTimeout = async <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new UpstreamError(`${label} timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 export const resolveMarketSymbol = async (
   db: Database,
   symbolId: string,
@@ -106,7 +120,10 @@ export const getFreshBars = async (
   const barStore = getBarStore();
 
   if (latest) {
-    await barStore.ensureStream(key);
+    void barStore.ensureStream(key).catch(() => {
+      // First paint must not depend on live stream activation. The stream keeps
+      // its own status/reconnect loop; history can still come from DB/provider.
+    });
   }
 
   let bars = await barStore.getRange(key, {
@@ -119,16 +136,20 @@ export const getFreshBars = async (
 
   if (bars.length < opts.limit || stale) {
     const provider = getProvider(resolved.provider);
-    const exchangeBars = await provider.fetchHistorical({
-      symbol: resolved.providerTicker,
-      interval,
-      ...(rangeFrom !== undefined ? { from: rangeFrom } : {}),
-      ...(rangeTo !== undefined ? { to: rangeTo } : {}),
-      limit: opts.limit,
-    });
+    const exchangeBars = await withTimeout(
+      provider.fetchHistorical({
+        symbol: resolved.providerTicker,
+        interval,
+        ...(rangeFrom !== undefined ? { from: rangeFrom } : {}),
+        ...(rangeTo !== undefined ? { to: rangeTo } : {}),
+        limit: opts.limit,
+      }),
+      HISTORY_FETCH_TIMEOUT_MS,
+      `${resolved.provider} ${resolved.providerTicker} ${interval} history`,
+    ).catch(() => [] as Bar[]);
     const exchangeLast = exchangeBars.at(-1)?.time ?? 0;
     const currentLast = bars.at(-1)?.time ?? 0;
-    if (exchangeBars.length > bars.length || exchangeLast > currentLast || stale) {
+    if (exchangeBars.length > 0 && (exchangeBars.length > bars.length || exchangeLast > currentLast || stale)) {
       bars = exchangeBars;
       source = 'exchange';
     }

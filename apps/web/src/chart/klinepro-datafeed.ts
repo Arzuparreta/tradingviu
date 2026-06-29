@@ -106,8 +106,8 @@ export class TradingviuDatafeed implements Datafeed {
   ): Promise<KLineData[]> {
     this.callbacks.onSymbolPeriodChange?.(symbol, period);
     const interval = periodToInterval(period);
-    const res = await api.history(symbolKey(symbol), interval, 1000);
-    let bars = res.bars.map(barToKLine).filter((k) => k.timestamp >= from && k.timestamp <= to);
+    const res = await api.history(symbolKey(symbol), interval, 1000, { from, to });
+    let bars = res.bars.map(barToKLine);
     if (this._maxTimestamp != null) {
       bars = bars.filter((k) => k.timestamp <= this._maxTimestamp!);
     }

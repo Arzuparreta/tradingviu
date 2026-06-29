@@ -119,7 +119,12 @@ export const api = {
     if (opts.assetClass) p.set('assetClass', opts.assetClass);
     return request<{ results: Symbol[]; backend: 'meili' | 'db' }>(`/api/search?${p.toString()}`);
   },
-  history: (symbol: string, interval = '1h', limit = 500) =>
+  history: (
+    symbol: string,
+    interval = '1h',
+    limit = 500,
+    range: { from?: number; to?: number; before?: number; after?: number } = {},
+  ) =>
     request<{
       symbol: { id: string; exchange: string; ticker: string; name: string };
       interval: string;
@@ -127,9 +132,7 @@ export const api = {
       source?: 'barstore' | 'exchange';
       asOf?: number | null;
       fresh?: boolean;
-    }>(
-      `/api/chart/history?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
-    ),
+    }>(`/api/chart/history${queryString({ symbol, interval, limit, ...range })}`),
   dom: (symbol: string, levels = 16) =>
     request<{
       symbol: {

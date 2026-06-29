@@ -23,6 +23,9 @@ const HistoricalQuery = z.object({
   limit: z.coerce.number().int().positive().max(5000).default(500),
 });
 
+const toSeconds = (value: number): number =>
+  value > 10_000_000_000 ? Math.floor(value / 1000) : value;
+
 export const symbolRoutes = new Hono()
   .get('/symbols/search', zValidator('query', QuerySchema), async (c) => {
     const { q, limit, assetClass } = c.req.valid('query');
@@ -74,10 +77,10 @@ export const chartRoutes = new Hono()
     const q = c.req.valid('query');
     const db = c.get('db');
     const result = await getFreshBars(db, q.symbol, q.interval, {
-      ...(q.from !== undefined ? { from: q.from } : {}),
-      ...(q.to !== undefined ? { to: q.to } : {}),
-      ...(q.before !== undefined ? { before: q.before } : {}),
-      ...(q.after !== undefined ? { after: q.after } : {}),
+      ...(q.from !== undefined ? { from: toSeconds(q.from) } : {}),
+      ...(q.to !== undefined ? { to: toSeconds(q.to) } : {}),
+      ...(q.before !== undefined ? { before: toSeconds(q.before) } : {}),
+      ...(q.after !== undefined ? { after: toSeconds(q.after) } : {}),
       limit: q.limit,
     });
 
