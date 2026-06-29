@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
-import type { Bar, WatchlistItem } from '../api/types';
+import type { Bar, Quote, WatchlistItem } from '../api/types';
+import { quoteKey, useMarketQuotes, type QuoteSymbol } from '../hooks/use-market-quotes';
+import type { MarketStatus } from '../hooks/use-market-stream';
 
 const money = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -51,6 +53,13 @@ const asIsoDate = (offsetDays: number) => {
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="dashboard-empty">{children}</div>;
+}
+
+function LiveDot({ status }: { status: MarketStatus }) {
+  if (status === 'idle') return null;
+  const cls = status === 'live' ? 'live' : status === 'down' ? 'down' : 'connecting';
+  const label = status === 'live' ? 'Live' : status === 'down' ? 'Offline' : 'Connecting…';
+  return <span className={`live-dot ${cls}`} title={label} aria-label={label} />;
 }
 
 function Panel({
@@ -101,7 +110,7 @@ function Sparkline({ bars }: { bars: readonly Bar[] }) {
   );
 }
 
-function WatchlistRow({ item }: { item: WatchlistItem }) {
+function WatchlistRow({ item, quote }: { item: WatchlistItem; quote?: Quote | undefined }) {
   const historyQ = useQuery({
     queryKey: ['dashboard-history', item.symbol.id],
     queryFn: () => api.history(item.symbol.id, '1d', 80),
@@ -109,8 +118,25 @@ function WatchlistRow({ item }: { item: WatchlistItem }) {
   });
   const bars = historyQ.data?.bars ?? [];
   const first = bars[0]?.close;
-  const last = bars[bars.length - 1]?.close;
-  const change = first && last ? (last - first) / first : null;
+  const lastClose = bars[bars.length - 1]?.close;
+  const mid = quote ? (quote.bid + quote.ask) / 2 : undefined;
+  const price = mid ?? lastClose;
+  const change = first && price ? (price - first) / first : null;
+
+  // Brief flash when the live price ticks up or down.
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null);
+  const prev = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (mid == null) return;
+    const before = prev.current;
+    prev.current = mid;
+    if (before != null && mid !== before) {
+      setFlash(mid > before ? 'up' : 'down');
+      const t = setTimeout(() => setFlash(null), 450);
+      return () => clearTimeout(t);
+    }
+    return;
+  }, [mid]);
 
   return (
     <Link className="dashboard-watch-row" to={`/chart/${item.symbol.ticker}`}>
@@ -120,7 +146,9 @@ function WatchlistRow({ item }: { item: WatchlistItem }) {
       </div>
       <Sparkline bars={bars} />
       <div className="dashboard-watch-price">
-        <strong>{last ? compact.format(last) : historyQ.isLoading ? '...' : '-'}</strong>
+        <strong className={`price-flash${flash ? ` ${flash}` : ''}`}>
+          {price != null ? compact.format(price) : historyQ.isLoading ? '...' : '-'}
+        </strong>
         {change != null && <span className={change >= 0 ? 'up' : 'down'}>{pct.format(change)}</span>}
       </div>
     </Link>
@@ -193,6 +221,13 @@ export function DashboardPage() {
   const watchItems = (watchlistItemsQ.data?.items ?? []).slice(0, 6);
   const analytics = analyticsQ.data?.analytics;
 
+  const quoteSymbols: QuoteSymbol[] = watchItems.map((i) => ({
+    id: i.symbol.id,
+    exchange: i.symbol.exchange,
+    ticker: i.symbol.ticker,
+  }));
+  const { status: liveStatus, quotes } = useMarketQuotes(quoteSymbols);
+
   return (
     <div className="page dashboard-page">
       <div className="dashboard-top">
@@ -215,12 +250,17 @@ export function DashboardPage() {
         <Panel
           icon={<Star size={16} />}
           title={selectedWatchlist?.name ?? 'Watchlist'}
-          action={<Link to="/watchlists">Manage</Link>}
+          action={
+            <span className="row" style={{ gap: 8 }}>
+              <LiveDot status={liveStatus} />
+              <Link to="/watchlists">Manage</Link>
+            </span>
+          }
         >
           {watchItems.length > 0 ? (
             <div className="dashboard-watchlist">
               {watchItems.map((item) => (
-                <WatchlistRow key={item.id} item={item} />
+                <WatchlistRow key={item.id} item={item} quote={quotes[quoteKey(item.symbol)]} />
               ))}
             </div>
           ) : (
