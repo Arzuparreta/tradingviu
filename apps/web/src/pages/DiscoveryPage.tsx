@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { Badge, PageHeader } from '../ui';
 import type {
   DividendEvent,
   EconomicEvent,
@@ -94,7 +95,7 @@ function ScreenerRow({
         <div className="muted small">{result.sector ?? result.assetClass}</div>
       </td>
       {columns.map((col) => (
-        <td key={col.key} className="mono">
+        <td key={col.key} className="num">
           {formatScreenerMetric(result.metrics[col.key], col.format)}
         </td>
       ))}
@@ -201,9 +202,9 @@ function EconomicRow({ event }: { event: EconomicEvent }) {
           <span>Actual {compact(event.actual)}</span>
         </div>
       </div>
-      <span className={`discovery-importance discovery-importance-${event.importance}`}>
+      <Badge tone={event.importance === 'high' ? 'down' : event.importance === 'medium' ? 'warn' : 'neutral'}>
         {event.importance}
-      </span>
+      </Badge>
     </div>
   );
 }
@@ -467,14 +468,7 @@ export function DiscoveryPage() {
 
   return (
     <div className="page discovery-page">
-      <div className="row" style={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <h1>Discovery</h1>
-          <p className="muted" style={{ marginTop: -8 }}>
-            Market news, earnings and macro calendar.
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Discovery" subtitle="News, calendars, screener, fundamentals and macro" />
 
       <section className="card discovery-filters">
         <div>
@@ -699,14 +693,14 @@ export function DiscoveryPage() {
           <div className="card muted">No symbols match these filters.</div>
         )}
         {(screenerQ.data?.results.length ?? 0) > 0 && (
-          <div className="discovery-table-wrap">
-            <table className="discovery-table">
+          <div className="tbl-wrap">
+            <table className="tbl">
               <thead>
                 <tr>
                   <th>Symbol</th>
                   <th>Name</th>
                   {columnDefs.map((col) => (
-                    <th key={col.key}>
+                    <th key={col.key} className="num">
                       <button
                         type="button"
                         className="ghost discovery-th-sort"

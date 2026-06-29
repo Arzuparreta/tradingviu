@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { Pause, Play, SkipBack, SkipForward } from 'lucide-react';
 import { useAuth } from '../stores/auth';
 import { KLineProChartPanel, type PanelBounds, type KLineProChartPanelHandle } from '../chart/KLineProChartPanel';
 import {
@@ -258,11 +259,15 @@ export function LayoutPage() {
           </button>
           {replayActive && (
             <>
-              <button className="ghost" onClick={() => replayStep(-1)} title="Step back" style={{ padding: '4px 8px' }}>⏮</button>
-              <button className="ghost" onClick={replayTogglePlay} title={replayPlaying ? 'Pause' : 'Play'} style={{ padding: '4px 8px' }}>
-                {replayPlaying ? '⏸' : '▶'}
+              <button className="ghost" onClick={() => replayStep(-1)} title="Step back" style={{ padding: '4px 8px' }}>
+                <SkipBack size={14} />
               </button>
-              <button className="ghost" onClick={() => replayStep(1)} title="Step forward" style={{ padding: '4px 8px' }}>⏭</button>
+              <button className="ghost" onClick={replayTogglePlay} title={replayPlaying ? 'Pause' : 'Play'} style={{ padding: '4px 8px' }}>
+                {replayPlaying ? <Pause size={14} /> : <Play size={14} />}
+              </button>
+              <button className="ghost" onClick={() => replayStep(1)} title="Step forward" style={{ padding: '4px 8px' }}>
+                <SkipForward size={14} />
+              </button>
               <select value={replaySpeed} onChange={(e) => setReplaySpeed(Number(e.target.value))} style={{ width: 56 }}>
                 {REPLAY_SPEEDS.map((s) => (
                   <option key={s} value={s}>{s}×</option>

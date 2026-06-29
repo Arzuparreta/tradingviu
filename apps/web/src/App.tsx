@@ -1,95 +1,27 @@
-import { useEffect } from 'react';
-import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { lazy, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useAuth } from './stores/auth';
+import { Shell } from './components/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { ChartPage } from './pages/ChartPage';
-import { ChartProPage } from './pages/ChartProPage';
-import { WatchlistsPage } from './pages/WatchlistsPage';
-import { LayoutPage } from './pages/LayoutPage';
-import { PineEditorPage } from './pages/PineEditorPage';
-import { AlertsPage } from './pages/AlertsPage';
-import { PortfoliosPage } from './pages/PortfoliosPage';
-import { PaperTradingPage } from './pages/PaperTradingPage';
-import { OptionsPage } from './pages/OptionsPage';
-import { BrokersPage } from './pages/BrokersPage';
-import { DiscoveryPage } from './pages/DiscoveryPage';
-import { BacktestsPage } from './pages/BacktestsPage';
-import { SymbolSearch } from './components/SymbolSearch';
 
-function TopBar() {
-  const { user } = useAuth();
-  const loc = useLocation();
-  return (
-    <header className="topbar">
-      <div className="row" style={{ gap: 16 }}>
-        <Link to="/" className="logo">
-          tradingviu
-        </Link>
-        {user && (
-          <nav>
-            <Link to="/" className={loc.pathname === '/' ? 'active' : ''}>
-              Dashboard
-            </Link>
-            <Link
-              to="/chart"
-              className={
-                loc.pathname.startsWith('/chart') && !loc.pathname.startsWith('/chart-pro')
-                  ? 'active'
-                  : ''
-              }
-            >
-              Chart
-            </Link>
-            <Link to="/chart-pro" className={loc.pathname.startsWith('/chart-pro') ? 'active' : ''}>
-              Pro
-            </Link>
-            <Link to="/layout" className={loc.pathname.startsWith('/layout') ? 'active' : ''}>
-              Layouts
-            </Link>
-            <Link to="/pine" className={loc.pathname.startsWith('/pine') ? 'active' : ''}>
-              Pine
-            </Link>
-            <Link to="/alerts" className={loc.pathname.startsWith('/alerts') ? 'active' : ''}>
-              Alerts
-            </Link>
-            <Link
-              to="/portfolios"
-              className={loc.pathname.startsWith('/portfolios') ? 'active' : ''}
-            >
-              Portfolios
-            </Link>
-            <Link to="/paper" className={loc.pathname.startsWith('/paper') ? 'active' : ''}>
-              Paper
-            </Link>
-            <Link to="/brokers" className={loc.pathname.startsWith('/brokers') ? 'active' : ''}>
-              Brokers
-            </Link>
-            <Link to="/options" className={loc.pathname.startsWith('/options') ? 'active' : ''}>
-              Options
-            </Link>
-            <Link to="/backtests" className={loc.pathname.startsWith('/backtests') ? 'active' : ''}>
-              Backtests
-            </Link>
-            <Link to="/discovery" className={loc.pathname.startsWith('/discovery') ? 'active' : ''}>
-              Discovery
-            </Link>
-            <Link to="/watchlists" className={loc.pathname === '/watchlists' ? 'active' : ''}>
-              Watchlists
-            </Link>
-          </nav>
-        )}
-      </div>
-      <div className="row" style={{ gap: 12 }}>
-        {user && <SymbolSearch />}
-        {user && <span className="muted small">{user.email}</span>}
-      </div>
-    </header>
-  );
-}
+// Pages are code-split so heavy surfaces (Monaco-backed Pine, KLineChart Pro)
+// only load when their route is visited, keeping first paint small.
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const ChartProPage = lazy(() => import('./pages/ChartProPage').then((m) => ({ default: m.ChartProPage })));
+const WatchlistsPage = lazy(() => import('./pages/WatchlistsPage').then((m) => ({ default: m.WatchlistsPage })));
+const LayoutPage = lazy(() => import('./pages/LayoutPage').then((m) => ({ default: m.LayoutPage })));
+const PineEditorPage = lazy(() => import('./pages/PineEditorPage').then((m) => ({ default: m.PineEditorPage })));
+const AlertsPage = lazy(() => import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage })));
+const PortfoliosPage = lazy(() => import('./pages/PortfoliosPage').then((m) => ({ default: m.PortfoliosPage })));
+const PaperTradingPage = lazy(() => import('./pages/PaperTradingPage').then((m) => ({ default: m.PaperTradingPage })));
+const OptionsPage = lazy(() => import('./pages/OptionsPage').then((m) => ({ default: m.OptionsPage })));
+const BrokersPage = lazy(() => import('./pages/BrokersPage').then((m) => ({ default: m.BrokersPage })));
+const DiscoveryPage = lazy(() => import('./pages/DiscoveryPage').then((m) => ({ default: m.DiscoveryPage })));
+const BacktestsPage = lazy(() => import('./pages/BacktestsPage').then((m) => ({ default: m.BacktestsPage })));
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading)
     return (
@@ -101,6 +33,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Legacy chart routes collapse to the canonical /chart, preserving any symbol. */
+function RedirectToChart() {
+  const { symbol } = useParams<{ symbol?: string }>();
+  return <Navigate to={symbol ? `/chart/${symbol}` : '/chart'} replace />;
+}
+
 export function App() {
   const bootstrap = useAuth((s) => s.bootstrap);
   useEffect(() => {
@@ -108,149 +46,36 @@ export function App() {
   }, [bootstrap]);
 
   return (
-    <div className="app-shell">
-      <TopBar />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route
-          path="/"
-          element={
-            <RequireAuth>
-              <DashboardPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/chart"
-          element={
-            <RequireAuth>
-              <ChartProPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/chart/:symbol"
-          element={
-            <RequireAuth>
-              <ChartProPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/chart-pro"
-          element={
-            <RequireAuth>
-              <ChartProPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/chart-pro/:symbol"
-          element={
-            <RequireAuth>
-              <ChartProPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/chart-legacy"
-          element={
-            <RequireAuth>
-              <ChartPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/chart-legacy/:symbol"
-          element={
-            <RequireAuth>
-              <ChartPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/layout"
-          element={
-            <RequireAuth>
-              <LayoutPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/pine"
-          element={
-            <RequireAuth>
-              <PineEditorPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/alerts"
-          element={
-            <RequireAuth>
-              <AlertsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/portfolios"
-          element={
-            <RequireAuth>
-              <PortfoliosPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/paper"
-          element={
-            <RequireAuth>
-              <PaperTradingPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/brokers"
-          element={
-            <RequireAuth>
-              <BrokersPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/options"
-          element={
-            <RequireAuth>
-              <OptionsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/backtests"
-          element={
-            <RequireAuth>
-              <BacktestsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/watchlists"
-          element={
-            <RequireAuth>
-              <WatchlistsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/discovery"
-          element={
-            <RequireAuth>
-              <DiscoveryPage />
-            </RequireAuth>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route
+        element={
+          <RequireAuth>
+            <Shell />
+          </RequireAuth>
+        }
+      >
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/chart" element={<ChartProPage />} />
+        <Route path="/chart/:symbol" element={<ChartProPage />} />
+        <Route path="/watchlists" element={<WatchlistsPage />} />
+        <Route path="/discovery" element={<DiscoveryPage />} />
+        <Route path="/layout" element={<LayoutPage />} />
+        <Route path="/alerts" element={<AlertsPage />} />
+        <Route path="/portfolios" element={<PortfoliosPage />} />
+        <Route path="/paper" element={<PaperTradingPage />} />
+        <Route path="/brokers" element={<BrokersPage />} />
+        <Route path="/options" element={<OptionsPage />} />
+        <Route path="/pine" element={<PineEditorPage />} />
+        <Route path="/backtests" element={<BacktestsPage />} />
+        {/* Legacy aliases → canonical chart. */}
+        <Route path="/chart-pro" element={<RedirectToChart />} />
+        <Route path="/chart-pro/:symbol" element={<RedirectToChart />} />
+        <Route path="/chart-legacy" element={<RedirectToChart />} />
+        <Route path="/chart-legacy/:symbol" element={<RedirectToChart />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

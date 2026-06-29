@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plug } from 'lucide-react';
 import { api } from '../api/client';
 import type { BrokerId } from '../api/types';
+import { Card, EmptyState, Field, PageHeader } from '../ui';
 
 const brokerLabels: Record<BrokerId, string> = {
   alpaca: 'Alpaca',
@@ -24,10 +26,7 @@ export function BrokersPage() {
   const [quantity, setQuantity] = useState('1');
   const [limitPrice, setLimitPrice] = useState('100');
 
-  const connectionsQ = useQuery({
-    queryKey: ['broker-connections'],
-    queryFn: () => api.brokerConnections(),
-  });
+  const connectionsQ = useQuery({ queryKey: ['broker-connections'], queryFn: () => api.brokerConnections() });
   const selected = useMemo(
     () => connectionsQ.data?.connections.find((connection) => connection.id === selectedId) ?? null,
     [connectionsQ.data, selectedId],
@@ -44,8 +43,7 @@ export function BrokersPage() {
   });
 
   useEffect(() => {
-    if (!selectedId && connectionsQ.data?.connections[0])
-      setSelectedId(connectionsQ.data.connections[0].id);
+    if (!selectedId && connectionsQ.data?.connections[0]) setSelectedId(connectionsQ.data.connections[0].id);
   }, [connectionsQ.data, selectedId]);
 
   const create = useMutation({
@@ -117,197 +115,169 @@ export function BrokersPage() {
     },
   });
 
-  const canCreate =
-    broker === 'ibkr' ? ibkrBaseUrl.length > 0 : apiKey.length > 0 && secretKey.length > 0;
+  const canCreate = broker === 'ibkr' ? ibkrBaseUrl.length > 0 : apiKey.length > 0 && secretKey.length > 0;
+  const connections = connectionsQ.data?.connections ?? [];
+  const accounts = accountsQ.data?.accounts ?? [];
+  const positions = positionsQ.data?.positions ?? [];
 
   return (
-    <div className="page">
-      <h1>Brokers</h1>
-      <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
-        <aside className="col" style={{ width: 340 }}>
-          <section className="card col">
-            <div className="row">
-              <div className="grow">
-                <label>Broker</label>
-                <select
-                  value={broker}
-                  onChange={(event) => setBroker(event.target.value as BrokerId)}
-                >
-                  <option value="alpaca">Alpaca paper</option>
-                  <option value="binance">Binance testnet</option>
-                  <option value="ibkr">IBKR gateway</option>
-                </select>
+    <div className="page ui-page">
+      <PageHeader title="Brokers" subtitle="Connect and trade through your broker accounts" />
+      <div className="split">
+        <div className="col">
+          <Card title="New connection" icon={<Plug size={13} />}>
+            <div className="col">
+              <div className="ui-field-row">
+                <Field label="Broker">
+                  <select value={broker} onChange={(e) => setBroker(e.target.value as BrokerId)}>
+                    <option value="alpaca">Alpaca paper</option>
+                    <option value="binance">Binance testnet</option>
+                    <option value="ibkr">IBKR gateway</option>
+                  </select>
+                </Field>
+                <Field label="Label">
+                  <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={brokerLabels[broker]} />
+                </Field>
               </div>
-              <div className="grow">
-                <label>Label</label>
-                <input
-                  value={label}
-                  onChange={(event) => setLabel(event.target.value)}
-                  placeholder={brokerLabels[broker]}
-                />
-              </div>
+              {broker === 'ibkr' ? (
+                <>
+                  <Field label="Gateway URL">
+                    <input value={ibkrBaseUrl} onChange={(e) => setIbkrBaseUrl(e.target.value)} />
+                  </Field>
+                  <Field label="Account ID">
+                    <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder="U1234567" />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="API key">
+                    <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="off" />
+                  </Field>
+                  <Field label="Secret key">
+                    <input
+                      type="password"
+                      value={secretKey}
+                      onChange={(e) => setSecretKey(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </Field>
+                </>
+              )}
+              <button className="primary" disabled={!canCreate || create.isPending} onClick={() => create.mutate()}>
+                Connect
+              </button>
             </div>
-            {broker === 'ibkr' ? (
-              <>
-                <div>
-                  <label>Gateway URL</label>
-                  <input
-                    value={ibkrBaseUrl}
-                    onChange={(event) => setIbkrBaseUrl(event.target.value)}
-                  />
-                </div>
-                <div>
-                  <label>Account ID</label>
-                  <input
-                    value={accountId}
-                    onChange={(event) => setAccountId(event.target.value)}
-                    placeholder="U1234567"
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label>API key</label>
-                  <input
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-                <div>
-                  <label>Secret key</label>
-                  <input
-                    type="password"
-                    value={secretKey}
-                    onChange={(event) => setSecretKey(event.target.value)}
-                    autoComplete="off"
-                  />
-                </div>
-              </>
-            )}
-            <button
-              className="primary"
-              disabled={!canCreate || create.isPending}
-              onClick={() => create.mutate()}
-            >
-              Connect
-            </button>
-          </section>
+          </Card>
 
-          {connectionsQ.data?.connections.map((connection) => (
-            <button
-              key={connection.id}
-              className={selectedId === connection.id ? 'primary' : ''}
-              style={{ textAlign: 'left' }}
-              onClick={() => setSelectedId(connection.id)}
-            >
-              <span>{connection.label ?? brokerLabels[connection.broker]}</span>
-              <span className="muted small mono" style={{ display: 'block' }}>
-                {connection.broker} · {connection.status}
-              </span>
-            </button>
-          ))}
-        </aside>
+          <Card title="Connections" flush>
+            <div className="wl-lists">
+              {connections.length === 0 && <p className="muted small wl-pad">No connections yet.</p>}
+              {connections.map((c) => (
+                <button
+                  key={c.id}
+                  className={`wl-list-row${selectedId === c.id ? ' active' : ''}`}
+                  onClick={() => setSelectedId(c.id)}
+                >
+                  <span className="col grow" style={{ gap: 1, minWidth: 0, alignItems: 'flex-start' }}>
+                    <span className="ellipsis" style={{ maxWidth: '100%' }}>
+                      {c.label ?? brokerLabels[c.broker]}
+                    </span>
+                    <span className="muted small mono ellipsis" style={{ maxWidth: '100%' }}>
+                      {c.broker} · {c.status}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
 
-        <main className="col" style={{ flex: 1, minWidth: 0 }}>
-          {!selected && <p className="muted">Create or select a broker connection.</p>}
-          {selected && (
+        <div className="col" style={{ minWidth: 0 }}>
+          {!selected ? (
+            <Card>
+              <EmptyState icon={<Plug size={20} />} title="No connection selected" hint="Create or pick a broker connection." />
+            </Card>
+          ) : (
             <>
-              <section className="card">
+              <Card>
                 <div className="row">
-                  <div>
-                    <div style={{ fontWeight: 600 }}>
-                      {selected.label ?? brokerLabels[selected.broker]}
-                    </div>
-                    <div className="muted small mono">
-                      {selected.broker} · {selected.accountId ?? 'no account pinned'} ·{' '}
-                      {selected.status}
-                    </div>
+                  <div className="col" style={{ gap: 2, minWidth: 0 }}>
+                    <strong className="ellipsis">{selected.label ?? brokerLabels[selected.broker]}</strong>
+                    <span className="muted small mono">
+                      {selected.broker} · {selected.accountId ?? 'no account pinned'} · {selected.status}
+                    </span>
                   </div>
                   <span className="grow" />
-                  <button disabled={test.isPending} onClick={() => test.mutate(selected.id)}>
+                  <button className="sm" disabled={test.isPending} onClick={() => test.mutate(selected.id)}>
                     Test
                   </button>
-                  <button
-                    className="ghost"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate(selected.id)}
-                  >
+                  <button className="sm danger" disabled={remove.isPending} onClick={() => remove.mutate(selected.id)}>
                     Delete
                   </button>
                 </div>
                 {test.data && (
-                  <p className={test.data.health.ok ? 'up small' : 'down small'}>
-                    {test.data.health.ok
-                      ? 'Connected'
-                      : (test.data.health.message ?? 'Connection failed')}{' '}
-                    · {test.data.health.latencyMs}ms
+                  <p className={test.data.health.ok ? 'up small' : 'down small'} style={{ marginTop: 8 }}>
+                    {test.data.health.ok ? 'Connected' : (test.data.health.message ?? 'Connection failed')} ·{' '}
+                    {test.data.health.latencyMs}ms
                   </p>
                 )}
-              </section>
+              </Card>
 
-              <section className="card">
-                <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Accounts</h2>
-                <div className="col">
-                  {accountsQ.data?.accounts.map((account) => (
-                    <div key={account.id} className="row small">
-                      <span className="mono">{account.id}</span>
-                      <span>{account.name}</span>
-                      <span className="grow" />
-                      <span>
-                        cash {account.cash.toFixed(2)} {account.currency}
-                      </span>
-                      <span>equity {account.equity.toFixed(2)}</span>
-                    </div>
-                  ))}
-                  {accountsQ.data?.accounts.length === 0 && (
-                    <p className="muted">No accounts returned.</p>
-                  )}
-                </div>
-              </section>
-
-              <section className="card">
-                <div className="row" style={{ alignItems: 'end' }}>
-                  <div className="grow">
-                    <label>Symbol</label>
-                    <input
-                      value={symbol}
-                      onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-                    />
+              <Card title="Accounts" flush>
+                {accounts.length === 0 ? (
+                  <EmptyState icon={<Plug size={20} />} title="No accounts returned" hint="Test the connection to load accounts." />
+                ) : (
+                  <div className="tbl-wrap" style={{ border: 0 }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Account</th>
+                          <th>Name</th>
+                          <th className="num">Cash</th>
+                          <th className="num">Equity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {accounts.map((account) => (
+                          <tr key={account.id}>
+                            <td className="mono">{account.id}</td>
+                            <td>{account.name}</td>
+                            <td className="num">
+                              {account.cash.toFixed(2)} {account.currency}
+                            </td>
+                            <td className="num">{account.equity.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <div>
-                    <label>Side</label>
-                    <select
-                      value={side}
-                      onChange={(event) => setSide(event.target.value as 'buy' | 'sell')}
-                    >
+                )}
+              </Card>
+
+              <Card title="Order ticket">
+                <div className="pt-ticket">
+                  <Field label="Symbol">
+                    <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} />
+                  </Field>
+                  <Field label="Side">
+                    <select value={side} onChange={(e) => setSide(e.target.value as 'buy' | 'sell')}>
                       <option value="buy">buy</option>
                       <option value="sell">sell</option>
                     </select>
-                  </div>
-                  <div>
-                    <label>Type</label>
-                    <select
-                      value={type}
-                      onChange={(event) => setType(event.target.value as 'market' | 'limit')}
-                    >
+                  </Field>
+                  <Field label="Type">
+                    <select value={type} onChange={(e) => setType(e.target.value as 'market' | 'limit')}>
                       <option value="market">market</option>
                       <option value="limit">limit</option>
                     </select>
-                  </div>
-                  <div>
-                    <label>Qty</label>
-                    <input value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-                  </div>
+                  </Field>
+                  <Field label="Qty">
+                    <input value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="decimal" />
+                  </Field>
                   {type === 'limit' && (
-                    <div>
-                      <label>Limit</label>
-                      <input
-                        value={limitPrice}
-                        onChange={(event) => setLimitPrice(event.target.value)}
-                      />
-                    </div>
+                    <Field label="Limit">
+                      <input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} inputMode="decimal" />
+                    </Field>
                   )}
                   <button
                     className="primary"
@@ -318,46 +288,56 @@ export function BrokersPage() {
                   </button>
                 </div>
                 {order.data && (
-                  <p className="small up">
+                  <p className="small up" style={{ marginTop: 8 }}>
                     Order {order.data.order.id} is {order.data.order.status}
                   </p>
                 )}
                 {order.error instanceof Error && (
-                  <p className="small down">{order.error.message}</p>
+                  <p className="small down" style={{ marginTop: 8 }}>
+                    {order.error.message}
+                  </p>
                 )}
-              </section>
+              </Card>
 
-              <section className="card">
-                <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Positions</h2>
-                <div className="col">
-                  {positionsQ.data?.positions.map((position) => (
-                    <div
-                      key={`${position.accountId ?? selected.id}:${position.symbol}`}
-                      className="row small"
-                    >
-                      <span className="mono">{position.symbol}</span>
-                      <span>qty {position.quantity}</span>
-                      {position.averagePrice !== undefined && (
-                        <span>avg {position.averagePrice.toFixed(2)}</span>
-                      )}
-                      {position.marketValue !== undefined && (
-                        <span>value {position.marketValue.toFixed(2)}</span>
-                      )}
-                      {position.unrealizedPnl !== undefined && (
-                        <span className={position.unrealizedPnl >= 0 ? 'up' : 'down'}>
-                          pnl {position.unrealizedPnl.toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                  {positionsQ.data?.positions.length === 0 && (
-                    <p className="muted">No open positions.</p>
-                  )}
-                </div>
-              </section>
+              <Card title="Positions" flush>
+                {positions.length === 0 ? (
+                  <EmptyState icon={<Plug size={20} />} title="No open positions" />
+                ) : (
+                  <div className="tbl-wrap" style={{ border: 0 }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Symbol</th>
+                          <th className="num">Qty</th>
+                          <th className="num">Avg</th>
+                          <th className="num">Value</th>
+                          <th className="num">P&amp;L</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {positions.map((position) => (
+                          <tr key={`${position.accountId ?? selected.id}:${position.symbol}`}>
+                            <td className="mono">{position.symbol}</td>
+                            <td className="num">{position.quantity}</td>
+                            <td className="num">
+                              {position.averagePrice !== undefined ? position.averagePrice.toFixed(2) : '—'}
+                            </td>
+                            <td className="num">
+                              {position.marketValue !== undefined ? position.marketValue.toFixed(2) : '—'}
+                            </td>
+                            <td className={`num ${position.unrealizedPnl !== undefined && position.unrealizedPnl >= 0 ? 'up' : 'down'}`}>
+                              {position.unrealizedPnl !== undefined ? position.unrealizedPnl.toFixed(2) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
             </>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );

@@ -1,26 +1,25 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { Plus, Star, Trash2, X } from 'lucide-react';
 import { api } from '../api/client';
-import { useAuth } from '../stores/auth';
+import { Card, EmptyState, PageHeader } from '../ui';
 
 export function WatchlistsPage() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
 
-  const listsQ = useQuery({
-    queryKey: ['watchlists'],
-    queryFn: () => api.watchlists(),
-    enabled: !!user,
-  });
+  const listsQ = useQuery({ queryKey: ['watchlists'], queryFn: () => api.watchlists() });
+  const lists = listsQ.data?.watchlists ?? [];
+  const activeId = picked ?? lists[0]?.id ?? null;
+  const activeList = lists.find((l) => l.id === activeId) ?? null;
 
   const create = useMutation({
     mutationFn: (name: string) => api.createWatchlist(name),
     onSuccess: (r) => {
       queryClient.invalidateQueries({ queryKey: ['watchlists'] });
-      setSelectedId(r.id);
+      setPicked(r.id);
       setNewName('');
     },
   });
@@ -29,103 +28,122 @@ export function WatchlistsPage() {
     mutationFn: (id: string) => api.deleteWatchlist(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['watchlists'] });
-      setSelectedId(null);
+      setPicked(null);
     },
   });
 
   const itemsQ = useQuery({
-    queryKey: ['watchlist-items', selectedId],
-    queryFn: () => api.watchlistItems(selectedId!),
-    enabled: !!selectedId,
+    queryKey: ['watchlist-items', activeId],
+    queryFn: () => api.watchlistItems(activeId!),
+    enabled: !!activeId,
   });
 
   const removeItem = useMutation({
-    mutationFn: (itemId: string) => api.removeFromWatchlist(selectedId!, itemId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist-items', selectedId] }),
+    mutationFn: (itemId: string) => api.removeFromWatchlist(activeId!, itemId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist-items', activeId] }),
   });
 
-  if (!user) return <div className="page"><Link to="/login">Log in</Link></div>;
+  const items = itemsQ.data?.items ?? [];
 
   return (
-    <div className="page">
-      <h1>Watchlists</h1>
-      <div className="row" style={{ gap: 24, alignItems: 'flex-start' }}>
-        <div className="col" style={{ minWidth: 240 }}>
-          <div className="row">
+    <div className="page ui-page">
+      <PageHeader title="Watchlists" subtitle="Symbols you track" />
+      <div className="wl-grid">
+        <Card title="Lists" icon={<Star size={13} />} flush>
+          <div className="wl-create">
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="New watchlist name"
-              style={{ flex: 1 }}
+              placeholder="New watchlist…"
+              onKeyDown={(e) => e.key === 'Enter' && newName && create.mutate(newName)}
             />
             <button
-              className="primary"
+              className="primary sm"
               disabled={!newName || create.isPending}
               onClick={() => newName && create.mutate(newName)}
+              aria-label="Create watchlist"
             >
-              Create
+              <Plus size={14} />
             </button>
           </div>
-          {listsQ.isLoading && <p className="muted">Loading…</p>}
-          {listsQ.data && (
-            <div className="col" style={{ gap: 4, marginTop: 12 }}>
-              {listsQ.data.watchlists.length === 0 && (
-                <p className="muted small">No watchlists yet</p>
-              )}
-              {listsQ.data.watchlists.map((l) => (
-                <div
-                  key={l.id}
-                  className="row"
-                  style={{
-                    padding: 8,
-                    background: selectedId === l.id ? 'var(--bg-3)' : 'transparent',
-                    border: '1px solid var(--border)',
-                    borderRadius: 4,
-                    cursor: 'pointer',
+          <div className="wl-lists">
+            {listsQ.isLoading && <p className="muted small wl-pad">Loading…</p>}
+            {!listsQ.isLoading && lists.length === 0 && (
+              <p className="muted small wl-pad">No watchlists yet.</p>
+            )}
+            {lists.map((l) => (
+              <button
+                key={l.id}
+                className={`wl-list-row${l.id === activeId ? ' active' : ''}`}
+                onClick={() => setPicked(l.id)}
+              >
+                <span className="grow ellipsis">{l.name}</span>
+                <span
+                  className="wl-del"
+                  role="button"
+                  tabIndex={0}
+                  title="Delete list"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Delete "${l.name}"?`)) remove.mutate(l.id);
                   }}
-                  onClick={() => setSelectedId(l.id)}
                 >
-                  <span style={{ flex: 1 }}>{l.name}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${l.name}"?`)) remove.mutate(l.id); }}
-                    style={{ padding: '2px 8px', fontSize: 11 }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  <Trash2 size={13} />
+                </span>
+              </button>
+            ))}
+          </div>
+        </Card>
 
-        <div className="col" style={{ flex: 1 }}>
-          {!selectedId && <p className="muted">Select a watchlist to view symbols.</p>}
-          {selectedId && itemsQ.isLoading && <p className="muted">Loading…</p>}
-          {itemsQ.data && (
-            <div className="col" style={{ gap: 4 }}>
-              <p className="muted small">{itemsQ.data.items.length} symbol(s)</p>
-              {itemsQ.data.items.length === 0 && (
-                <p className="muted">Empty. Add symbols from a chart page.</p>
-              )}
-              {itemsQ.data.items.map((item) => (
-                <div key={item.id} className="row card" style={{ padding: 8 }}>
-                  <Link to={`/chart/${item.symbol.id}`} className="mono">
-                    {item.symbol.exchange}:{item.symbol.ticker}
-                  </Link>
-                  <span className="muted small">{item.symbol.name}</span>
-                  {item.note && <span className="muted small">— {item.note}</span>}
-                  <span className="grow" />
-                  <button
-                    onClick={() => removeItem.mutate(item.id)}
-                    style={{ padding: '2px 8px', fontSize: 11 }}
-                  >
-                    remove
-                  </button>
-                </div>
-              ))}
+        <Card title={activeList?.name ?? 'Symbols'} flush>
+          {!activeId ? (
+            <EmptyState icon={<Star size={20} />} title="No watchlist selected" hint="Create or pick a list." />
+          ) : itemsQ.isLoading ? (
+            <p className="muted small wl-pad">Loading…</p>
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={<Star size={20} />}
+              title="No symbols yet"
+              hint="Add symbols from any chart’s watchlist button."
+            />
+          ) : (
+            <div className="tbl-wrap" style={{ border: 0 }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Name</th>
+                    <th>Note</th>
+                    <th className="num" aria-label="actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <Link to={`/chart/${item.symbol.id}`} className="mono">
+                          {item.symbol.exchange}:{item.symbol.ticker}
+                        </Link>
+                      </td>
+                      <td className="muted ellipsis">{item.symbol.name}</td>
+                      <td className="muted ellipsis">{item.note ?? ''}</td>
+                      <td className="num">
+                        <button
+                          className="sm danger"
+                          onClick={() => removeItem.mutate(item.id)}
+                          title="Remove from list"
+                          aria-label="Remove from list"
+                        >
+                          <X size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

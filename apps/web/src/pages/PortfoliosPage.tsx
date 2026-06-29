@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PieChart, Plus } from 'lucide-react';
 import { api } from '../api/client';
+import { Card, EmptyState, Field, PageHeader, Stat } from '../ui';
+
+const money = (v: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(v);
+const pct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
 
 export function PortfoliosPage() {
   const queryClient = useQueryClient();
@@ -58,212 +63,237 @@ export function PortfoliosPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['portfolio', selectedId] }),
   });
 
-  return (
-    <div className="page">
-      <h1>Portfolios</h1>
-      <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
-        <aside className="col" style={{ width: 280 }}>
-          <div className="row">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Portfolio name" />
-            <button className="primary" disabled={!name || create.isPending} onClick={() => create.mutate()}>Create</button>
-          </div>
-          {portfoliosQ.data?.portfolios.map((p) => (
-            <button
-              key={p.id}
-              className={selectedId === p.id ? 'primary' : ''}
-              style={{ textAlign: 'left' }}
-              onClick={() => setSelectedId(p.id)}
-            >
-              {p.name}
-            </button>
-          ))}
-        </aside>
+  const portfolios = portfoliosQ.data?.portfolios ?? [];
+  const detail = detailQ.data;
+  const analytics = analyticsQ.data?.analytics;
 
-        <main className="col" style={{ flex: 1 }}>
-          {!selectedId && <p className="muted">Create or select a portfolio.</p>}
-          {detailQ.data && (
+  return (
+    <div className="page ui-page">
+      <PageHeader title="Portfolios" subtitle="Holdings, transactions and analytics" />
+      <div className="split">
+        <Card title="Portfolios" icon={<PieChart size={13} />} flush>
+          <div className="wl-create">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Portfolio name…"
+              onKeyDown={(e) => e.key === 'Enter' && name && create.mutate()}
+            />
+            <button
+              className="primary sm"
+              disabled={!name || create.isPending}
+              onClick={() => create.mutate()}
+              aria-label="Create portfolio"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="wl-lists">
+            {portfolios.length === 0 && <p className="muted small wl-pad">No portfolios yet.</p>}
+            {portfolios.map((p) => (
+              <button
+                key={p.id}
+                className={`wl-list-row${selectedId === p.id ? ' active' : ''}`}
+                onClick={() => setSelectedId(p.id)}
+              >
+                <span className="grow ellipsis">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <div className="col" style={{ minWidth: 0 }}>
+          {!selectedId || !detail ? (
+            <Card>
+              <EmptyState icon={<PieChart size={20} />} title="No portfolio selected" hint="Create or pick a portfolio." />
+            </Card>
+          ) : (
             <>
-              <section className="card">
+              <Card>
                 <div className="row">
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{detailQ.data.portfolio.name}</div>
-                    <div className="muted small">{detailQ.data.portfolio.baseCurrency}</div>
+                  <div className="col" style={{ gap: 2, minWidth: 0 }}>
+                    <strong className="ellipsis">{detail.portfolio.name}</strong>
+                    <span className="muted small">{detail.portfolio.baseCurrency}</span>
                   </div>
                   <span className="grow" />
-                  <div className="mono">Invested {detailQ.data.metrics.invested.toFixed(2)}</div>
-                  <div className={detailQ.data.metrics.realizedPnl >= 0 ? 'up mono' : 'down mono'}>
-                    P&L {detailQ.data.metrics.realizedPnl.toFixed(2)}
+                  <div className="ui-stat end">
+                    <span className="ui-stat-label">Invested</span>
+                    <span className="ui-stat-value">{detail.metrics.invested.toFixed(2)}</span>
                   </div>
-                  <button onClick={() => remove.mutate(detailQ.data.portfolio.id)}>Delete</button>
+                  <div className="ui-stat end">
+                    <span className="ui-stat-label">Realized P&amp;L</span>
+                    <span className={`ui-stat-value ${detail.metrics.realizedPnl >= 0 ? 'up' : 'down'}`}>
+                      {detail.metrics.realizedPnl.toFixed(2)}
+                    </span>
+                  </div>
+                  <button className="sm danger" onClick={() => remove.mutate(detail.portfolio.id)}>
+                    Delete
+                  </button>
                 </div>
-              </section>
+              </Card>
 
-              <section className="card">
-                <div className="row" style={{ alignItems: 'end' }}>
-                  <div style={{ flex: 1 }}>
-                    <label>Symbol</label>
+              <Card title="Add transaction">
+                <div className="pt-ticket">
+                  <Field label="Symbol">
                     <select value={symbolId} onChange={(e) => setSymbolId(e.target.value)}>
-                      <option value="">Select symbol</option>
-                      {symbolsQ.data?.results.map((s) => <option key={s.id} value={s.id}>{s.exchange}:{s.ticker}</option>)}
+                      <option value="">Select symbol…</option>
+                      {symbolsQ.data?.results.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.exchange}:{s.ticker}
+                        </option>
+                      ))}
                     </select>
-                  </div>
-                  <div>
-                    <label>Side</label>
+                  </Field>
+                  <Field label="Side">
                     <select value={side} onChange={(e) => setSide(e.target.value as 'buy' | 'sell' | 'dividend')}>
                       <option value="buy">buy</option>
                       <option value="sell">sell</option>
                       <option value="dividend">dividend</option>
                     </select>
-                  </div>
-                  <div><label>Qty</label><input value={quantity} onChange={(e) => setQuantity(e.target.value)} /></div>
-                  <div><label>Price</label><input value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-                  <div><label>Fee</label><input value={fee} onChange={(e) => setFee(e.target.value)} /></div>
-                  <button className="primary" disabled={!symbolId || addTx.isPending} onClick={() => addTx.mutate()}>Add</button>
+                  </Field>
+                  <Field label="Qty">
+                    <input value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="decimal" />
+                  </Field>
+                  <Field label="Price">
+                    <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" />
+                  </Field>
+                  <Field label="Fee">
+                    <input value={fee} onChange={(e) => setFee(e.target.value)} inputMode="decimal" />
+                  </Field>
+                  <button className="primary" disabled={!symbolId || addTx.isPending} onClick={() => addTx.mutate()}>
+                    Add
+                  </button>
                 </div>
-              </section>
+              </Card>
 
-              <section className="card">
-                <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Holdings</h2>
-                <div className="col">
-                  {detailQ.data.holdings.map((h) => (
-                    <div key={h.id} className="row">
-                      <span className="mono">{h.symbol.exchange}:{h.symbol.ticker}</span>
-                      <span className="grow muted small">{h.symbol.name}</span>
-                      <span className="mono">{h.quantity}</span>
-                      <span className="mono">@ {h.avgCost}</span>
-                    </div>
-                  ))}
-                  {detailQ.data.holdings.length === 0 && <p className="muted">No open holdings.</p>}
-                </div>
-              </section>
-
-              {analyticsQ.data && analyticsQ.data.analytics.positionsCount > 0 &&
-                (() => {
-                  const a = analyticsQ.data.analytics;
-                  const money = (v: number) =>
-                    new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(v);
-                  const pct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
-                  return (
-                    <section className="card">
-                      <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Analytics</h2>
-                      <div className="row" style={{ flexWrap: 'wrap', gap: 18, marginBottom: 12 }}>
-                        <div className="col" style={{ gap: 0 }}>
-                          <span className="muted small">Market value</span>
-                          <span className="mono">{money(a.marketValue)}</span>
-                        </div>
-                        <div className="col" style={{ gap: 0 }}>
-                          <span className="muted small">Unrealized P&L</span>
-                          <span className={a.unrealizedPnl >= 0 ? 'up mono' : 'down mono'}>
-                            {money(a.unrealizedPnl)} ({pct(a.unrealizedPnlPct)})
-                          </span>
-                        </div>
-                        <div className="col" style={{ gap: 0 }}>
-                          <span className="muted small">Effective holdings</span>
-                          <span className="mono">
-                            {a.concentration.effectiveHoldings.toFixed(1)} / {a.positionsCount}
-                          </span>
-                        </div>
-                        <div className="col" style={{ gap: 0 }}>
-                          <span className="muted small">Top / Top 3</span>
-                          <span className="mono">
-                            {(a.concentration.topWeight * 100).toFixed(0)}% /{' '}
-                            {(a.concentration.top3Weight * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                        {a.best && (
-                          <div className="col" style={{ gap: 0 }}>
-                            <span className="muted small">Best / Worst</span>
-                            <span className="mono">
-                              <span className="up">{a.best.ticker} {pct(a.best.unrealizedPnlPct)}</span>
-                              {a.worst && a.worst.symbolId !== a.best.symbolId && (
-                                <>
-                                  {' · '}
-                                  <span className="down">
-                                    {a.worst.ticker} {pct(a.worst.unrealizedPnlPct)}
-                                  </span>
-                                </>
-                              )}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="muted small" style={{ marginBottom: 6 }}>Allocation by asset class</div>
-                      <div className="col" style={{ gap: 4, marginBottom: 12 }}>
-                        {a.byAssetClass.map((s) => (
-                          <div key={s.key} className="row small" style={{ gap: 8, alignItems: 'center' }}>
-                            <span style={{ width: 70, textTransform: 'capitalize' }}>{s.key}</span>
-                            <div style={{ flex: 1, background: 'var(--bg-3)', borderRadius: 3, height: 10 }}>
-                              <div
-                                style={{
-                                  width: `${(s.weight * 100).toFixed(1)}%`,
-                                  background: '#4c8bf5',
-                                  height: '100%',
-                                  borderRadius: 3,
-                                }}
-                              />
-                            </div>
-                            <span className="mono" style={{ width: 48, textAlign: 'right' }}>
-                              {(s.weight * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <table className="discovery-table" style={{ minWidth: 0, fontSize: 12 }}>
-                        <thead>
-                          <tr>
-                            <th>Symbol</th>
-                            <th style={{ textAlign: 'right' }}>Weight</th>
-                            <th style={{ textAlign: 'right' }}>Value</th>
-                            <th style={{ textAlign: 'right' }}>Return</th>
-                            <th style={{ textAlign: 'right' }}>P&L</th>
+              <Card title="Holdings" flush>
+                {detail.holdings.length === 0 ? (
+                  <EmptyState icon={<PieChart size={20} />} title="No open holdings" hint="Add a transaction to build positions." />
+                ) : (
+                  <div className="tbl-wrap" style={{ border: 0 }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Symbol</th>
+                          <th>Name</th>
+                          <th className="num">Qty</th>
+                          <th className="num">Avg cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.holdings.map((h) => (
+                          <tr key={h.id}>
+                            <td className="mono">
+                              {h.symbol.exchange}:{h.symbol.ticker}
+                            </td>
+                            <td className="muted ellipsis">{h.symbol.name}</td>
+                            <td className="num">{h.quantity}</td>
+                            <td className="num">{h.avgCost}</td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {a.positions.map((p) => (
-                            <tr key={p.symbolId}>
-                              <td className="mono">{p.ticker}</td>
-                              <td className="mono" style={{ textAlign: 'right' }}>
-                                {(p.weight * 100).toFixed(1)}%
-                              </td>
-                              <td className="mono" style={{ textAlign: 'right' }}>{money(p.marketValue)}</td>
-                              <td
-                                className={`mono ${p.unrealizedPnl >= 0 ? 'up' : 'down'}`}
-                                style={{ textAlign: 'right' }}
-                              >
-                                {pct(p.unrealizedPnlPct)}
-                              </td>
-                              <td
-                                className={`mono ${p.unrealizedPnl >= 0 ? 'up' : 'down'}`}
-                                style={{ textAlign: 'right' }}
-                              >
-                                {money(p.unrealizedPnl)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </section>
-                  );
-                })()}
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
 
-              <section className="card">
-                <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Transactions</h2>
-                <div className="col">
-                  {detailQ.data.transactions.map((tx) => (
-                    <div key={tx.id} className="row small">
-                      <span className="mono">{new Date(tx.occurredAt).toLocaleString()}</span>
-                      <span>{tx.side}</span>
-                      <span className="mono">{tx.quantity} @ {tx.price}</span>
-                      <span className="muted">fee {tx.fee}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
+              {analytics && analytics.positionsCount > 0 && (
+                <Card title="Analytics">
+                  <div className="opt-stats" style={{ marginBottom: 12 }}>
+                    <Stat label="Market value" value={money(analytics.marketValue)} />
+                    <Stat
+                      label="Unrealized P&L"
+                      value={
+                        <span className={analytics.unrealizedPnl >= 0 ? 'up' : 'down'}>
+                          {money(analytics.unrealizedPnl)} ({pct(analytics.unrealizedPnlPct)})
+                        </span>
+                      }
+                    />
+                    <Stat
+                      label="Effective holdings"
+                      value={`${analytics.concentration.effectiveHoldings.toFixed(1)} / ${analytics.positionsCount}`}
+                    />
+                    <Stat
+                      label="Top / Top 3"
+                      value={`${(analytics.concentration.topWeight * 100).toFixed(0)}% / ${(analytics.concentration.top3Weight * 100).toFixed(0)}%`}
+                    />
+                  </div>
+
+                  <div className="muted small" style={{ marginBottom: 6 }}>
+                    Allocation by asset class
+                  </div>
+                  <div className="col" style={{ gap: 5, marginBottom: 14 }}>
+                    {analytics.byAssetClass.map((s) => (
+                      <div key={s.key} className="alloc-row">
+                        <span className="alloc-key">{s.key}</span>
+                        <div className="alloc-bar">
+                          <div className="alloc-fill" style={{ width: `${(s.weight * 100).toFixed(1)}%` }} />
+                        </div>
+                        <span className="alloc-val">{(s.weight * 100).toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Symbol</th>
+                          <th className="num">Weight</th>
+                          <th className="num">Value</th>
+                          <th className="num">Return</th>
+                          <th className="num">P&amp;L</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.positions.map((p) => (
+                          <tr key={p.symbolId}>
+                            <td className="mono">{p.ticker}</td>
+                            <td className="num">{(p.weight * 100).toFixed(1)}%</td>
+                            <td className="num">{money(p.marketValue)}</td>
+                            <td className={`num ${p.unrealizedPnl >= 0 ? 'up' : 'down'}`}>{pct(p.unrealizedPnlPct)}</td>
+                            <td className={`num ${p.unrealizedPnl >= 0 ? 'up' : 'down'}`}>{money(p.unrealizedPnl)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+
+              <Card title="Transactions" flush>
+                {detail.transactions.length === 0 ? (
+                  <EmptyState icon={<PieChart size={20} />} title="No transactions yet" />
+                ) : (
+                  <div className="tbl-wrap" style={{ border: 0 }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Side</th>
+                          <th className="num">Qty</th>
+                          <th className="num">Price</th>
+                          <th className="num">Fee</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.transactions.map((tx) => (
+                          <tr key={tx.id}>
+                            <td className="muted">{new Date(tx.occurredAt).toLocaleString()}</td>
+                            <td>{tx.side}</td>
+                            <td className="num">{tx.quantity}</td>
+                            <td className="num">{tx.price}</td>
+                            <td className="num muted">{tx.fee}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
             </>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );

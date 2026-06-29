@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Sigma } from 'lucide-react';
 import { api } from '../api/client';
 import type { StrategyAnalysis, StrategyTemplate } from '../api/types';
+import { Card, EmptyState, Field, PageHeader, Stat } from '../ui';
 
 const TEMPLATES: { value: StrategyTemplate; label: string }[] = [
   { value: 'long_call', label: 'Long Call' },
@@ -19,7 +21,8 @@ const TEMPLATES: { value: StrategyTemplate; label: string }[] = [
   { value: 'call_butterfly', label: 'Call Butterfly' },
 ];
 
-const fmt = (n: number, dp = 2) => n.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmt = (n: number, dp = 2) =>
+  n.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 function PayoffChart({ analysis, spot }: { analysis: StrategyAnalysis; spot: number }) {
   const { path, zeroY, spotX, beMarks, W, H } = useMemo(() => {
@@ -47,22 +50,29 @@ function PayoffChart({ analysis, spot }: { analysis: StrategyAnalysis; spot: num
   }, [analysis, spot]);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', background: 'var(--panel, #111)', borderRadius: 8 }}>
-      <line x1={0} y1={zeroY} x2={W} y2={zeroY} stroke="#555" strokeWidth={1} />
-      {spotX !== null && <line x1={spotX} y1={8} x2={spotX} y2={H - 8} stroke="#3b82f6" strokeWidth={1} strokeDasharray="4 4" />}
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: '100%', height: 'auto', background: 'var(--bg)', borderRadius: 'var(--radius)' }}
+    >
+      <line x1={0} y1={zeroY} x2={W} y2={zeroY} stroke="var(--border-strong)" strokeWidth={1} />
+      {spotX !== null && (
+        <line x1={spotX} y1={8} x2={spotX} y2={H - 8} stroke="var(--accent)" strokeWidth={1} strokeDasharray="4 4" />
+      )}
       {beMarks.map((m, i) => (
         <g key={i}>
-          <line x1={m.x} y1={8} x2={m.x} y2={H - 8} stroke="#eab308" strokeWidth={1} strokeDasharray="2 3" />
-          <text x={m.x + 3} y={18} fill="#eab308" fontSize={10}>{fmt(m.v)}</text>
+          <line x1={m.x} y1={8} x2={m.x} y2={H - 8} stroke="var(--warn)" strokeWidth={1} strokeDasharray="2 3" />
+          <text x={m.x + 3} y={18} fill="var(--warn)" fontSize={10}>
+            {fmt(m.v)}
+          </text>
         </g>
       ))}
-      <path d={path} fill="none" stroke="#22c55e" strokeWidth={2} />
+      <path d={path} fill="none" stroke="var(--up)" strokeWidth={2} />
     </svg>
   );
 }
 
 const greekRow = (label: string, value: number, dp = 4) => (
-  <div className="row small" style={{ justifyContent: 'space-between' }}>
+  <div className="opt-greek">
     <span className="muted">{label}</span>
     <span className="mono">{fmt(value, dp)}</span>
   </div>
@@ -86,7 +96,8 @@ export function OptionsPage() {
     width: Number(width),
     contracts: Number(contracts),
   };
-  const valid = params.spot > 0 && params.volatility > 0 && params.timeToExpiry > 0 && params.width > 0 && params.contracts > 0;
+  const valid =
+    params.spot > 0 && params.volatility > 0 && params.timeToExpiry > 0 && params.width > 0 && params.contracts > 0;
 
   const analysisQ = useQuery({
     queryKey: ['options-strategy', params],
@@ -98,94 +109,132 @@ export function OptionsPage() {
   const ng = a?.netGreeks;
 
   return (
-    <div className="page">
-      <h1>Options</h1>
-      <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
-        <aside className="col" style={{ width: 240 }}>
-          <section className="card col" style={{ gap: 8 }}>
-            <div>
-              <label>Strategy</label>
+    <div className="page ui-page">
+      <PageHeader title="Options" subtitle="Strategy builder · payoff · greeks" />
+      <div className="split">
+        <Card title="Strategy" icon={<Sigma size={13} />}>
+          <div className="col">
+            <Field label="Strategy">
               <select value={template} onChange={(e) => setTemplate(e.target.value as StrategyTemplate)}>
-                {TEMPLATES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {TEMPLATES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
               </select>
+            </Field>
+            <div className="ui-field-row">
+              <Field label="Spot">
+                <input value={spot} onChange={(e) => setSpot(e.target.value)} inputMode="decimal" />
+              </Field>
+              <Field label="Vol %">
+                <input value={vol} onChange={(e) => setVol(e.target.value)} inputMode="decimal" />
+              </Field>
             </div>
-            <div className="row">
-              <div><label>Spot</label><input value={spot} onChange={(e) => setSpot(e.target.value)} /></div>
-              <div><label>Vol %</label><input value={vol} onChange={(e) => setVol(e.target.value)} /></div>
+            <div className="ui-field-row">
+              <Field label="Rate %">
+                <input value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" />
+              </Field>
+              <Field label="Days">
+                <input value={days} onChange={(e) => setDays(e.target.value)} inputMode="decimal" />
+              </Field>
             </div>
-            <div className="row">
-              <div><label>Rate %</label><input value={rate} onChange={(e) => setRate(e.target.value)} /></div>
-              <div><label>Days</label><input value={days} onChange={(e) => setDays(e.target.value)} /></div>
+            <div className="ui-field-row">
+              <Field label="Width">
+                <input value={width} onChange={(e) => setWidth(e.target.value)} inputMode="decimal" />
+              </Field>
+              <Field label="Contracts">
+                <input value={contracts} onChange={(e) => setContracts(e.target.value)} inputMode="decimal" />
+              </Field>
             </div>
-            <div className="row">
-              <div><label>Width</label><input value={width} onChange={(e) => setWidth(e.target.value)} /></div>
-              <div><label>Contracts</label><input value={contracts} onChange={(e) => setContracts(e.target.value)} /></div>
-            </div>
-          </section>
-        </aside>
+          </div>
+        </Card>
 
-        <main className="col" style={{ flex: 1, gap: 16 }}>
-          {!valid && <p className="muted">Enter positive spot, vol, days, width and contracts.</p>}
-          {analysisQ.isError && <p className="down">Failed to analyze strategy.</p>}
-          {a && (
+        <div className="col" style={{ minWidth: 0 }}>
+          {!valid ? (
+            <Card>
+              <EmptyState
+                icon={<Sigma size={20} />}
+                title="Enter strategy parameters"
+                hint="Positive spot, vol, days, width and contracts."
+              />
+            </Card>
+          ) : analysisQ.isError ? (
+            <Card>
+              <EmptyState icon={<Sigma size={20} />} title="Failed to analyze strategy" />
+            </Card>
+          ) : a ? (
             <>
-              <section className="card">
-                <div className="row" style={{ gap: 24, flexWrap: 'wrap' }}>
-                  <div>
-                    <div className="muted small">{a.netDebit >= 0 ? 'Net Debit' : 'Net Credit'}</div>
-                    <div className="mono" style={{ fontWeight: 600 }}>{fmt(Math.abs(a.netDebit))}</div>
-                  </div>
-                  <div>
-                    <div className="muted small">Max Profit</div>
-                    <div className="mono up">{a.unlimitedProfit ? 'Unlimited' : fmt(a.maxProfit ?? 0)}</div>
-                  </div>
-                  <div>
-                    <div className="muted small">Max Loss</div>
-                    <div className="mono down">{a.unlimitedLoss ? 'Unlimited' : fmt(a.maxLoss ?? 0)}</div>
-                  </div>
-                  <div>
-                    <div className="muted small">Breakeven{a.breakevens.length === 1 ? '' : 's'}</div>
-                    <div className="mono">{a.breakevens.length ? a.breakevens.map((b) => fmt(b)).join(', ') : '—'}</div>
-                  </div>
+              <Card>
+                <div className="opt-stats">
+                  <Stat label={a.netDebit >= 0 ? 'Net debit' : 'Net credit'} value={fmt(Math.abs(a.netDebit))} />
+                  <Stat
+                    label="Max profit"
+                    value={<span className="up">{a.unlimitedProfit ? 'Unlimited' : fmt(a.maxProfit ?? 0)}</span>}
+                  />
+                  <Stat
+                    label="Max loss"
+                    value={<span className="down">{a.unlimitedLoss ? 'Unlimited' : fmt(a.maxLoss ?? 0)}</span>}
+                  />
+                  <Stat
+                    label={`Breakeven${a.breakevens.length === 1 ? '' : 's'}`}
+                    value={a.breakevens.length ? a.breakevens.map((b) => fmt(b)).join(', ') : '—'}
+                  />
                 </div>
-              </section>
+              </Card>
 
-              <section className="card">
-                <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Payoff at expiration</h2>
+              <Card title="Payoff at expiration">
                 <PayoffChart analysis={a} spot={params.spot} />
-              </section>
+              </Card>
 
-              <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
-                <section className="card" style={{ flex: 1 }}>
-                  <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Legs</h2>
-                  <div className="col" style={{ gap: 6 }}>
-                    {a.legs.map((l, i) => (
-                      <div key={i} className="row small" style={{ gap: 10 }}>
-                        <span className={l.side === 'long' ? 'up' : 'down'}>{l.side === 'long' ? '+' : '−'}{l.quantity}</span>
-                        <span>{l.type.toUpperCase()}</span>
-                        <span className="mono">@ {fmt(l.strike)}</span>
-                        <span className="grow" />
-                        <span className="muted">premium</span>
-                        <span className="mono">{fmt(l.premium)}</span>
-                      </div>
-                    ))}
+              <div className="opt-bottom">
+                <Card title="Legs" flush>
+                  <div className="tbl-wrap" style={{ border: 0 }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Side</th>
+                          <th>Type</th>
+                          <th className="num">Strike</th>
+                          <th className="num">Premium</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {a.legs.map((l, i) => (
+                          <tr key={i}>
+                            <td>
+                              <span className={l.side === 'long' ? 'up' : 'down'}>
+                                {l.side === 'long' ? '+' : '−'}
+                                {l.quantity} {l.side}
+                              </span>
+                            </td>
+                            <td>{l.type.toUpperCase()}</td>
+                            <td className="num">{fmt(l.strike)}</td>
+                            <td className="num">{fmt(l.premium)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </section>
+                </Card>
 
                 {ng && (
-                  <section className="card" style={{ width: 220 }}>
-                    <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Net Greeks</h2>
+                  <Card title="Net greeks">
                     {greekRow('Delta', ng.delta)}
                     {greekRow('Gamma', ng.gamma)}
                     {greekRow('Theta / day', ng.theta / 365)}
                     {greekRow('Vega / 1%', ng.vega / 100)}
                     {greekRow('Rho / 1%', ng.rho / 100)}
-                  </section>
+                  </Card>
                 )}
               </div>
             </>
+          ) : (
+            <Card>
+              <p className="muted small">Analyzing…</p>
+            </Card>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );

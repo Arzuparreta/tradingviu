@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Editor from '@monaco-editor/react';
+import { FlaskConical, Play } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import { registerPine } from '../lib/monaco-pine';
@@ -182,12 +183,19 @@ export function PineEditorPage() {
         <select value={interval} onChange={(e) => setInterval(e.target.value)} style={{ width: 72 }}>
           {INTERVALS.map((i) => <option key={i} value={i}>{i}</option>)}
         </select>
-        <button className="primary" onClick={run} disabled={running || !symbolId}>{running ? 'Running…' : '▶ Run'}</button>
+        <button className="primary with-icon" onClick={run} disabled={running || !symbolId}>
+          {running ? 'Running…' : (<><Play size={13} /> Run</>)}
+        </button>
         <label className="layout-toggle" title="Allow short positions in the backtest">
           <input type="checkbox" checked={allowShort} onChange={(e) => setAllowShort(e.target.checked)} /> shorts
         </label>
-        <button onClick={backtest} disabled={btRunning || !symbolId} title="Backtest the script's signal plot (titled “signal”, else the first plot)">
-          {btRunning ? 'Backtesting…' : '⚗ Backtest'}
+        <button
+          className="with-icon"
+          onClick={backtest}
+          disabled={btRunning || !symbolId}
+          title="Backtest the script's signal plot (titled “signal”, else the first plot)"
+        >
+          {btRunning ? 'Backtesting…' : (<><FlaskConical size={13} /> Backtest</>)}
         </button>
         {validateMsg && <span className={`small ${validateMsg.ok ? 'up' : 'down'}`}>{validateMsg.text}</span>}
         <span className="grow" />
@@ -259,11 +267,11 @@ export function PineEditorPage() {
                       x2={W}
                       y1={y(st.initialCapital)}
                       y2={y(st.initialCapital)}
-                      stroke="#787b86"
+                      stroke="var(--border-strong)"
                       strokeWidth={0.5}
                       strokeDasharray="3 3"
                     />
-                    <path d={path} fill="none" stroke={up ? '#26a69a' : '#ef5350'} strokeWidth={1.5} />
+                    <path d={path} fill="none" stroke={up ? 'var(--up)' : 'var(--down)'} strokeWidth={1.5} />
                   </svg>
                   <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
                     {chip('Net profit', pct(st.netProfitPct), up ? 'up' : 'down')}
