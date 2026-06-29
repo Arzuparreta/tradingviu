@@ -7,8 +7,8 @@ import {
   NotFoundError,
   UpdatePortfolioSchema,
   ValidationError,
-  tryGetTenant,
-  type TenantContext,
+  tryGetUserContext,
+  type UserContext,
 } from '@tv/core';
 import { exchanges, holdings, portfolios, symbols, transactions } from '@tv/db/schema';
 import { ulid } from 'ulid';
@@ -32,7 +32,7 @@ const lastPrice = async (
 
 const assertPortfolio = async (
   db: ReturnType<typeof import('@tv/db').createDb>,
-  tenant: TenantContext,
+  tenant: UserContext,
   portfolioId: string,
 ) => {
   const [portfolio] = await db
@@ -46,7 +46,7 @@ const assertPortfolio = async (
 
 const rebuildHoldings = async (
   db: ReturnType<typeof import('@tv/db').createDb>,
-  tenant: TenantContext,
+  tenant: UserContext,
   portfolioId: string,
 ) => {
   const rows = await db
@@ -75,7 +75,7 @@ const rebuildHoldings = async (
 export const portfolioRoutes = new Hono()
   .get('/portfolios', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const rows = await db
       .select()
       .from(portfolios)
@@ -85,7 +85,7 @@ export const portfolioRoutes = new Hono()
   })
   .post('/portfolios', zValidator('json', CreatePortfolioSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const body = c.req.valid('json');
     const id = ulid();
     await db.insert(portfolios).values({
@@ -98,7 +98,7 @@ export const portfolioRoutes = new Hono()
   })
   .get('/portfolios/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const portfolio = await assertPortfolio(db, tenant, id);
     const holdingRows = await db
@@ -129,7 +129,7 @@ export const portfolioRoutes = new Hono()
   })
   .get('/portfolios/:id/analytics', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     await assertPortfolio(db, tenant, id);
 
@@ -168,7 +168,7 @@ export const portfolioRoutes = new Hono()
   })
   .patch('/portfolios/:id', zValidator('json', UpdatePortfolioSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const body = c.req.valid('json');
     await assertPortfolio(db, tenant, id);
@@ -183,7 +183,7 @@ export const portfolioRoutes = new Hono()
   })
   .delete('/portfolios/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     await db
       .delete(portfolios)
@@ -192,7 +192,7 @@ export const portfolioRoutes = new Hono()
   })
   .post('/portfolios/:id/transactions', zValidator('json', CreatePortfolioTransactionSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const portfolioId = c.req.param('id');
     const body = c.req.valid('json');
     validatePortfolioTransaction(body);

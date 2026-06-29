@@ -6,8 +6,8 @@ import {
   NotFoundError,
   PlacePaperOrderSchema,
   ValidationError,
-  tryGetTenant,
-  type TenantContext,
+  tryGetUserContext,
+  type UserContext,
 } from '@tv/core';
 import { exchanges, paperAccounts, paperOrders, symbols } from '@tv/db/schema';
 import { ulid } from 'ulid';
@@ -16,7 +16,7 @@ import { toDecimalText } from '../services/portfolio-engine.js';
 
 const assertAccount = async (
   db: ReturnType<typeof import('@tv/db').createDb>,
-  tenant: TenantContext,
+  tenant: UserContext,
   accountId: string,
 ) => {
   const [account] = await db
@@ -31,7 +31,7 @@ const assertAccount = async (
 export const paperRoutes = new Hono()
   .get('/paper/accounts', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const rows = await db
       .select()
       .from(paperAccounts)
@@ -41,7 +41,7 @@ export const paperRoutes = new Hono()
   })
   .post('/paper/accounts', zValidator('json', CreatePaperAccountSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const body = c.req.valid('json');
     const id = ulid();
     await db.insert(paperAccounts).values({
@@ -56,7 +56,7 @@ export const paperRoutes = new Hono()
   })
   .get('/paper/accounts/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const account = await assertAccount(db, tenant, id);
     const orders = await db
@@ -88,7 +88,7 @@ export const paperRoutes = new Hono()
   })
   .post('/paper/accounts/:id/orders', zValidator('json', PlacePaperOrderSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const accountId = c.req.param('id');
     const body = c.req.valid('json');
     const account = await assertAccount(db, tenant, accountId);

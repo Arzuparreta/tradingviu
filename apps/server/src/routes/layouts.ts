@@ -5,7 +5,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { layouts } from '@tv/db/schema';
 import { ulid } from 'ulid';
 import { LayoutConfigSchema, parseLayoutConfig } from '@tv/layout-sync';
-import { NotFoundError, tryGetTenant, type TenantContext } from '@tv/core';
+import { NotFoundError, tryGetUserContext, type UserContext } from '@tv/core';
 
 const CreateBody = z.object({
   name: z.string().min(1).max(80),
@@ -22,7 +22,7 @@ const UpdateBody = z.object({
 export const layoutRoutes = new Hono()
   .get('/layouts', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const rows = await db
       .select()
       .from(layouts)
@@ -32,7 +32,7 @@ export const layoutRoutes = new Hono()
   })
   .get('/layouts/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const [row] = await db
       .select()
@@ -43,7 +43,7 @@ export const layoutRoutes = new Hono()
   })
   .post('/layouts', zValidator('json', CreateBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const body = c.req.valid('json');
     const config = parseLayoutConfig(body.config);
     const id = ulid();
@@ -64,7 +64,7 @@ export const layoutRoutes = new Hono()
   })
   .put('/layouts/:id', zValidator('json', UpdateBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const body = c.req.valid('json');
 
@@ -94,7 +94,7 @@ export const layoutRoutes = new Hono()
   })
   .delete('/layouts/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     await db
       .delete(layouts)

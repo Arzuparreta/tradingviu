@@ -10,7 +10,7 @@ import {
   doublePrecision,
 } from 'drizzle-orm/pg-core';
 import { ulid } from 'ulid';
-import { users } from './tenants';
+import { users } from './users';
 import { symbols } from './symbols';
 
 const id = () =>

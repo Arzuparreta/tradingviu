@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { eq } from 'drizzle-orm';
 import { symbols, exchanges, dataSubscriptions } from '@tv/db/schema';
-import { DomQuerySchema, IntervalSchema, NotFoundError, tryGetTenant, type TenantContext } from '@tv/core';
+import { DomQuerySchema, IntervalSchema, NotFoundError, tryGetUserContext, type UserContext } from '@tv/core';
 import { getFreshBars, resolveMarketSymbol } from '../services/market-data.js';
 import { getMarketStore } from '../services/market-store.js';
 
@@ -81,7 +81,7 @@ export const chartRoutes = new Hono()
       limit: q.limit,
     });
 
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const lastBar = result.bars.at(-1);
     await db
       .insert(dataSubscriptions)

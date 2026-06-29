@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { runWithTenant, type TenantContext } from '@tv/core';
+import { runWithUserContext, type UserContext } from '@tv/core';
 import { drawingRoutes } from './drawings.js';
 
 interface FakeRow {
@@ -42,7 +42,7 @@ class FakeDb {
   }
 }
 
-const tenant: TenantContext = {
+const tenant: UserContext = {
   userId: 'user_1',
 };
 
@@ -67,7 +67,7 @@ const appFor = (db: FakeDb): Hono => {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('db', db as never);
-    await runWithTenant(tenant, next);
+    await runWithUserContext(tenant, next);
   });
   app.route('/api', drawingRoutes);
   return app;

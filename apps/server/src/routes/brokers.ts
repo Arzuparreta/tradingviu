@@ -10,9 +10,9 @@ import {
   UpdateBrokerConnectionSchema,
   ValidationError,
   loadEnv,
-  tryGetTenant,
+  tryGetUserContext,
   type BrokerCredentials,
-  type TenantContext,
+  type UserContext,
 } from '@tv/core';
 import { brokerConnections } from '@tv/db/schema';
 import { ulid } from 'ulid';
@@ -33,7 +33,7 @@ const publicConnection = (row: typeof brokerConnections.$inferSelect) => ({
 
 const loadConnection = async (
   db: ReturnType<typeof import('@tv/db').createDb>,
-  tenant: TenantContext,
+  tenant: UserContext,
   id: string,
 ) => {
   const [row] = await db
@@ -59,7 +59,7 @@ const loadCredentials = async (encrypted: string): Promise<BrokerCredentials> =>
 export const brokerRoutes = new Hono()
   .get('/brokers/connections', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const rows = await db
       .select()
       .from(brokerConnections)
@@ -74,7 +74,7 @@ export const brokerRoutes = new Hono()
   })
   .post('/brokers/connections', zValidator('json', CreateBrokerConnectionSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const body = c.req.valid('json');
     const id = ulid();
     const credentials = await encryptCredentialPayload(
@@ -98,7 +98,7 @@ export const brokerRoutes = new Hono()
     zValidator('json', UpdateBrokerConnectionSchema),
     async (c) => {
       const db = c.get('db');
-      const tenant = tryGetTenant() as TenantContext;
+      const tenant = tryGetUserContext() as UserContext;
       const id = c.req.param('id');
       await loadConnection(db, tenant, id);
       const body = c.req.valid('json');
@@ -114,7 +114,7 @@ export const brokerRoutes = new Hono()
   )
   .delete('/brokers/connections/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     await loadConnection(db, tenant, id);
     await db
@@ -124,7 +124,7 @@ export const brokerRoutes = new Hono()
   })
   .post('/brokers/connections/:id/test', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const row = await loadConnection(db, tenant, id);
     const adapter = createBrokerAdapter(await loadCredentials(row.credentialsEncrypted));
@@ -137,7 +137,7 @@ export const brokerRoutes = new Hono()
   })
   .get('/brokers/connections/:id/accounts', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const row = await loadConnection(db, tenant, id);
     const adapter = createBrokerAdapter(await loadCredentials(row.credentialsEncrypted));
@@ -150,7 +150,7 @@ export const brokerRoutes = new Hono()
   })
   .get('/brokers/connections/:id/positions', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const row = await loadConnection(db, tenant, id);
     const accountId = c.req.query('accountId') ?? row.accountId ?? undefined;
@@ -163,7 +163,7 @@ export const brokerRoutes = new Hono()
     zValidator('json', PlaceBrokerOrderSchema),
     async (c) => {
       const db = c.get('db');
-      const tenant = tryGetTenant() as TenantContext;
+      const tenant = tryGetUserContext() as UserContext;
       const id = c.req.param('id');
       const row = await loadConnection(db, tenant, id);
       const body = c.req.valid('json');

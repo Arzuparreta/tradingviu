@@ -6,9 +6,9 @@ import {
   CreateScreenerPresetSchema,
   ScreenerPresetQuerySchema,
   ScreenerQuerySchema,
-  tryGetTenant,
+  tryGetUserContext,
   UpdateScreenerPresetSchema,
-  type TenantContext,
+  type UserContext,
 } from '@tv/core';
 import { exchanges, fundamentalSnapshots, screenerPresets, symbols } from '@tv/db/schema';
 import {
@@ -106,7 +106,7 @@ export const screenerRoutes = new Hono()
   .get('/screener/presets', zValidator('query', ScreenerPresetQuerySchema), async (c) => {
     const q = c.req.valid('query');
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const filters = [
       or(eq(screenerPresets.userId, tenant.userId), eq(screenerPresets.isPublic, true))!,
     ];
@@ -132,7 +132,7 @@ export const screenerRoutes = new Hono()
   .post('/screener/presets', zValidator('json', CreateScreenerPresetSchema), async (c) => {
     const body = c.req.valid('json');
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = ulid();
 
     await db.insert(screenerPresets).values({
@@ -149,7 +149,7 @@ export const screenerRoutes = new Hono()
   .patch('/screener/presets/:id', zValidator('json', UpdateScreenerPresetSchema), async (c) => {
     const body = c.req.valid('json');
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
 
     await db
@@ -167,7 +167,7 @@ export const screenerRoutes = new Hono()
   })
   .delete('/screener/presets/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
 
     await db

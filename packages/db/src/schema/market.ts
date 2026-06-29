@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, boolean, bigint, doublePrecision, index, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
 import { ulid } from 'ulid';
 import { exchanges, symbols } from './symbols';
-import { users } from './tenants';
+import { users } from './users';
 
 const id = () => text('id').primaryKey().$defaultFn(() => ulid());
 const ts = (name: string) =>

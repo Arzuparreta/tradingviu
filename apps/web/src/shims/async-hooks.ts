@@ -1,6 +1,6 @@
 // Browser-safe shim for node:async_hooks.
-// The real AsyncLocalStorage is only used server-side in middleware/tenant.ts.
-// This stub allows @tv/core/tenant.ts to load in the browser without crashing.
+// The real AsyncLocalStorage is only used server-side in middleware/user-context.ts.
+// This stub allows @tv/core/user-context.ts to load in the browser without crashing.
 // Server code never calls these from the client; tree-shaking removes them in prod builds.
 
 export class AsyncLocalStorage<T> {

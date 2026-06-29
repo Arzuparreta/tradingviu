@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { eq, and, asc } from 'drizzle-orm';
 import { watchlists, watchlistItems, symbols, exchanges } from '@tv/db/schema';
 import { ulid } from 'ulid';
-import { NotFoundError, ValidationError, tryGetTenant, type TenantContext } from '@tv/core';
+import { NotFoundError, ValidationError, tryGetUserContext, type UserContext } from '@tv/core';
 
 const CreateBody = z.object({
   name: z.string().min(1).max(80),
@@ -24,13 +24,13 @@ const UpdateItemBody = z.object({
 export const watchlistRoutes = new Hono()
   .get('/watchlists', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const lists = await db.select().from(watchlists).where(eq(watchlists.userId, tenant.userId));
     return c.json({ watchlists: lists });
   })
   .post('/watchlists', zValidator('json', CreateBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const body = c.req.valid('json');
     const id = ulid();
     await db.insert(watchlists).values({
@@ -42,7 +42,7 @@ export const watchlistRoutes = new Hono()
   })
   .delete('/watchlists/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     await db
       .delete(watchlists)
@@ -51,7 +51,7 @@ export const watchlistRoutes = new Hono()
   })
   .get('/watchlists/:id/items', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const rows = await db
       .select({
@@ -76,7 +76,7 @@ export const watchlistRoutes = new Hono()
   })
   .post('/watchlists/:id/items', zValidator('json', AddItemBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const body = c.req.valid('json');
 
@@ -115,7 +115,7 @@ export const watchlistRoutes = new Hono()
   })
   .patch('/watchlists/:id/items/:itemId', zValidator('json', UpdateItemBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const itemId = c.req.param('itemId');
     const body = c.req.valid('json');
     await db
@@ -126,7 +126,7 @@ export const watchlistRoutes = new Hono()
   })
   .delete('/watchlists/:id/items/:itemId', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const itemId = c.req.param('itemId');
     await db
       .delete(watchlistItems)

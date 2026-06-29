@@ -7,10 +7,10 @@ import {
   EvaluateAlertSchema,
   NotFoundError,
   ValidationError,
-  tryGetTenant,
+  tryGetUserContext,
   type AlertCondition,
   type Interval,
-  type TenantContext,
+  type UserContext,
 } from '@tv/core';
 import { alertHistory, alerts, exchanges, symbols } from '@tv/db/schema';
 import { ulid } from 'ulid';
@@ -28,7 +28,7 @@ const collectIndicatorIntervals = (condition: AlertCondition): Interval[] => {
 export const alertRoutes = new Hono()
   .get('/alerts', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const rows = await db
       .select({
         id: alerts.id,
@@ -59,7 +59,7 @@ export const alertRoutes = new Hono()
   })
   .post('/alerts', zValidator('json', CreateAlertSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const body = c.req.valid('json');
     const [symbol] = await db.select({ id: symbols.id }).from(symbols).where(eq(symbols.id, body.symbolId)).limit(1);
     if (!symbol) throw new ValidationError('Symbol not found');
@@ -81,7 +81,7 @@ export const alertRoutes = new Hono()
   })
   .patch('/alerts/:id', zValidator('json', CreateAlertSchema.partial()), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const body = c.req.valid('json');
     const patch: Partial<typeof alerts.$inferInsert> = { updatedAt: new Date() };
@@ -105,7 +105,7 @@ export const alertRoutes = new Hono()
   })
   .delete('/alerts/:id', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     await db
       .delete(alerts)
@@ -114,7 +114,7 @@ export const alertRoutes = new Hono()
   })
   .get('/alerts/:id/history', async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const rows = await db
       .select()
@@ -125,7 +125,7 @@ export const alertRoutes = new Hono()
   })
   .post('/alerts/:id/evaluate', zValidator('json', EvaluateAlertSchema), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const id = c.req.param('id');
     const body = c.req.valid('json');
     const [row] = await db

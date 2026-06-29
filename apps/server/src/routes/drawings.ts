@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drawings as drawingsTable } from '@tv/db/schema';
 import { DrawingsSchema } from '@tv/drawing-tools';
-import { tryGetTenant, type TenantContext } from '@tv/core';
+import { tryGetUserContext, type UserContext } from '@tv/core';
 import { drawingToColumns, rowToDrawing } from '../services/drawings.js';
 
 const legacyDrawingScope = (symbol: string, interval: string): string => `symbol:${symbol}:${interval}`;
@@ -25,7 +25,7 @@ const BatchBody = z.object({
 export const drawingRoutes = new Hono()
   .get('/drawings', zValidator('query', ScopeQuery), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const { symbol, interval, scope } = c.req.valid('query');
     const scopeId = scope ?? legacyDrawingScope(symbol, interval);
     const rows = await db
@@ -50,7 +50,7 @@ export const drawingRoutes = new Hono()
   // delete + insert are atomic.
   .put('/drawings', zValidator('query', ScopeQuery), zValidator('json', SaveBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const { symbol, interval, scope } = c.req.valid('query');
     const scopeId = scope ?? legacyDrawingScope(symbol, interval);
     const { drawings } = c.req.valid('json');
@@ -91,7 +91,7 @@ export const drawingRoutes = new Hono()
   })
   .post('/drawings/batch', zValidator('query', ScopeQuery), zValidator('json', BatchBody), async (c) => {
     const db = c.get('db');
-    const tenant = tryGetTenant() as TenantContext;
+    const tenant = tryGetUserContext() as UserContext;
     const { symbol, interval, scope } = c.req.valid('query');
     const scopeId = scope ?? legacyDrawingScope(symbol, interval);
     const { upsert, deleteIds } = c.req.valid('json');

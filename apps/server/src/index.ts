@@ -28,7 +28,7 @@ import { optionsRoutes } from './routes/options.js';
 import { brokerRoutes } from './routes/brokers.js';
 import { discoveryRoutes } from './routes/discovery.js';
 import { screenerRoutes } from './routes/screener.js';
-import { tenantContext } from './middleware/tenant.js';
+import { userContext } from './middleware/user-context.js';
 import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
 import { authenticateWsToken } from './services/ws-auth.js';
@@ -73,7 +73,7 @@ app.get('/chart/status', (c) => c.json({ streams: barStore.stats() }));
 app.route('/auth', authRoutes);
 app.route('/health', healthRoutes);
 
-app.use('/api/*', tenantContext({ db, redis }));
+app.use('/api/*', userContext({ db, redis }));
 app.route('/api', symbolRoutes);
 app.route('/api', chartRoutes);
 app.route('/api', indicatorRoutes);
