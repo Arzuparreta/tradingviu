@@ -2,18 +2,12 @@ import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import {
   Bell,
-  Braces,
   CandlestickChart,
   Compass,
-  FlaskConical,
   LayoutDashboard,
   LayoutGrid,
   LogOut,
-  PieChart,
-  Plug,
-  Sigma,
   Star,
-  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../stores/auth';
@@ -26,8 +20,8 @@ interface NavItem {
   end?: boolean;
 }
 
-// Grouped so the rail reads as one product: home + chart, monitoring, signals,
-// trading, research. Order = how often the owner reaches for each surface.
+// Grouped so the rail reads as one market terminal: home + chart, monitoring,
+// and alerts. Order = how often the owner reaches for each surface.
 const NAV_GROUPS: readonly (readonly NavItem[])[] = [
   [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -39,16 +33,6 @@ const NAV_GROUPS: readonly (readonly NavItem[])[] = [
     { to: '/layout', label: 'Layouts', icon: LayoutGrid },
   ],
   [{ to: '/alerts', label: 'Alerts', icon: Bell }],
-  [
-    { to: '/portfolios', label: 'Portfolios', icon: PieChart },
-    { to: '/paper', label: 'Paper trading', icon: Wallet },
-    { to: '/brokers', label: 'Brokers', icon: Plug },
-    { to: '/options', label: 'Options', icon: Sigma },
-  ],
-  [
-    { to: '/pine', label: 'Pine', icon: Braces },
-    { to: '/backtests', label: 'Backtests', icon: FlaskConical },
-  ],
 ];
 
 function Rail() {

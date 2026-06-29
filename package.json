@@ -2,7 +2,7 @@
   "name": "tradingviu",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal single-owner trading platform.",
+  "description": "Personal single-owner market terminal.",
   "engines": {
     "node": ">=22.0.0",
     "bun": ">=1.3.0",

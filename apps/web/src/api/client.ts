@@ -11,14 +11,6 @@ import type {
   VolumeProfile,
   TpoProfile,
   Ichimoku,
-  StrategyConfig,
-  StrategyDef,
-  StrategyType,
-  BacktestSettings,
-  BacktestResult,
-  OptimizeObjective,
-  OptimizeResult,
-  WalkForwardResult,
   PivotMethod,
   PivotPeriod,
   PivotPoints,
@@ -29,18 +21,6 @@ import type {
   WatchlistItem,
   AlertRow,
   AlertHistoryRow,
-  PortfolioRow,
-  PortfolioHolding,
-  PortfolioMetrics,
-  PortfolioAnalytics,
-  PortfolioTransaction,
-  PaperAccount,
-  PaperOrder,
-  BrokerAccount,
-  BrokerConnection,
-  BrokerHealth,
-  BrokerOrder,
-  BrokerPosition,
   DividendEvent,
   NewsArticle,
   EarningsEvent,
@@ -53,18 +33,9 @@ import type {
   ScreenerMetricDef,
   YieldCurvePoint,
   AlertCondition,
-  OptionPriceResult,
-  StrategyAnalysis,
-  StrategyTemplate,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
 import type { Drawing } from '@tv/drawing-tools';
-import type { PineRunResult, ValidateResult } from '@tv/pine-runtime';
-
-type PineInputs = Record<string, number | boolean | string>;
-type PineRunResponse =
-  | { ok: true; result: PineRunResult }
-  | { ok: false; error: { kind: string; message: string; line?: number; column?: number } };
 
 const TOKEN_KEY = 'tv_token';
 
@@ -268,92 +239,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ symbol, interval, method, period, limit }),
     }),
-  backtestStrategies: () => request<{ strategies: StrategyDef[] }>('/api/backtest/strategies'),
-  backtestOptimize: (
-    symbol: string,
-    interval: string,
-    type: StrategyType,
-    paramGrid: Record<string, number[]>,
-    settings: Partial<BacktestSettings> = {},
-    objective: OptimizeObjective = 'netProfitPct',
-    limit = 1000,
-  ) =>
-    request<{
-      symbol: { id: string; ticker: string; exchange: string };
-      interval: string;
-      bars: number;
-      optimization: OptimizeResult;
-    }>('/api/backtest/optimize', {
-      method: 'POST',
-      body: JSON.stringify({ symbol, interval, limit, type, paramGrid, settings, objective }),
-    }),
-  backtestWalkForward: (
-    symbol: string,
-    interval: string,
-    type: StrategyType,
-    paramGrid: Record<string, number[]>,
-    settings: Partial<BacktestSettings> = {},
-    objective: OptimizeObjective = 'netProfitPct',
-    inSampleBars = 300,
-    outOfSampleBars = 100,
-    limit = 1500,
-  ) =>
-    request<{
-      symbol: { id: string; ticker: string; exchange: string };
-      interval: string;
-      bars: number;
-      walkForward: WalkForwardResult;
-    }>('/api/backtest/walkforward', {
-      method: 'POST',
-      body: JSON.stringify({
-        symbol,
-        interval,
-        limit,
-        type,
-        paramGrid,
-        settings,
-        objective,
-        inSampleBars,
-        outOfSampleBars,
-      }),
-    }),
-  backtest: (
-    symbol: string,
-    interval: string,
-    strategy: StrategyConfig,
-    settings: Partial<BacktestSettings> = {},
-    limit = 1000,
-  ) =>
-    request<{
-      symbol: { id: string; ticker: string; exchange: string };
-      interval: string;
-      bars: number;
-      result: BacktestResult;
-    }>('/api/backtest', {
-      method: 'POST',
-      body: JSON.stringify({ symbol, interval, limit, strategy, settings }),
-    }),
-  backtestPine: (body: {
-    symbol: string;
-    interval: string;
-    source: string;
-    inputs?: Record<string, number | boolean | string>;
-    signalPlot?: string;
-    settings?: Partial<BacktestSettings>;
-    limit?: number;
-  }) =>
-    request<
-      | {
-          ok: true;
-          symbol: { id: string; ticker: string; exchange: string };
-          interval: string;
-          bars: number;
-          signalPlot: string;
-          plots: string[];
-          result: BacktestResult;
-        }
-      | { ok: false; error: { kind: string; message: string } }
-    >('/api/backtest/pine', { method: 'POST', body: JSON.stringify(body) }),
   watchlists: () => request<{ watchlists: Watchlist[] }>('/api/watchlists'),
   createWatchlist: (name: string) =>
     request<{ id: string }>('/api/watchlists', { method: 'POST', body: JSON.stringify({ name }) }),
@@ -394,18 +279,6 @@ export const api = {
       `/api/drawings/batch?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
-  pineValidate: (source: string) =>
-    request<ValidateResult>('/api/pine/validate', {
-      method: 'POST',
-      body: JSON.stringify({ source }),
-    }),
-  pineRun: (body: {
-    source: string;
-    symbol: string;
-    interval?: string;
-    inputs?: PineInputs;
-    limit?: number;
-  }) => request<PineRunResponse>('/api/pine/run', { method: 'POST', body: JSON.stringify(body) }),
   alerts: () => request<{ alerts: AlertRow[] }>('/api/alerts'),
   createAlert: (body: {
     symbolId: string;
@@ -428,143 +301,6 @@ export const api = {
     ),
   alertHistory: (id: string) =>
     request<{ history: AlertHistoryRow[] }>(`/api/alerts/${id}/history`),
-  portfolios: () => request<{ portfolios: PortfolioRow[] }>('/api/portfolios'),
-  createPortfolio: (body: { name: string; baseCurrency?: string }) =>
-    request<{ id: string }>('/api/portfolios', { method: 'POST', body: JSON.stringify(body) }),
-  portfolio: (id: string) =>
-    request<{
-      portfolio: PortfolioRow;
-      holdings: PortfolioHolding[];
-      transactions: PortfolioTransaction[];
-      metrics: PortfolioMetrics;
-    }>(`/api/portfolios/${id}`),
-  portfolioAnalytics: (id: string) =>
-    request<{ analytics: PortfolioAnalytics }>(`/api/portfolios/${id}/analytics`),
-  deletePortfolio: (id: string) =>
-    request<{ ok: true }>(`/api/portfolios/${id}`, { method: 'DELETE' }),
-  addPortfolioTransaction: (
-    id: string,
-    body: {
-      symbolId: string;
-      side: 'buy' | 'sell' | 'dividend';
-      quantity: number;
-      price: number;
-      fee?: number;
-      note?: string;
-    },
-  ) =>
-    request<{ id: string; metrics: PortfolioMetrics }>(`/api/portfolios/${id}/transactions`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  paperAccounts: () => request<{ accounts: PaperAccount[] }>('/api/paper/accounts'),
-  createPaperAccount: (body: {
-    name: string;
-    balance?: number;
-    currency?: string;
-    leverage?: number;
-  }) =>
-    request<{ id: string }>('/api/paper/accounts', { method: 'POST', body: JSON.stringify(body) }),
-  paperAccount: (id: string) =>
-    request<{ account: PaperAccount; orders: PaperOrder[] }>(`/api/paper/accounts/${id}`),
-  placePaperOrder: (
-    id: string,
-    body: {
-      symbolId: string;
-      side: 'buy' | 'sell';
-      type: 'market' | 'limit';
-      quantity: number;
-      limitPrice?: number;
-      lastPrice?: number;
-    },
-  ) =>
-    request<{
-      id: string;
-      fill: { status: 'filled' | 'pending'; fillPrice?: number; fee: number; cashDelta: number };
-    }>(`/api/paper/accounts/${id}/orders`, { method: 'POST', body: JSON.stringify(body) }),
-  priceOption: (body: {
-    type: 'call' | 'put';
-    spot: number;
-    strike: number;
-    timeToExpiry: number;
-    volatility: number;
-    rate?: number;
-    dividendYield?: number;
-  }) =>
-    request<OptionPriceResult>('/api/options/price', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  analyzeStrategy: (body: {
-    template?: StrategyTemplate;
-    spot: number;
-    volatility: number;
-    timeToExpiry: number;
-    rate?: number;
-    width?: number;
-    contracts?: number;
-    priceMin?: number;
-    priceMax?: number;
-    steps?: number;
-  }) =>
-    request<StrategyAnalysis>('/api/options/strategy', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  brokerConnections: () => request<{ connections: BrokerConnection[] }>('/api/brokers/connections'),
-  createBrokerConnection: (
-    body:
-      | {
-          broker: 'alpaca';
-          label?: string;
-          environment?: 'paper' | 'live';
-          accountId?: string;
-          credentials: { apiKey: string; secretKey: string; paper: boolean };
-        }
-      | {
-          broker: 'binance';
-          label?: string;
-          environment?: 'paper' | 'live';
-          accountId?: string;
-          credentials: { apiKey: string; secretKey: string; testnet: boolean };
-        }
-      | {
-          broker: 'ibkr';
-          label?: string;
-          environment?: 'paper' | 'live';
-          accountId?: string;
-          credentials: { baseUrl: string; accountId?: string };
-        },
-  ) =>
-    request<{ id: string }>('/api/brokers/connections', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  deleteBrokerConnection: (id: string) =>
-    request<{ ok: true }>(`/api/brokers/connections/${id}`, { method: 'DELETE' }),
-  testBrokerConnection: (id: string) =>
-    request<{ health: BrokerHealth }>(`/api/brokers/connections/${id}/test`, { method: 'POST' }),
-  brokerAccounts: (id: string) =>
-    request<{ accounts: BrokerAccount[] }>(`/api/brokers/connections/${id}/accounts`),
-  brokerPositions: (id: string, accountId?: string) =>
-    request<{ positions: BrokerPosition[] }>(
-      `/api/brokers/connections/${id}/positions${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
-    ),
-  placeBrokerOrder: (
-    id: string,
-    body: {
-      symbol: string;
-      side: 'buy' | 'sell';
-      type: 'market' | 'limit';
-      quantity: number;
-      limitPrice?: number;
-      timeInForce?: string;
-    },
-  ) =>
-    request<{ order: BrokerOrder }>(`/api/brokers/connections/${id}/orders`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
   news: (
     params: {
       symbol?: string;
@@ -645,9 +381,6 @@ export type {
   Watchlist,
   WatchlistItem,
   AlertRow,
-  PortfolioRow,
-  PaperAccount,
-  BrokerConnection,
   DividendEvent,
   NewsArticle,
   EarningsEvent,

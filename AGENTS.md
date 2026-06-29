@@ -6,11 +6,12 @@ Start with [`docs/PRODUCT.md`](docs/PRODUCT.md) for direction and
 
 ## Mental model
 
-- Personal single-owner trading terminal. One user, their machine, their data.
+- Personal single-owner market terminal. One user, their machine, their data.
 - Request context is `{ userId }`; user-owned data scopes by `user_id`.
 - Anything about tenants, RLS, super-admin, billing, plans, quotas, public `/v1`
-  tokens, or social/marketplace surfaces is dead history. Don't rebuild it and
-  don't treat it as a constraint.
+  tokens, social/marketplace surfaces, brokers, order placement, paper trading,
+  portfolios, options, Pine, backtesting, or papers is dead history. Don't
+  rebuild it and don't treat it as a constraint.
 
 ## Code
 
@@ -27,7 +28,7 @@ Start with [`docs/PRODUCT.md`](docs/PRODUCT.md) for direction and
 - Global reference data (exchanges, symbols, news, calendars, fundamentals,
   macro) is explicitly global. Everything a user creates scopes by `user_id`.
 - Schema changes go through a migration (`pnpm db:generate`).
-- Broker credentials stay encrypted at rest (libsodium, `CRED_ENC_KEY`).
+- No active broker-credential surface exists in the product.
 
 ## Verify
 
@@ -40,5 +41,5 @@ Start with [`docs/PRODUCT.md`](docs/PRODUCT.md) for direction and
 ## Don't invent
 
 - No made-up endpoints, env vars, or table names — check the code.
-- Pine support is a v5 subset; see `packages/pine-parser/GRAMMAR.md` before
-  extending syntax.
+- Do not add Pine, strategy/backtest, options, broker, paper-trading, portfolio,
+  or papers/documents features unless the product direction is changed first.

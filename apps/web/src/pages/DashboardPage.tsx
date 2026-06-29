@@ -5,22 +5,16 @@ import {
   Bell,
   CalendarDays,
   CandlestickChart,
+  Compass,
   LogOut,
   Newspaper,
-  PieChart,
   Star,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
-import type { Bar, Quote, WatchlistItem } from '../api/types';
+import type { Bar, Quote, ScreenerResult, WatchlistItem } from '../api/types';
 import { quoteKey, useMarketQuotes, type QuoteSymbol } from '../hooks/use-market-quotes';
 import type { MarketStatus } from '../hooks/use-market-stream';
-
-const money = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-});
 
 const pct = new Intl.NumberFormat('en-US', {
   style: 'percent',
@@ -50,6 +44,14 @@ const asIsoDate = (offsetDays: number) => {
   d.setDate(d.getDate() + offsetDays);
   return d.toISOString().slice(0, 10);
 };
+
+const formatCap = (value: number | undefined): string =>
+  value == null
+    ? '-'
+    : new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(value);
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="dashboard-empty">{children}</div>;
@@ -155,6 +157,26 @@ function WatchlistRow({ item, quote }: { item: WatchlistItem; quote?: Quote | un
   );
 }
 
+function AssetBoardRow({ result }: { result: ScreenerResult }) {
+  const marketCap = result.metrics.marketCap;
+  const growth = result.metrics.revenueGrowth;
+
+  return (
+    <Link className="dashboard-list-row dashboard-asset-row" to={`/chart/${result.ticker}`}>
+      <strong>
+        {result.ticker}
+        <span>{result.exchange}</span>
+      </strong>
+      <span>
+        {result.assetClass}
+        {' · '}
+        {formatCap(marketCap)}
+        {growth != null ? ` · ${pct.format(growth)}` : ''}
+      </span>
+    </Link>
+  );
+}
+
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const watchlistsQ = useQuery({ queryKey: ['watchlists'], queryFn: () => api.watchlists() });
@@ -164,15 +186,18 @@ export function DashboardPage() {
     queryFn: () => api.watchlistItems(selectedWatchlist!.id),
     enabled: !!selectedWatchlist,
   });
-  const portfoliosQ = useQuery({ queryKey: ['portfolios'], queryFn: () => api.portfolios() });
-  const selectedPortfolio = portfoliosQ.data?.portfolios[0] ?? null;
-  const analyticsQ = useQuery({
-    queryKey: ['portfolio-analytics', selectedPortfolio?.id],
-    queryFn: () => api.portfolioAnalytics(selectedPortfolio!.id),
-    enabled: !!selectedPortfolio,
-  });
   const alertsQ = useQuery({ queryKey: ['alerts'], queryFn: () => api.alerts() });
   const newsQ = useQuery({ queryKey: ['dashboard-news'], queryFn: () => api.news({ limit: 5 }) });
+  const assetBoardQ = useQuery({
+    queryKey: ['dashboard-assets'],
+    queryFn: () =>
+      api.screener({
+        active: true,
+        sort: 'marketCap',
+        direction: 'desc',
+        limit: 6,
+      }),
+  });
   const earningsQ = useQuery({
     queryKey: ['dashboard-earnings'],
     queryFn: () => api.earningsCalendar({ from: asIsoDate(0), to: asIsoDate(21), limit: 5 }),
@@ -219,7 +244,7 @@ export function DashboardPage() {
   }, [dividendsQ.data?.events, earningsQ.data?.events, economicQ.data?.events]);
 
   const watchItems = (watchlistItemsQ.data?.items ?? []).slice(0, 6);
-  const analytics = analyticsQ.data?.analytics;
+  const assetBoard = assetBoardQ.data?.results ?? [];
 
   const quoteSymbols: QuoteSymbol[] = watchItems.map((i) => ({
     id: i.symbol.id,
@@ -232,8 +257,8 @@ export function DashboardPage() {
     <div className="page dashboard-page">
       <div className="dashboard-top">
         <div>
-          <h1>{user?.displayName ? `${user.displayName}'s trading desk` : 'Trading desk'}</h1>
-          <p className="muted">Single-user market command center</p>
+          <h1>{user?.displayName ? `${user.displayName}'s market desk` : 'Market desk'}</h1>
+          <p className="muted">Charts, watchlists, alerts, catalysts and news</p>
         </div>
         <div className="row">
           <Link to="/chart/BTCUSDT" className="dashboard-action">
@@ -268,38 +293,15 @@ export function DashboardPage() {
           )}
         </Panel>
 
-        <Panel icon={<PieChart size={16} />} title="Portfolio" action={<Link to="/portfolios">Open</Link>}>
-          {analytics ? (
-            <div className="dashboard-portfolio">
-              <div className="dashboard-metric-main">
-                <span>Market value</span>
-                <strong>{money.format(analytics.marketValue)}</strong>
-              </div>
-              <div className="dashboard-metric-row">
-                <span>Unrealized P&L</span>
-                <strong className={analytics.unrealizedPnl >= 0 ? 'up' : 'down'}>
-                  {money.format(analytics.unrealizedPnl)} ({pct.format(analytics.unrealizedPnlPct / 100)})
-                </strong>
-              </div>
-              <div className="dashboard-metric-row">
-                <span>Positions</span>
-                <strong>{analytics.positionsCount}</strong>
-              </div>
-              <div className="dashboard-metric-row">
-                <span>Top weight</span>
-                <strong>{pct.format(analytics.concentration.topWeight)}</strong>
-              </div>
-              <div className="dashboard-position-list">
-                {analytics.positions.slice(0, 4).map((p) => (
-                  <Link key={p.symbolId} to={`/chart/${p.ticker}`}>
-                    <span>{p.ticker}</span>
-                    <strong className={p.unrealizedPnl >= 0 ? 'up' : 'down'}>{money.format(p.unrealizedPnl)}</strong>
-                  </Link>
-                ))}
-              </div>
+        <Panel icon={<Compass size={16} />} title="Asset board" action={<Link to="/discovery">Discovery</Link>}>
+          {assetBoard.length > 0 ? (
+            <div className="dashboard-list">
+              {assetBoard.map((result) => (
+                <AssetBoardRow key={result.id} result={result} />
+              ))}
             </div>
           ) : (
-            <Empty>{portfoliosQ.isLoading || analyticsQ.isLoading ? 'Loading portfolio...' : 'No portfolio data yet.'}</Empty>
+            <Empty>{assetBoardQ.isLoading ? 'Loading assets...' : 'No tracked assets available.'}</Empty>
           )}
         </Panel>
 

@@ -4,6 +4,7 @@ import {
   FinnhubNewsProvider,
   MockNewsProvider,
   NewsApiProvider,
+  buildMockNewsArticles,
   createNewsProvider,
   fetchNormalizedNews,
   normalizeNewsArticle,
@@ -38,7 +39,9 @@ describe('news provider normalization', () => {
   });
 
   test('mock provider filters by symbol and date deterministically', async () => {
-    const provider = new MockNewsProvider();
+    const provider = new MockNewsProvider(
+      buildMockNewsArticles(new Date('2026-06-24T00:00:00.000Z')),
+    );
     const articles = await fetchNormalizedNews(provider, {
       symbols: ['BTCUSDT'],
       from: '2026-06-24T00:00:00.000Z',

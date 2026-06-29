@@ -286,7 +286,7 @@ export const discoveryRoutes = new Hono()
       .orderBy(
         asc(macroSeriesObservations.country),
         asc(macroSeriesObservations.metricCode),
-        asc(macroSeriesObservations.observedAt),
+        desc(macroSeriesObservations.observedAt),
       )
       .limit(q.limit);
 

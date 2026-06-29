@@ -1,87 +1,93 @@
 # Architecture
 
-tradingviu is a single-owner trading terminal. It was once a multi-tenant SaaS;
-that model is gone. Where old code or comments still say `tenant`, RLS,
-super-admin, `tv_app`, or `/v1` public API, read it as legacy naming for a
-user-scoped concept — not a requirement to honor.
+tradingviu is a single-owner market terminal. The active architecture serves
+charting, watchlists, layouts, alerts, discovery, and market data. Brokerage,
+portfolio, options, Pine, backtesting, papers, SaaS, tenant, billing, and public
+API surfaces are out of scope.
 
 ## Shape
 
 ```
 Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest services
                                                     ->  Postgres + TimescaleDB, Redis, MinIO, Meilisearch
-                                                    ->  market / news / calendar / broker providers
+                                                    ->  market / news / calendar / fundamentals / macro providers
 ```
 
-- `apps/*` deployables, `packages/*` libraries, `services/*` workers, `tools/*` CLIs.
-- Frontend talks only to the API. The API reaches providers through
-  packages/services, never ad hoc in route code.
+- `apps/*` deployables, `packages/*` active libraries, `services/*` ingest
+  workers, `tools/*` CLIs.
+- The frontend talks only to the API. Provider access lives in packages or
+  services, not ad hoc route code.
 - TypeScript strict end to end, ESM only, Zod at API and external boundaries.
 
-## Auth & scope
+## Auth & Scope
 
 - First-party email/password (Argon2id) + 7-day HS256 JWT.
-- Request context is `{ userId }`. User-owned rows scope by `user_id`.
-- No tenants, RLS, super-admin, or public token API in the live model.
-- `tvctl ensure-owner` bootstraps/repairs the single owner from `.env`.
+- Request context is `{ userId }`.
+- User-owned rows scope by `user_id`.
+- No tenants, RLS, super-admin, billing, public token API, or marketplace
+  constraints in the live model.
 
 ## Data
 
-- **Global reference data** (not user-scoped): `exchanges`, `symbols`, news,
-  calendars, fundamentals, yield curves, macro series.
+- **Global reference data**: exchanges, symbols, news, calendars, fundamentals,
+  yield curves, macro series, and market history.
 - **Market history**: Timescale hypertable `bars`. Binance uses native REST
   klines; CCXT is the fallback for other providers.
-- **User-owned**: watchlists, layouts, drawings, alerts, portfolios, paper
-  accounts, broker connections, user indicators, backtests, screener presets.
-- Broker credentials are encrypted at rest with libsodium (`CRED_ENC_KEY`).
+- **User-owned active data**: watchlists, layouts, drawings, alerts, and screener
+  presets if a discovery workflow needs saved filters.
+- Retired trading, broker, portfolio, paper, Pine, and backtest data models are
+  removed from the active schema through migrations.
 
-## Real-time data layer
+## Real-Time Data Layer
 
-- One upstream per `(provider, ticker, interval)`, shared across all clients —
-  the server-side `BarStore` (`market-store.ts`), backed by an in-memory ring
-  buffer and persisted to `bars`.
-- `market-data.ts` is the single freshness-aware source of historical bars, used
-  by chart history, indicators, patterns, profiles, Pine, backtests, alerts, and
-  portfolio analytics.
+- One upstream per `(provider, ticker, interval)`, shared across all clients.
+- The server-side `BarStore` (`market-store.ts`) owns upstreams, in-memory ring
+  buffers, fanout, and persistence to `bars`.
+- `market-data.ts` is the freshness-aware historical bar source for chart
+  history, indicators, patterns, profiles, alerts, and discovery support.
 - One WebSocket at `/ws`. Messages include `subscribe_market`, `market_status`,
-  `quote`, and `book`. The chart's history cache is the candle source of truth;
-  live bars upsert it.
+  `quote`, and `book`.
 
 ## Charting
 
-- `/chart` and `/chart/:symbol` render `ChartProPage` → `KLineProChart`
+- `/chart` and `/chart/:symbol` render `ChartProPage` -> `KLineProChart`
   (KLineChart Pro) over `klinepro-datafeed.ts`, which adapts `/api/symbols`,
   `/api/chart/history`, and `/ws`.
-- `/layout` tiles `KLineProChartPanel` (KLineChart Pro) with synced bar replay and
-  drawing persistence via `@tv/drawing-tools`.
-- Legacy remaining: only the Pine preview still uses `@tv/chart-engine`
-  (lightweight-charts). Keep that stack until Pine is migrated; everything else is
-  on KLineChart Pro.
+- `/layout` tiles `KLineProChartPanel` with independent panel state and only
+  explicitly useful synchronization.
+- Drawing persistence lives through `@tv/drawing-tools`.
 
 ## API
 
-- The Hono app mounts everything under `/api` (`apps/server/src/index.ts`), one
-  route module per domain in `apps/server/src/routes/`. No `/v1` public API.
+- The Hono app mounts everything active under `/api`
+  (`apps/server/src/index.ts`), one route module per active domain in
+  `apps/server/src/routes/`.
+- Active route domains: auth, health, symbols/chart, search, indicators,
+  patterns, chart patterns, volume profile, TPO profile, Ichimoku, pivot points,
+  watchlists, layouts, drawings, alerts, discovery, and screener.
+- There is no active `/v1` public API and no active API for brokers, order
+  placement, portfolios, paper trading, options, Pine, or backtesting.
 
-## Key paths
+## Key Paths
 
 | Path | Purpose |
 | --- | --- |
-| `apps/server/src/index.ts` | API entry, route mounts, `/ws` |
-| `apps/server/src/routes/*` | one module per domain |
+| `apps/server/src/index.ts` | API entry, active route mounts, `/ws` |
+| `apps/server/src/routes/*` | one active route module per domain |
 | `apps/server/src/services/market-store.ts` | live upstream + ring buffer |
 | `apps/server/src/services/market-data.ts` | freshness-aware history |
-| `apps/web/src/App.tsx` | web shell + routes |
+| `apps/web/src/App.tsx` | web shell + active routes |
 | `apps/web/src/chart/KLineProChart.tsx` | KLineChart Pro wrapper |
-| `apps/web/src/pages/*` | one page per surface |
+| `apps/web/src/pages/*` | active product surfaces |
+| `apps/web/src/pages/DiscoveryPage.tsx` | news/macro/catalyst/asset discovery |
 | `apps/web/src/styles/index.css` | global styles / design tokens |
-| `packages/db/src/schema/*` | Drizzle schema (market + user-owned) |
+| `packages/db/src/schema/*` | Drizzle schema |
 
 ## Commands
 
 ```bash
 pnpm dev:infra        # docker infra
-pnpm db:migrate       # apply migrations (run pnpm db:generate after schema changes)
+pnpm db:migrate       # apply migrations; run pnpm db:generate after schema changes
 pnpm dev:restart      # run web + api
 pnpm lint && pnpm typecheck && pnpm test
 ```

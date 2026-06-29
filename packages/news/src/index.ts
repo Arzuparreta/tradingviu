@@ -81,24 +81,39 @@ export const fetchNormalizedNews = async (
   return rawArticles.map((article) => normalizeNewsArticle(provider, article, fetchedAt));
 };
 
-const mockArticles: readonly NewsProviderArticle[] = [
+const utcTimeOn = (referenceDate: Date, hours: number, minutes: number): Date =>
+  new Date(
+    Date.UTC(
+      referenceDate.getUTCFullYear(),
+      referenceDate.getUTCMonth(),
+      referenceDate.getUTCDate(),
+      hours,
+      minutes,
+      0,
+      0,
+    ),
+  );
+
+export const buildMockNewsArticles = (
+  referenceDate = new Date(),
+): readonly NewsProviderArticle[] => [
   {
     source: 'Tradingviu Mockwire',
     url: 'https://example.com/tradingviu/mockwire/apple-ai-refresh',
     title: 'Apple suppliers rise as desk chatter turns to AI device refresh',
-    body: 'Options volume clustered near weekly calls while equity desks tracked stronger supplier breadth.',
+    body: 'Large-cap technology breadth improved while semiconductors led the intraday watchlist.',
     symbols: ['AAPL'],
     sentiment: 'positive',
-    publishedAt: new Date('2026-06-24T08:30:00.000Z'),
+    publishedAt: utcTimeOn(referenceDate, 8, 30),
   },
   {
     source: 'Tradingviu Mockwire',
     url: 'https://example.com/tradingviu/mockwire/rates-pressure-megacap',
     title: 'Megacap software names trade mixed as yields edge higher',
-    body: 'Macro-sensitive growth shares opened unevenly with portfolio hedges concentrated in index futures.',
+    body: 'Macro-sensitive growth shares opened unevenly as index futures tracked higher yields.',
     symbols: ['MSFT', 'AAPL'],
     sentiment: 'neutral',
-    publishedAt: new Date('2026-06-24T10:15:00.000Z'),
+    publishedAt: utcTimeOn(referenceDate, 10, 15),
   },
   {
     source: 'Tradingviu Mockwire',
@@ -107,9 +122,11 @@ const mockArticles: readonly NewsProviderArticle[] = [
     body: 'Bitcoin and Ethereum books showed tighter spreads as derivatives funding normalized.',
     symbols: ['BTCUSDT', 'ETHUSDT'],
     sentiment: 'positive',
-    publishedAt: new Date('2026-06-24T11:45:00.000Z'),
+    publishedAt: utcTimeOn(referenceDate, 11, 45),
   },
 ];
+
+const mockArticles = buildMockNewsArticles();
 
 export class MockNewsProvider implements NewsProvider {
   public readonly id = 'mock';
