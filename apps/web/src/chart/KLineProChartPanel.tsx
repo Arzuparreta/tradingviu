@@ -114,15 +114,38 @@ export const KLineProChartPanel = forwardRef<KLineProChartPanelHandle, ChartPane
     const onBoundsRef = useRef(onBounds);
     onBoundsRef.current = onBounds;
 
+    // What we last handed to Pro. The datafeed fires onSymbolPeriodChange on
+    // *every* history load (init, programmatic setSymbol, loadMore), so without
+    // this guard the chart's own symbol gets written back into the layout config
+    // and clobbers programmatic changes (e.g. ⌘K / route nav) — a feedback loop
+    // that pins the chart to its initial fallback symbol. Only propagate a change
+    // the user actually made inside Pro (reported value differs from what we
+    // pushed). Kept current during render so it's set before Pro's synchronous
+    // getHistoryKLineData callback runs.
+    const lastPushedRef = useRef<{ id: string | null; interval: string }>({
+      id: null,
+      interval: panel.interval,
+    });
+
     const datafeedRef = useRef<TradingviuDatafeed | null>(null);
     if (!datafeedRef.current) {
       datafeedRef.current = new TradingviuDatafeed({
         onSymbolPeriodChange: (sym: SymbolInfo, period: Period) => {
           const tvSym = sym as TvSymbolInfo;
-          onChangeRef.current({
-            symbolId: tvSym.id ?? null,
-            interval: periodToInterval(period) as Panel['interval'],
-          });
+          const newId = tvSym.id ?? null;
+          const newInterval = periodToInterval(period);
+          const patch: Partial<Panel> = {};
+          if (newId !== lastPushedRef.current.id) {
+            lastPushedRef.current.id = newId;
+            patch.symbolId = newId;
+          }
+          if (newInterval !== lastPushedRef.current.interval) {
+            lastPushedRef.current.interval = newInterval;
+            patch.interval = newInterval as Panel['interval'];
+          }
+          if (patch.symbolId !== undefined || patch.interval !== undefined) {
+            onChangeRef.current(patch);
+          }
         },
       });
     }
@@ -153,6 +176,11 @@ export const KLineProChartPanel = forwardRef<KLineProChartPanelHandle, ChartPane
         type: chosen.assetClass,
       };
     }, [symbolsQ.data, panel.symbolId]);
+
+    // Record what we hand to Pro so its symbol/interval echo is recognized and
+    // not written back into the layout (see lastPushedRef above).
+    lastPushedRef.current.id = symbolInfo?.id ?? null;
+    lastPushedRef.current.interval = panel.interval;
 
     const period = useMemo(() => intervalToPeriod(panel.interval), [panel.interval]);
 
@@ -367,7 +395,11 @@ export const KLineProChartPanel = forwardRef<KLineProChartPanelHandle, ChartPane
         onMouseDown={onActivate}
       >
         <div className="chart-panel-chart" style={{ width: '100%', height: '100%' }}>
+          {/* Key by symbol id so a symbol change remounts the Pro widget: its
+              constructor reliably loads the new symbol's data, whereas
+              setSymbol() updates the label without a dependable reload. */}
           <KLineProChart
+            key={symbolInfo.id}
             ref={chartHandleRef}
             symbol={symbolInfo}
             period={period}

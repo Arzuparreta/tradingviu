@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Link2, Mail } from 'lucide-react';
 import { api } from '../api/client';
 import type { AlertCondition, AlertOperator, Symbol } from '../api/types';
-import { Badge, Card, EmptyState, Field, PageHeader, Toolbar } from '../ui';
+import { Badge, DataTable, EmptyState, Field, Panel, TitleBar, Toolbar } from '../ui';
 
 const operators: AlertOperator[] = ['above', 'below', 'crosses_above', 'crosses_below', 'equals'];
 
@@ -69,15 +69,16 @@ export function AlertsPage() {
   });
 
   const evaluate = useMutation({
-    mutationFn: (id: string) => api.evaluateAlert(id, manualPrice ? { price: Number(manualPrice) } : {}),
+    mutationFn: (id: string) =>
+      api.evaluateAlert(id, manualPrice ? { price: Number(manualPrice) } : {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
   });
 
   return (
-    <div className="page ui-page">
-      <PageHeader title="Alerts" subtitle="Price conditions that notify you" />
-      <div className="al-grid">
-        <Card title="New alert" icon={<Bell size={13} />}>
+    <div className="alerts">
+      <TitleBar title="Alerts" />
+      <div className="alerts-grid">
+        <Panel title="New alert" icon={<Bell size={14} />}>
           <div className="col">
             <Field label="Symbol">
               <select value={symbolId} onChange={(e) => setSymbolId(e.target.value)}>
@@ -90,11 +91,18 @@ export function AlertsPage() {
               </select>
             </Field>
             <Field label="Name">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Breakout alert" />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Breakout alert"
+              />
             </Field>
             <div className="ui-field-row">
               <Field label="Operator">
-                <select value={operator} onChange={(e) => setOperator(e.target.value as AlertOperator)}>
+                <select
+                  value={operator}
+                  onChange={(e) => setOperator(e.target.value as AlertOperator)}
+                >
                   {operators.map((op) => (
                     <option key={op} value={op}>
                       {op}
@@ -106,7 +114,7 @@ export function AlertsPage() {
                 <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" />
               </Field>
             </div>
-            <Field label="Webhook URL (optional)" error={null}>
+            <Field label="Webhook URL">
               <input
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
@@ -115,7 +123,11 @@ export function AlertsPage() {
               />
             </Field>
             <label className="ui-check">
-              <input type="checkbox" checked={emailMe} onChange={(e) => setEmailMe(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={emailMe}
+                onChange={(e) => setEmailMe(e.target.checked)}
+              />
               Email me when it fires
             </label>
             <button
@@ -126,9 +138,9 @@ export function AlertsPage() {
               Create alert
             </button>
           </div>
-        </Card>
+        </Panel>
 
-        <div className="col" style={{ minWidth: 0 }}>
+        <div className="alerts-col">
           <Toolbar>
             <input
               value={manualPrice}
@@ -137,70 +149,78 @@ export function AlertsPage() {
               inputMode="decimal"
               style={{ maxWidth: 220 }}
             />
-            <span className="muted small">Leave empty to use provider history.</span>
           </Toolbar>
-          <Card title="Your alerts" flush>
+          <Panel title="Your alerts" flush>
             {alertsQ.isLoading ? (
-              <p className="muted small" style={{ padding: 10 }}>
+              <p className="muted small" style={{ padding: 'var(--space-3)' }}>
                 Loading…
               </p>
             ) : alerts.length === 0 ? (
-              <EmptyState icon={<Bell size={20} />} title="No alerts yet" hint="Create your first alert on the left." />
+              <EmptyState icon={<Bell size={20} />} title="No alerts yet" />
             ) : (
-              <div className="tbl-wrap" style={{ border: 0 }}>
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Name</th>
-                      <th>Symbol</th>
-                      <th>Condition</th>
-                      <th>Channels</th>
-                      <th className="num">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {alerts.map((alert) => (
-                      <tr key={alert.id}>
-                        <td>
-                          <Badge tone={alert.active ? 'up' : 'neutral'}>{alert.active ? 'active' : 'paused'}</Badge>
-                        </td>
-                        <td>
-                          <div>{alert.name}</div>
-                          {alert.lastFiredAt && (
-                            <div className="small up">fired {new Date(alert.lastFiredAt).toLocaleString()}</div>
-                          )}
-                        </td>
-                        <td className="mono">
-                          {alert.symbol.exchange}:{alert.symbol.ticker}
-                        </td>
-                        <td className="muted">{formatCondition(alert.condition)}</td>
-                        <td>
-                          <span className="al-channels">
-                            {alert.channels.includes('email') && <Mail size={13} aria-label="email" />}
-                            {alert.webhookUrl && <Link2 size={13} aria-label="webhook" />}
-                          </span>
-                        </td>
-                        <td className="num">
-                          <div className="al-actions">
-                            <button className="sm" onClick={() => toggle.mutate({ id: alert.id, active: !alert.active })}>
-                              {alert.active ? 'Pause' : 'Resume'}
-                            </button>
-                            <button className="sm" onClick={() => evaluate.mutate(alert.id)} disabled={evaluate.isPending}>
-                              Evaluate
-                            </button>
-                            <button className="sm danger" onClick={() => remove.mutate(alert.id)}>
-                              Delete
-                            </button>
+              <DataTable>
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Name</th>
+                    <th>Symbol</th>
+                    <th>Condition</th>
+                    <th>Channels</th>
+                    <th className="num">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alerts.map((alert) => (
+                    <tr key={alert.id}>
+                      <td>
+                        <Badge tone={alert.active ? 'up' : 'neutral'}>
+                          {alert.active ? 'active' : 'paused'}
+                        </Badge>
+                      </td>
+                      <td>
+                        <div>{alert.name}</div>
+                        {alert.lastFiredAt && (
+                          <div className="small up">
+                            fired {new Date(alert.lastFiredAt).toLocaleString()}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                      </td>
+                      <td className="mono">
+                        {alert.symbol.exchange}:{alert.symbol.ticker}
+                      </td>
+                      <td className="muted">{formatCondition(alert.condition)}</td>
+                      <td>
+                        <span className="alerts-channels">
+                          {alert.channels.includes('email') && <Mail size={13} aria-label="email" />}
+                          {alert.webhookUrl && <Link2 size={13} aria-label="webhook" />}
+                        </span>
+                      </td>
+                      <td className="num">
+                        <div className="alerts-actions">
+                          <button
+                            className="sm"
+                            onClick={() => toggle.mutate({ id: alert.id, active: !alert.active })}
+                          >
+                            {alert.active ? 'Pause' : 'Resume'}
+                          </button>
+                          <button
+                            className="sm"
+                            onClick={() => evaluate.mutate(alert.id)}
+                            disabled={evaluate.isPending}
+                          >
+                            Evaluate
+                          </button>
+                          <button className="sm danger" onClick={() => remove.mutate(alert.id)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
             )}
-          </Card>
+          </Panel>
         </div>
       </div>
     </div>

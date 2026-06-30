@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, CalendarClock, Landmark, Newspaper, Search, Zap } from 'lucide-react';
 import { api } from '../api/client';
-import { Badge, EmptyState, PageHeader, Segmented, type BadgeTone } from '../ui';
+import {
+  Badge,
+  DataList,
+  DataRow,
+  DataTable,
+  EmptyState,
+  Panel,
+  Segmented,
+  TitleBar,
+  type BadgeTone,
+} from '../ui';
 import type {
-  EconomicEvent,
-  EarningsEvent,
-  FundamentalSnapshot,
-  MacroSeriesObservation,
-  NewsArticle,
   ScreenerQuery,
   ScreenerResult,
   YieldCurvePoint,
@@ -34,26 +39,20 @@ const HORIZON_OPTIONS: readonly { value: Horizon; label: string }[] = [
 const dateOnly = (value: string): string =>
   new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(value));
 
-const timeOnly = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(
-    new Date(value),
-  );
-
 const compact = (value: number | undefined): string =>
   value == null
-    ? '-'
-    : new Intl.NumberFormat(undefined, {
-        notation: 'compact',
-        maximumFractionDigits: 1,
-      }).format(value);
+    ? '–'
+    : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(
+        value,
+      );
 
 const ratio = (value: number | undefined): string =>
-  value == null ? '-' : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  value == null ? '–' : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 
 const percent = (value: number | undefined): string =>
-  value == null ? '-' : `${(value * 100).toFixed(1)}%`;
+  value == null ? '–' : `${(value * 100).toFixed(1)}%`;
 
-const textOrDash = (value: string | null): string => value ?? '-';
+const textOrDash = (value: string | null): string => value ?? '–';
 
 const horizonRange = (horizon: Horizon) => {
   const now = new Date();
@@ -62,76 +61,21 @@ const horizonRange = (horizon: Horizon) => {
   return { from, to };
 };
 
-const badgeToneForSentiment = (sentiment: string | null): BadgeTone => {
-  const normalized = sentiment?.toLowerCase();
-  if (normalized === 'positive' || normalized === 'bullish') return 'up';
-  if (normalized === 'negative' || normalized === 'bearish') return 'down';
+const sentimentTone = (sentiment: string | null): BadgeTone => {
+  const n = sentiment?.toLowerCase();
+  if (n === 'positive' || n === 'bullish') return 'up';
+  if (n === 'negative' || n === 'bearish') return 'down';
   return 'neutral';
 };
 
-const badgeToneForImportance = (importance: string): BadgeTone => {
+const importanceTone = (importance: string): BadgeTone => {
   if (importance === 'high') return 'down';
   if (importance === 'medium') return 'warn';
   return 'neutral';
 };
 
-function Panel({
-  icon,
-  title,
-  meta,
-  className,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  meta?: React.ReactNode;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className={`discovery-panel${className ? ` ${className}` : ''}`}>
-      <div className="discovery-panel-head">
-        <div className="row">
-          {icon}
-          <h2>{title}</h2>
-        </div>
-        {meta != null && <span className="discovery-panel-meta">{meta}</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function ArticleRow({ article }: { article: NewsArticle }) {
-  return (
-    <a className="discovery-news-row" href={article.url} target="_blank" rel="noreferrer">
-      <div className="discovery-news-main">
-        <div className="discovery-news-meta">
-          <span>{article.source}</span>
-          <span>{dateOnly(article.publishedAt)}</span>
-          {article.sentiment != null && (
-            <Badge tone={badgeToneForSentiment(article.sentiment)}>{article.sentiment}</Badge>
-          )}
-        </div>
-        <strong>{article.title}</strong>
-        {article.body != null && <p>{article.body}</p>}
-      </div>
-      {article.symbols.length > 0 && (
-        <div className="discovery-symbol-strip">
-          {article.symbols.slice(0, 4).map((symbol) => (
-            <span key={symbol}>{symbol}</span>
-          ))}
-        </div>
-      )}
-    </a>
-  );
-}
-
 function AssetRow({ result }: { result: ScreenerResult }) {
-  const marketCap = result.metrics.marketCap;
-  const revenueGrowth = result.metrics.revenueGrowth;
-  const peRatio = result.metrics.peRatio;
-
+  const { marketCap, revenueGrowth, peRatio } = result.metrics;
   return (
     <tr>
       <td>
@@ -153,91 +97,24 @@ function AssetRow({ result }: { result: ScreenerResult }) {
   );
 }
 
-function EconomicRow({ event }: { event: EconomicEvent }) {
-  return (
-    <div className="discovery-event-row">
-      <div className="discovery-event-date">
-        <strong>{dateOnly(event.eventAt)}</strong>
-        <span>{timeOnly(event.eventAt)}</span>
-      </div>
-      <div className="grow">
-        <div className="row discovery-event-title">
-          <strong>{event.name}</strong>
-          <Badge tone={badgeToneForImportance(event.importance)}>{event.importance}</Badge>
-        </div>
-        <div className="muted small">
-          {event.country} · Actual {textOrDash(event.actual)} · Forecast {textOrDash(event.forecast)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EarningsRow({ event }: { event: EarningsEvent }) {
-  return (
-    <div className="discovery-event-row">
-      <div className="discovery-event-date">
-        <strong>{dateOnly(event.date)}</strong>
-      </div>
-      <div className="grow">
-        <strong>{event.symbol.ticker} earnings</strong>
-        <div className="muted small">
-          {event.symbol.name} · EPS est {textOrDash(event.epsEstimate)} · Rev est{' '}
-          {textOrDash(event.revenueEstimate)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function YieldCurve({ points }: { points: readonly YieldCurvePoint[] }) {
   const max = points.reduce((m, point) => Math.max(m, point.rate), 0);
   if (points.length === 0) {
     return <EmptyState icon={<Landmark size={18} />} title="No yield curve data" />;
   }
-
   return (
-    <div className="discovery-yield">
+    <div className="disc-yield">
       {points.map((point) => (
-        <div key={point.id} className="discovery-yield-point">
-          <div className="discovery-yield-track">
+        <div key={point.id} className="disc-yield-point">
+          <div className="disc-yield-track">
             <span style={{ height: `${Math.max(8, (point.rate / Math.max(max, 1)) * 100)}%` }} />
           </div>
           <strong>{point.rate.toFixed(2)}%</strong>
-          <span>{point.tenorMonths < 12 ? `${point.tenorMonths}M` : `${point.tenorMonths / 12}Y`}</span>
+          <span>
+            {point.tenorMonths < 12 ? `${point.tenorMonths}M` : `${point.tenorMonths / 12}Y`}
+          </span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function MacroRow({ observation }: { observation: MacroSeriesObservation }) {
-  return (
-    <div className="discovery-macro-row">
-      <div>
-        <strong>{observation.metricName}</strong>
-        <span>{observation.metricCode}</span>
-      </div>
-      <div className="num">
-        {observation.value.toFixed(2)}
-        {observation.unit}
-      </div>
-    </div>
-  );
-}
-
-function FundamentalRow({ snapshot }: { snapshot: FundamentalSnapshot }) {
-  return (
-    <div className="discovery-fund-row">
-      <div>
-        <strong>{snapshot.symbol.ticker}</strong>
-        <span>{snapshot.symbol.name}</span>
-      </div>
-      <div className="discovery-fund-metrics">
-        <span>Cap {compact(snapshot.marketCap ?? undefined)}</span>
-        <span>P/E {ratio(snapshot.peRatio ?? undefined)}</span>
-        <span>Growth {percent(snapshot.revenueGrowth ?? undefined)}</span>
-      </div>
     </div>
   );
 }
@@ -286,11 +163,7 @@ export function DiscoveryPage() {
   const earningsQ = useQuery({
     queryKey: ['discovery-earnings', focusSymbol, range],
     queryFn: () =>
-      api.earningsCalendar({
-        ...range,
-        limit: 12,
-        ...(focusSymbol ? { symbol: focusSymbol } : {}),
-      }),
+      api.earningsCalendar({ ...range, limit: 12, ...(focusSymbol ? { symbol: focusSymbol } : {}) }),
   });
   const yieldCurveQ = useQuery({
     queryKey: ['discovery-yield-curve', country],
@@ -317,153 +190,191 @@ export function DiscoveryPage() {
   const earnings = earningsQ.data?.events ?? [];
   const macro = macroQ.data?.observations ?? [];
   const fundamentals = fundamentalsQ.data?.snapshots ?? [];
+  const noCatalysts = events.length + earnings.length === 0;
 
   return (
-    <div className="page discovery-page">
-      <PageHeader
+    <div className="disc">
+      <TitleBar
         title="Discovery"
-        subtitle="Market news, macro, catalysts and tracked assets"
         actions={<Segmented value={horizon} onChange={setHorizon} options={HORIZON_OPTIONS} />}
       />
 
-      <section className="discovery-controlbar" aria-label="Discovery filters">
-        <div className="discovery-searchbox">
+      <div className="disc-controls">
+        <div className="disc-search">
           <Search size={15} />
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search news or assets"
           />
         </div>
         <input
-          className="discovery-symbol-input"
+          className="disc-inp"
           value={symbol}
-          onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+          onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           placeholder="Symbol"
         />
         <input
-          className="discovery-country-input"
+          className="disc-inp"
           value={country}
-          onChange={(event) => setCountry(event.target.value.toUpperCase())}
+          onChange={(e) => setCountry(e.target.value.toUpperCase())}
           placeholder="Country"
         />
         <Segmented value={assetClass} onChange={setAssetClass} options={ASSET_OPTIONS} />
-      </section>
+      </div>
 
-      <div className="discovery-layout">
-        <Panel
-          icon={<Newspaper size={15} />}
-          title="Headlines"
-          meta={newsQ.isLoading ? 'Loading' : `${articles.length}`}
-          className="discovery-headlines"
-        >
-          {articles.length > 0 ? (
-            <div className="discovery-news-list">
-              {articles.map((article) => (
-                <ArticleRow key={article.id} article={article} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Newspaper size={18} />}
-              title={newsQ.isLoading ? 'Loading news' : 'No indexed news'}
-              hint={newsQ.isError ? 'News API failed.' : undefined}
-            />
-          )}
-        </Panel>
-
-        <div className="discovery-side">
-          <Panel icon={<Landmark size={15} />} title="Macro pulse" meta={country}>
-            <YieldCurve points={yieldCurveQ.data?.points ?? []} />
-            <div className="discovery-macro-list">
-              {macro.length > 0 ? (
-                macro.map((observation) => (
-                  <MacroRow key={observation.id} observation={observation} />
-                ))
-              ) : (
-                <EmptyState
-                  icon={<Landmark size={18} />}
-                  title={macroQ.isLoading ? 'Loading macro' : 'No macro observations'}
-                />
-              )}
-            </div>
+      <div className="disc-cols">
+        <div className="disc-col">
+          <Panel title="Headlines" icon={<Newspaper size={15} />} flush>
+            {articles.length > 0 ? (
+              <div className="disc-scroll">
+                <DataList>
+                  {articles.map((a) => (
+                    <DataRow
+                      key={a.id}
+                      href={a.url}
+                      title={a.title}
+                      sub={`${a.source} · ${dateOnly(a.publishedAt)}`}
+                      value={
+                        a.sentiment != null ? (
+                          <Badge tone={sentimentTone(a.sentiment)}>{a.sentiment}</Badge>
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </DataList>
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Newspaper size={18} />}
+                title={newsQ.isLoading ? 'Loading news' : 'No indexed news'}
+              />
+            )}
           </Panel>
 
-          <Panel
-            icon={<CalendarClock size={15} />}
-            title="Catalysts"
-            meta={`${events.length + earnings.length}`}
-          >
-            <div className="discovery-event-list">
-              {events.map((event) => (
-                <EconomicRow key={event.id} event={event} />
-              ))}
-              {earnings.map((event) => (
-                <EarningsRow key={event.id} event={event} />
-              ))}
-              {events.length + earnings.length === 0 && (
-                <EmptyState
-                  icon={<CalendarClock size={18} />}
-                  title={
-                    economicQ.isLoading || earningsQ.isLoading
-                      ? 'Loading catalysts'
-                      : 'No high-impact catalysts'
-                  }
-                />
-              )}
-            </div>
+          <Panel title="Asset board" icon={<BarChart3 size={15} />} flush>
+            {assets.length > 0 ? (
+              <div className="disc-scroll">
+                <DataTable>
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Name</th>
+                      <th className="num">Market cap</th>
+                      <th className="num">P/E</th>
+                      <th className="num">Growth</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assets.map((result) => (
+                      <AssetRow key={result.id} result={result} />
+                    ))}
+                  </tbody>
+                </DataTable>
+              </div>
+            ) : (
+              <EmptyState icon={<BarChart3 size={18} />} title="No tracked assets" />
+            )}
           </Panel>
-        </div>
 
-        <Panel
-          icon={<BarChart3 size={15} />}
-          title="Asset board"
-          meta={assetsQ.isLoading ? 'Loading' : `${assets.length}`}
-          className="discovery-assets"
-        >
-          {assets.length > 0 ? (
-            <div className="tbl-wrap discovery-asset-table">
-              <table className="tbl">
+          <Panel title="Fundamentals" icon={<Zap size={15} />} flush>
+            {fundamentals.length > 0 ? (
+              <DataTable>
                 <thead>
                   <tr>
                     <th>Symbol</th>
-                    <th>Name</th>
                     <th className="num">Market cap</th>
                     <th className="num">P/E</th>
                     <th className="num">Growth</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {assets.map((result) => (
-                    <AssetRow key={result.id} result={result} />
+                  {fundamentals.map((s) => (
+                    <tr key={s.id}>
+                      <td>
+                        <Link to={`/chart/${s.symbol.ticker}`}>
+                          <strong>{s.symbol.ticker}</strong>
+                        </Link>
+                        <div className="muted small">{s.symbol.name}</div>
+                      </td>
+                      <td className="num">{compact(s.marketCap ?? undefined)}</td>
+                      <td className="num">{ratio(s.peRatio ?? undefined)}</td>
+                      <td
+                        className={`num ${
+                          s.revenueGrowth != null && s.revenueGrowth >= 0 ? 'up' : 'down'
+                        }`}
+                      >
+                        {percent(s.revenueGrowth ?? undefined)}
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState icon={<BarChart3 size={18} />} title="No tracked assets" />
-          )}
-        </Panel>
+              </DataTable>
+            ) : (
+              <EmptyState
+                icon={<Zap size={18} />}
+                title={fundamentalsQ.isLoading ? 'Loading fundamentals' : 'No fundamental snapshots'}
+              />
+            )}
+          </Panel>
+        </div>
 
-        <Panel
-          icon={<Zap size={15} />}
-          title="Fundamental snapshots"
-          meta={fundamentalsQ.isLoading ? 'Loading' : `${fundamentals.length}`}
-          className="discovery-fundamentals"
-        >
-          {fundamentals.length > 0 ? (
-            <div className="discovery-fund-list">
-              {fundamentals.map((snapshot) => (
-                <FundamentalRow key={snapshot.id} snapshot={snapshot} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Zap size={18} />}
-              title={fundamentalsQ.isLoading ? 'Loading fundamentals' : 'No fundamental snapshots'}
-            />
-          )}
-        </Panel>
+        <div className="disc-col">
+          <Panel title="Macro pulse" icon={<Landmark size={15} />} flush>
+            <YieldCurve points={yieldCurveQ.data?.points ?? []} />
+            {macro.length > 0 ? (
+              <DataList>
+                {macro.map((o) => (
+                  <DataRow
+                    key={o.id}
+                    title={o.metricName}
+                    sub={o.metricCode}
+                    value={`${o.value.toFixed(2)}${o.unit}`}
+                  />
+                ))}
+              </DataList>
+            ) : (
+              <EmptyState
+                icon={<Landmark size={18} />}
+                title={macroQ.isLoading ? 'Loading macro' : 'No macro observations'}
+              />
+            )}
+          </Panel>
+
+          <Panel title="Catalysts" icon={<CalendarClock size={15} />} flush>
+            {noCatalysts ? (
+              <EmptyState
+                icon={<CalendarClock size={18} />}
+                title={
+                  economicQ.isLoading || earningsQ.isLoading
+                    ? 'Loading catalysts'
+                    : 'No high-impact catalysts'
+                }
+              />
+            ) : (
+              <div className="disc-scroll">
+                <DataList>
+                  {events.map((e) => (
+                    <DataRow
+                      key={e.id}
+                      title={e.name}
+                      sub={`${e.country} · act ${textOrDash(e.actual)} · fc ${textOrDash(e.forecast)}`}
+                      value={<Badge tone={importanceTone(e.importance)}>{e.importance}</Badge>}
+                    />
+                  ))}
+                  {earnings.map((e) => (
+                    <DataRow
+                      key={e.id}
+                      title={`${e.symbol.ticker} earnings`}
+                      sub={`${dateOnly(e.date)} · ${e.symbol.name}`}
+                      value={`EPS ${textOrDash(e.epsEstimate)}`}
+                    />
+                  ))}
+                </DataList>
+              </div>
+            )}
+          </Panel>
+        </div>
       </div>
     </div>
   );

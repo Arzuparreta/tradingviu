@@ -31,6 +31,7 @@
     "fundamentals:ingest": "bun run services/fundamentals-ingest/src/index.ts --once",
     "macro:ingest": "bun run services/macro-ingest/src/index.ts --once",
     "calendars:ingest": "bun run services/calendar-ingest/src/index.ts --once",
+    "search:reindex": "bun run apps/server/src/reindex-symbols.ts",
     "backfill:bars": "pnpm --filter @tv/backfill-bars backfill:bars",
     "tvctl": "pnpm --filter @tv/cli tvctl"
   },

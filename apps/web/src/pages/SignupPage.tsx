@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../stores/auth';
 import { ApiError } from '../api/client';
+import { Field } from '../ui';
 
 export function SignupPage() {
   const [email, setEmail] = useState('');
@@ -30,26 +31,45 @@ export function SignupPage() {
 
   return (
     <div className="auth-page">
-      <div className="card auth-card">
-        <h1>Create user</h1>
+      <div className="auth-card">
+        <div className="auth-brand">
+          <span className="auth-logo">t</span>
+          <h1>Create user</h1>
+        </div>
         <form onSubmit={submit}>
-          <div>
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-          </div>
-          <div>
-            <label>Display name</label>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
-          </div>
-          <div>
-            <label>Password (10+ chars)</label>
-            <input type="password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
-          </div>
+          <Field label="Email">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </Field>
+          <Field label="Display name">
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              autoComplete="name"
+            />
+          </Field>
+          <Field label="Password (10+ chars)">
+            <input
+              type="password"
+              minLength={10}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
+          </Field>
           {error && <div className="err">{error}</div>}
-          <button className="primary" type="submit" disabled={loading}>
-            {loading ? 'Creating…' : 'Create account'}
-          </button>
-          <p className="muted small" style={{ textAlign: 'center' }}>
+          <div className="auth-actions">
+            <button className="primary" type="submit" disabled={loading}>
+              {loading ? 'Creating…' : 'Create account'}
+            </button>
+          </div>
+          <p className="auth-alt muted small">
             Already have an account? <Link to="/login">Sign in</Link>
           </p>
         </form>

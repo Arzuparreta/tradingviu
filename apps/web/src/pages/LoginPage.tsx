@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../stores/auth';
 import { ApiError } from '../api/client';
+import { Field } from '../ui';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -41,11 +42,13 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="card auth-card">
-        <h1>Sign in to tradingviu</h1>
+      <div className="auth-card">
+        <div className="auth-brand">
+          <span className="auth-logo">t</span>
+          <h1>Sign in</h1>
+        </div>
         <form onSubmit={submit}>
-          <div>
-            <label>Email</label>
+          <Field label="Email">
             <input
               type="email"
               value={email}
@@ -53,9 +56,8 @@ export function LoginPage() {
               required
               autoComplete="email"
             />
-          </div>
-          <div>
-            <label>Password</label>
+          </Field>
+          <Field label="Password">
             <input
               type="password"
               value={password}
@@ -63,19 +65,21 @@ export function LoginPage() {
               required
               autoComplete="current-password"
             />
-          </div>
+          </Field>
           {error && <div className="err">{error}</div>}
-          <button className="primary" type="submit" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-          {import.meta.env.DEV && (
-            <button type="button" disabled={loading} onClick={loginAsLocalOwner}>
-              Local owner
+          <div className="auth-actions">
+            <button className="primary" type="submit" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
-          )}
-          <button type="button" disabled={loading} onClick={() => navigate('/signup')}>
-            Create user
-          </button>
+            {import.meta.env.DEV && (
+              <button type="button" disabled={loading} onClick={loginAsLocalOwner}>
+                Local owner
+              </button>
+            )}
+            <button type="button" disabled={loading} onClick={() => navigate('/signup')}>
+              Create user
+            </button>
+          </div>
         </form>
       </div>
     </div>

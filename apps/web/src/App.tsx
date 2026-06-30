@@ -7,12 +7,13 @@ import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 
 // Pages are code-split so the charting surfaces only load when visited.
-const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
-const ChartProPage = lazy(() => import('./pages/ChartProPage').then((m) => ({ default: m.ChartProPage })));
-const WatchlistsPage = lazy(() => import('./pages/WatchlistsPage').then((m) => ({ default: m.WatchlistsPage })));
-const LayoutPage = lazy(() => import('./pages/LayoutPage').then((m) => ({ default: m.LayoutPage })));
+const WorkspacePage = lazy(() =>
+  import('./pages/WorkspacePage').then((m) => ({ default: m.WorkspacePage })),
+);
 const AlertsPage = lazy(() => import('./pages/AlertsPage').then((m) => ({ default: m.AlertsPage })));
-const DiscoveryPage = lazy(() => import('./pages/DiscoveryPage').then((m) => ({ default: m.DiscoveryPage })));
+const DiscoveryPage = lazy(() =>
+  import('./pages/DiscoveryPage').then((m) => ({ default: m.DiscoveryPage })),
+);
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -49,14 +50,16 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/chart" element={<ChartProPage />} />
-        <Route path="/chart/:symbol" element={<ChartProPage />} />
-        <Route path="/watchlists" element={<WatchlistsPage />} />
+        <Route path="/" element={<WorkspacePage />} />
+        <Route path="/chart" element={<WorkspacePage />} />
+        <Route path="/chart/:symbol" element={<WorkspacePage />} />
         <Route path="/discovery" element={<DiscoveryPage />} />
-        <Route path="/layout" element={<LayoutPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
-        {/* Legacy aliases → canonical chart. */}
+        {/* Consolidated surfaces → workspace. */}
+        <Route path="/dashboard" element={<Navigate to="/" replace />} />
+        <Route path="/watchlists" element={<Navigate to="/" replace />} />
+        <Route path="/layout" element={<Navigate to="/" replace />} />
+        {/* Legacy chart aliases. */}
         <Route path="/chart-pro" element={<RedirectToChart />} />
         <Route path="/chart-pro/:symbol" element={<RedirectToChart />} />
         <Route path="/chart-legacy" element={<RedirectToChart />} />
