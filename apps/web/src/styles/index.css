@@ -161,8 +161,8 @@ label {
   color: var(--down);
 }
 
-/* Shared scroll containment: auto only shows bars on real overflow, and the
-   stable gutter keeps right-aligned labels/actions out from under the bar. */
+/* Shared scroll containment: auto only shows bars on real overflow, with the
+   reserved scrollbar lane living inside the container's right edge. */
 :is(
   .scroll-y,
   .scroll-x,
@@ -184,9 +184,9 @@ label {
   min-width: 0;
   min-height: 0;
   overscroll-behavior: contain;
-  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-color: #565c68 transparent;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
 }
 :is(
   .scroll-y,
@@ -230,8 +230,28 @@ label {
   .tbl-wrap,
   .wl-lists
 )::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
+}
+:is(
+  .scroll-y,
+  .scroll-x,
+  .scroll-both,
+  .page,
+  .symbol-search-results,
+  .layout-toolbar,
+  .dashboard-watchlist,
+  .dashboard-list,
+  .dashboard-news-list,
+  .dashboard-position-list,
+  .discovery-news-list,
+  .discovery-event-list,
+  .discovery-macro-list,
+  .discovery-fund-list,
+  .tbl-wrap,
+  .wl-lists
+)::-webkit-scrollbar-track {
+  background: transparent;
 }
 :is(
   .scroll-y,
@@ -251,10 +271,8 @@ label {
   .tbl-wrap,
   .wl-lists
 )::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--border-strong);
-  background-clip: padding-box;
+  border-radius: 6px;
+  background: #565c68;
 }
 
 .app-shell {

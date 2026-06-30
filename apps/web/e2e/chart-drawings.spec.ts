@@ -448,6 +448,7 @@ const expectContainedVerticalScroll = async (locator: Locator, rightEdgeSelector
       scrollHeight: node.scrollHeight,
       overflowY: style.overflowY,
       scrollbarGutter: style.scrollbarGutter,
+      scrollbarWidth: style.scrollbarWidth,
       gutterWidth: node.offsetWidth - node.clientWidth,
       clientRight: nodeRect.left + node.clientWidth,
       rightEdgeRight: rightRect?.right ?? null,
@@ -459,7 +460,8 @@ const expectContainedVerticalScroll = async (locator: Locator, rightEdgeSelector
   expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
   expect(metrics.overflowY).toBe('auto');
   expect(metrics.scrollbarGutter).toContain('stable');
-  expect(metrics.gutterWidth).toBeGreaterThan(0);
+  expect(metrics.scrollbarWidth).toBe('auto');
+  expect(metrics.gutterWidth).toBeGreaterThanOrEqual(10);
   if (metrics.rightEdgeRight != null) {
     expect(metrics.rightEdgeRight).toBeLessThanOrEqual(metrics.clientRight + 1);
   }
