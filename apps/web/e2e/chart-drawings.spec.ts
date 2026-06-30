@@ -1,5 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { LayoutConfig } from '@tv/layout-sync';
+import type { AlertRow, Symbol as TvSymbol, Watchlist, WatchlistItem } from '../src/api/types';
 
 const user = {
   id: 'usr_e2e',
@@ -50,6 +51,58 @@ const screenerResults = screenerTickers.map((ticker, index) => ({
   },
 }));
 
+const manySymbols: TvSymbol[] = Array.from({ length: 18 }, (_, index) => ({
+  id: `SYM${index}`,
+  exchange: 'NASDAQ',
+  ticker: `SYM${index}`,
+  name: `Scrollable Mock Equity ${index}`,
+  assetClass: 'stock',
+  currency: 'USD',
+  active: true,
+}));
+
+const manyWatchlists: Watchlist[] = Array.from({ length: 18 }, (_, index) => ({
+  id: `wl_${index}`,
+  name: `Long watchlist ${index + 1}`,
+  createdAt: '2026-06-27T00:00:00.000Z',
+  updatedAt: '2026-06-27T00:00:00.000Z',
+}));
+
+const manyWatchlistItems: WatchlistItem[] = manySymbols.map((symbol, index) => ({
+  id: `wli_${index}`,
+  symbolId: symbol.id,
+  color: null,
+  note: index % 2 === 0 ? 'High priority monitored symbol' : null,
+  sortOrder: index,
+  symbol: {
+    id: symbol.id,
+    ticker: symbol.ticker,
+    name: symbol.name,
+    exchange: symbol.exchange,
+  },
+}));
+
+const manyAlerts: AlertRow[] = manySymbols.map((symbol, index) => ({
+  id: `alert_${index}`,
+  symbolId: symbol.id,
+  name: `Alert ${index + 1}`,
+  kind: 'price',
+  condition: { type: 'price', operator: 'above', value: 100 + index },
+  channels: ['in_app'],
+  webhookUrl: null,
+  active: index % 3 !== 0,
+  expiresAt: null,
+  lastFiredAt: null,
+  createdAt: '2026-06-27T00:00:00.000Z',
+  updatedAt: '2026-06-27T00:00:00.000Z',
+  symbol: {
+    id: symbol.id,
+    ticker: symbol.ticker,
+    name: symbol.name,
+    exchange: symbol.exchange,
+  },
+}));
+
 const bars = Array.from({ length: 180 }, (_, index) => {
   const base = 100 + Math.sin(index / 9) * 4 + index * 0.08;
   return {
@@ -84,7 +137,19 @@ const layoutConfig = {
   activePanel: 0,
 } satisfies LayoutConfig;
 
-const installAppMocks = async (page: Page) => {
+interface AppMockOptions {
+  watchlists?: readonly Watchlist[];
+  watchlistItems?: readonly WatchlistItem[];
+  alerts?: readonly AlertRow[];
+  searchResults?: readonly TvSymbol[];
+}
+
+const installAppMocks = async (page: Page, options: AppMockOptions = {}) => {
+  const watchlists = options.watchlists ?? [];
+  const watchlistItems = options.watchlistItems ?? [];
+  const alerts = options.alerts ?? [];
+  const searchResults = options.searchResults ?? symbols;
+
   await page.addInitScript(() => {
     localStorage.setItem('tv_token', 'e2e-token');
 
@@ -156,6 +221,19 @@ const installAppMocks = async (page: Page) => {
       return;
     }
 
+    if (url.pathname === '/api/search') {
+      const query = url.searchParams.get('q')?.toLowerCase() ?? '';
+      await fulfillJson({
+        results: searchResults.filter(
+          (symbol) =>
+            symbol.ticker.toLowerCase().includes(query) ||
+            symbol.name.toLowerCase().includes(query),
+        ),
+        backend: 'db',
+      });
+      return;
+    }
+
     if (url.pathname === '/api/chart/history') {
       const symbolId = url.searchParams.get('symbol') ?? 'BTCUSDT';
       const symbol =
@@ -186,12 +264,17 @@ const installAppMocks = async (page: Page) => {
     }
 
     if (url.pathname === '/api/watchlists') {
-      await fulfillJson({ watchlists: [] });
+      await fulfillJson({ watchlists });
+      return;
+    }
+
+    if (/^\/api\/watchlists\/[^/]+\/items$/.test(url.pathname)) {
+      await fulfillJson({ items: watchlistItems });
       return;
     }
 
     if (url.pathname === '/api/alerts') {
-      await fulfillJson({ alerts: [] });
+      await fulfillJson({ alerts });
       return;
     }
 
@@ -352,6 +435,36 @@ const installAppMocks = async (page: Page) => {
   });
 };
 
+const expectContainedVerticalScroll = async (locator: Locator, rightEdgeSelector?: string) => {
+  const metrics = await locator.evaluate((node, selector) => {
+    if (!(node instanceof HTMLElement)) return null;
+    const nodeRect = node.getBoundingClientRect();
+    const rightEdge = selector ? node.querySelector(selector) : null;
+    const rightRect = rightEdge instanceof HTMLElement ? rightEdge.getBoundingClientRect() : null;
+    const style = window.getComputedStyle(node);
+
+    return {
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight,
+      overflowY: style.overflowY,
+      scrollbarGutter: style.scrollbarGutter,
+      gutterWidth: node.offsetWidth - node.clientWidth,
+      clientRight: nodeRect.left + node.clientWidth,
+      rightEdgeRight: rightRect?.right ?? null,
+    };
+  }, rightEdgeSelector);
+
+  expect(metrics).not.toBeNull();
+  if (metrics == null) return;
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  expect(metrics.overflowY).toBe('auto');
+  expect(metrics.scrollbarGutter).toContain('stable');
+  expect(metrics.gutterWidth).toBeGreaterThan(0);
+  if (metrics.rightEdgeRight != null) {
+    expect(metrics.rightEdgeRight).toBeLessThanOrEqual(metrics.clientRight + 1);
+  }
+};
+
 test('chart route renders KLineChart Pro', async ({ page }) => {
   await installAppMocks(page);
   await page.goto('/chart/BTCUSDT');
@@ -408,28 +521,52 @@ test('dashboard keeps asset board rows inside the panel', async ({ page }) => {
   await expect(assetPanel).toBeVisible();
   await expect(assetPanel.locator('.dashboard-asset-row')).toHaveCount(screenerResults.length);
 
-  const metrics = await assetPanel.evaluate((panel) => {
-    const list = panel.querySelector('.dashboard-list');
-    if (!(list instanceof HTMLElement)) return null;
+  await expectContainedVerticalScroll(
+    assetPanel.locator('.dashboard-list'),
+    '.dashboard-asset-row:first-child strong span',
+  );
 
+  const spillsBelow = await assetPanel.evaluate((panel) => {
     const panelRect = panel.getBoundingClientRect();
-    const listRect = list.getBoundingClientRect();
     const hit = document.elementFromPoint(
       panelRect.left + panelRect.width / 2,
       panelRect.bottom + 4,
     );
-
-    return {
-      listBottom: listRect.bottom,
-      panelBottom: panelRect.bottom,
-      listOverflowY: window.getComputedStyle(list).overflowY,
-      spillsBelow: hit?.closest('.dashboard-asset-row') != null,
-    };
+    return hit?.closest('.dashboard-asset-row') != null;
   });
 
-  expect(metrics).not.toBeNull();
-  if (metrics == null) return;
-  expect(metrics.listBottom).toBeLessThanOrEqual(metrics.panelBottom);
-  expect(metrics.listOverflowY).toBe('auto');
-  expect(metrics.spillsBelow).toBe(false);
+  expect(spillsBelow).toBe(false);
+});
+
+test('shared scroll containers keep long lists inside their content bounds', async ({ page }) => {
+  await installAppMocks(page, {
+    watchlists: manyWatchlists,
+    watchlistItems: manyWatchlistItems,
+    alerts: manyAlerts,
+    searchResults: manySymbols,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  await page.goto('/watchlists');
+  await expect(page.getByRole('heading', { name: 'Watchlists' })).toBeVisible();
+  await expectContainedVerticalScroll(
+    page.locator('.wl-lists'),
+    '.wl-list-row:first-of-type .wl-del',
+  );
+  await expectContainedVerticalScroll(
+    page.locator('.wl-grid .tbl-wrap'),
+    'tbody tr:first-child td.num button',
+  );
+
+  await page.goto('/alerts');
+  await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible();
+  await expectContainedVerticalScroll(page.locator('.al-grid .tbl-wrap'));
+
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
+  await page.keyboard.type('SYM');
+  await expect(page.locator('.symbol-search-results')).toBeVisible();
+  await expectContainedVerticalScroll(
+    page.locator('.symbol-search-results'),
+    '.symbol-search-item:first-of-type > span:last-child',
+  );
 });

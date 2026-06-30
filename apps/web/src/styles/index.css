@@ -161,6 +161,102 @@ label {
   color: var(--down);
 }
 
+/* Shared scroll containment: auto only shows bars on real overflow, and the
+   stable gutter keeps right-aligned labels/actions out from under the bar. */
+:is(
+  .scroll-y,
+  .scroll-x,
+  .scroll-both,
+  .page,
+  .symbol-search-results,
+  .layout-toolbar,
+  .dashboard-watchlist,
+  .dashboard-list,
+  .dashboard-news-list,
+  .dashboard-position-list,
+  .discovery-news-list,
+  .discovery-event-list,
+  .discovery-macro-list,
+  .discovery-fund-list,
+  .tbl-wrap,
+  .wl-lists
+) {
+  min-width: 0;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+:is(
+  .scroll-y,
+  .page,
+  .symbol-search-results,
+  .dashboard-watchlist,
+  .dashboard-list,
+  .dashboard-news-list,
+  .dashboard-position-list,
+  .discovery-news-list,
+  .discovery-event-list,
+  .discovery-macro-list,
+  .discovery-fund-list,
+  .wl-lists
+) {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+:is(.scroll-x, .layout-toolbar) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+:is(.scroll-both, .tbl-wrap) {
+  overflow: auto;
+}
+:is(
+  .scroll-y,
+  .scroll-x,
+  .scroll-both,
+  .page,
+  .symbol-search-results,
+  .layout-toolbar,
+  .dashboard-watchlist,
+  .dashboard-list,
+  .dashboard-news-list,
+  .dashboard-position-list,
+  .discovery-news-list,
+  .discovery-event-list,
+  .discovery-macro-list,
+  .discovery-fund-list,
+  .tbl-wrap,
+  .wl-lists
+)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+:is(
+  .scroll-y,
+  .scroll-x,
+  .scroll-both,
+  .page,
+  .symbol-search-results,
+  .layout-toolbar,
+  .dashboard-watchlist,
+  .dashboard-list,
+  .dashboard-news-list,
+  .dashboard-position-list,
+  .discovery-news-list,
+  .discovery-event-list,
+  .discovery-macro-list,
+  .discovery-fund-list,
+  .tbl-wrap,
+  .wl-lists
+)::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--border-strong);
+  background-clip: padding-box;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
@@ -184,7 +280,6 @@ label {
 .page {
   padding: var(--gap-2);
   height: 100%;
-  overflow: auto;
 }
 .page h1 {
   font-size: 18px;
@@ -292,10 +387,7 @@ label {
   display: grid;
   align-content: start;
   gap: 8px;
-  min-width: 0;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  max-block-size: 100%;
 }
 .dashboard-watch-row {
   display: grid;
@@ -475,8 +567,7 @@ label {
   left: 0;
   right: 0;
   z-index: 50;
-  max-height: 360px;
-  overflow-y: auto;
+  max-block-size: 360px;
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -518,7 +609,6 @@ label {
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   min-width: 0;
-  overflow-x: auto;
 }
 .layout-toolbar select {
   width: auto;
@@ -644,10 +734,13 @@ label {
   align-items: start;
 }
 .discovery-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, auto);
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-2);
+  overflow: hidden;
 }
 .discovery-panel-head {
   display: flex;
@@ -684,6 +777,7 @@ label {
 }
 .discovery-news-list {
   display: grid;
+  max-block-size: min(52vh, 520px);
 }
 .discovery-news-row {
   display: grid;
@@ -746,6 +840,7 @@ label {
 .discovery-macro-list,
 .discovery-fund-list {
   display: grid;
+  max-block-size: min(38vh, 380px);
 }
 .discovery-event-row,
 .discovery-macro-row,
@@ -841,6 +936,7 @@ label {
 .discovery-asset-table {
   border: 0;
   border-radius: 0;
+  max-block-size: min(48vh, 460px);
 }
 @media (max-width: 1100px) {
   .discovery-layout {
@@ -1063,6 +1159,7 @@ label {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-2);
+  overflow: hidden;
 }
 .ui-card-head {
   display: flex;
@@ -1088,6 +1185,7 @@ label {
   flex: 0 0 auto;
 }
 .ui-card-body {
+  flex: 1 1 auto;
   padding: 10px;
   min-width: 0;
   min-height: 0;
@@ -1248,11 +1346,9 @@ label {
 
 /* Tables */
 .tbl-wrap {
-  overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-2);
-  min-height: 0;
 }
 .tbl {
   width: 100%;
@@ -1328,6 +1424,11 @@ button.danger:hover {
   flex-direction: column;
   gap: 2px;
   padding: 6px;
+  max-block-size: min(56vh, 440px);
+}
+.wl-grid .tbl-wrap,
+.al-grid .tbl-wrap {
+  max-block-size: min(62vh, 560px);
 }
 .wl-pad {
   padding: 8px;
