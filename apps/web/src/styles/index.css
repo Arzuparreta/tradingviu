@@ -244,13 +244,14 @@ label {
 }
 .dashboard-panel {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   padding: var(--gap-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-2);
+  overflow: hidden;
 }
 .dashboard-panel:first-child,
 .dashboard-panel:last-child {
@@ -292,6 +293,9 @@ label {
   align-content: start;
   gap: 8px;
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .dashboard-watch-row {
   display: grid;

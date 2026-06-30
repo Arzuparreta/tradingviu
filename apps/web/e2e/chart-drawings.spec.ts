@@ -30,6 +30,26 @@ const apple = {
 
 const symbols = [btc, apple];
 
+const screenerTickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META'] as const;
+
+const screenerResults = screenerTickers.map((ticker, index) => ({
+  id: ticker,
+  ticker,
+  name: ticker === apple.ticker ? apple.name : `${ticker} Mock Equity`,
+  assetClass: 'stock',
+  currency: 'USD',
+  country: 'US',
+  sector: index < 3 ? 'Technology' : 'Communication Services',
+  industry: 'Listed equity',
+  active: true,
+  exchange: 'NASDAQ',
+  metrics: {
+    marketCap: 3_200_000_000_000 - index * 300_000_000_000,
+    peRatio: 30 + index,
+    revenueGrowth: 0.08 + index * 0.01,
+  },
+}));
+
 const bars = Array.from({ length: 180 }, (_, index) => {
   const base = 100 + Math.sin(index / 9) * 4 + index * 0.08;
   return {
@@ -138,7 +158,8 @@ const installAppMocks = async (page: Page) => {
 
     if (url.pathname === '/api/chart/history') {
       const symbolId = url.searchParams.get('symbol') ?? 'BTCUSDT';
-      const symbol = symbols.find((item) => item.id === symbolId || item.ticker === symbolId) ?? btc;
+      const symbol =
+        symbols.find((item) => item.id === symbolId || item.ticker === symbolId) ?? btc;
       await fulfillJson({
         symbol,
         interval: url.searchParams.get('interval') ?? '1h',
@@ -161,6 +182,16 @@ const installAppMocks = async (page: Page) => {
           },
         ],
       });
+      return;
+    }
+
+    if (url.pathname === '/api/watchlists') {
+      await fulfillJson({ watchlists: [] });
+      return;
+    }
+
+    if (url.pathname === '/api/alerts') {
+      await fulfillJson({ alerts: [] });
       return;
     }
 
@@ -220,6 +251,11 @@ const installAppMocks = async (page: Page) => {
           },
         ],
       });
+      return;
+    }
+
+    if (url.pathname === '/api/calendars/dividends') {
+      await fulfillJson({ events: [] });
       return;
     }
 
@@ -302,25 +338,7 @@ const installAppMocks = async (page: Page) => {
 
     if (url.pathname === '/api/screener' && request.method() === 'POST') {
       await fulfillJson({
-        results: [
-          {
-            id: apple.id,
-            ticker: apple.ticker,
-            name: apple.name,
-            assetClass: apple.assetClass,
-            currency: apple.currency,
-            country: 'US',
-            sector: 'Technology',
-            industry: 'Consumer Electronics',
-            active: true,
-            exchange: apple.exchange,
-            metrics: {
-              marketCap: 3_200_000_000_000,
-              peRatio: 31.4,
-              revenueGrowth: 0.08,
-            },
-          },
-        ],
+        results: screenerResults,
       });
       return;
     }
@@ -376,4 +394,42 @@ test('discovery renders news, macro, catalysts and assets', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Asset board' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'AAPL', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fundamental snapshots' })).toBeVisible();
+});
+
+test('dashboard keeps asset board rows inside the panel', async ({ page }) => {
+  await installAppMocks(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+
+  const assetPanel = page.locator('.dashboard-panel').filter({
+    has: page.getByRole('heading', { name: 'Asset board' }),
+  });
+
+  await expect(assetPanel).toBeVisible();
+  await expect(assetPanel.locator('.dashboard-asset-row')).toHaveCount(screenerResults.length);
+
+  const metrics = await assetPanel.evaluate((panel) => {
+    const list = panel.querySelector('.dashboard-list');
+    if (!(list instanceof HTMLElement)) return null;
+
+    const panelRect = panel.getBoundingClientRect();
+    const listRect = list.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      panelRect.left + panelRect.width / 2,
+      panelRect.bottom + 4,
+    );
+
+    return {
+      listBottom: listRect.bottom,
+      panelBottom: panelRect.bottom,
+      listOverflowY: window.getComputedStyle(list).overflowY,
+      spillsBelow: hit?.closest('.dashboard-asset-row') != null,
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  if (metrics == null) return;
+  expect(metrics.listBottom).toBeLessThanOrEqual(metrics.panelBottom);
+  expect(metrics.listOverflowY).toBe('auto');
+  expect(metrics.spillsBelow).toBe(false);
 });
