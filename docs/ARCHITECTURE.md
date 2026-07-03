@@ -51,14 +51,20 @@ Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest 
 ## Charting
 
 - `/chart` and `/chart/:symbol` render `WorkspacePage`, which tiles
-  `KLineChartPanel` instances over a direct `klinecharts` core surface.
+  `KLineChartPanel` instances over a direct `klinecharts` core surface themed
+  from the app's CSS tokens (`apps/web/src/chart/theme.ts`).
 - React layout state is the source of truth for chart symbol and interval.
   Each panel explicitly loads `/api/chart/history` and subscribes to `/ws` for
   the current `{ symbol, interval }`; stale requests/subscriptions are discarded
   on change.
 - `/layout` aliases into the same workspace model, with independent panel state
   and only explicitly useful synchronization.
-- Drawing persistence lives through `@tv/drawing-tools`.
+- Drawing tools are custom klinecharts overlays (`apps/web/src/chart/overlays/`)
+  registered on top of the built-ins: channels, pitchfork, fib levels, shapes,
+  annotations, measures, and position tools.
+- Drawings are symbol-scoped: one set per symbol (`scope symbol:<id>`,
+  interval slot pinned to `any`), shared across intervals, panels, layouts, and
+  reloads. Types/schemas live in `@tv/core` (`drawing-schemas.ts`).
 
 ## API
 
@@ -80,8 +86,11 @@ Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest 
 | `apps/server/src/services/market-store.ts` | live upstream + ring buffer |
 | `apps/server/src/services/market-data.ts` | freshness-aware history |
 | `apps/web/src/App.tsx` | web shell + active routes |
-| `apps/web/src/chart/KLineChartSurface.tsx` | Direct klinecharts core wrapper |
+| `apps/web/src/chart/KLineChartSurface.tsx` | Direct klinecharts core wrapper (theme, precision, indicators) |
 | `apps/web/src/chart/KLineChartPanel.tsx` | Panel-owned chart, drawing, replay integration |
+| `apps/web/src/chart/overlays/*` | custom drawing overlays (channels, fib, shapes, measures, positions) |
+| `apps/web/src/chart/ChartToolbar.tsx` | workspace drawing toolbar (grouped flyouts, magnet, bulk actions) |
+| `apps/web/src/ui/icons.tsx` | the terminal's hand-drawn icon set |
 | `apps/web/src/pages/*` | active product surfaces |
 | `apps/web/src/pages/DiscoveryPage.tsx` | news/macro/catalyst/asset discovery |
 | `apps/web/src/styles/index.css` | global styles / design tokens |

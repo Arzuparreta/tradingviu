@@ -143,21 +143,29 @@ export function WatchlistDock() {
         </button>
       }
     >
-      <div className="wl-dock-tools">
-        <select value={activeId ?? ''} onChange={(e) => setListId(e.target.value || null)}>
-          {lists.length === 0 && <option value="">No lists</option>}
-          {lists.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-        {activeId && (
+      {lists.length > 1 && (
+        <div className="wl-dock-tools">
+          <select value={activeId ?? ''} onChange={(e) => setListId(e.target.value || null)}>
+            {lists.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
           <button className="icon-btn" onClick={() => void deleteList()} title="Delete list">
             <IconTrash size={14} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
+
+      {lists.length === 0 && !creating && !listsQ.isLoading && (
+        <div className="ui-dock-empty">
+          No watchlist yet ·{' '}
+          <button type="button" className="wl-link" onClick={() => setCreating(true)}>
+            create one
+          </button>
+        </div>
+      )}
 
       {creating && (
         <div className="wl-dock-add">
@@ -197,7 +205,7 @@ export function WatchlistDock() {
             onRemove={() => void removeItem(item.id)}
           />
         ))}
-        {items.length === 0 && <div className="ui-dock-empty">No symbols</div>}
+        {activeId && items.length === 0 && <div className="ui-dock-empty">No symbols yet</div>}
       </div>
     </Dock>
   );

@@ -474,10 +474,9 @@ label {
   color: var(--text-bright);
 }
 .chart-tool-flyout {
-  position: absolute;
-  left: calc(100% + 6px);
-  top: -4px;
-  z-index: 60;
+  position: fixed;
+  left: calc(var(--rail-w) + 48px);
+  z-index: 160;
   min-width: 200px;
   padding: 4px;
   background: var(--surface-3);
@@ -1720,6 +1719,17 @@ button.ui-row {
 }
 .wl-row-remove:hover {
   color: var(--down);
+}
+.wl-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: inherit;
+}
+.wl-link:hover {
+  background: none;
+  color: var(--accent-2);
 }
 
 /* ── ⌘K trigger in the global context bar ───────────────────────────── */

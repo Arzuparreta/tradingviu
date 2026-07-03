@@ -119,6 +119,8 @@ export function ChartToolbar({
 }: ChartToolbarProps) {
   const [lastUsed, setLastUsed] = useState<Record<string, string>>(loadLastUsed);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  // Flyouts render position:fixed so the toolbar's scroll container can't clip them.
+  const [flyoutTop, setFlyoutTop] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -190,13 +192,17 @@ export function ChartToolbar({
             <button
               type="button"
               className={`chart-tool-flyout-arrow${openGroup === group.id ? ' open' : ''}`}
-              onClick={() => setOpenGroup((g) => (g === group.id ? null : group.id))}
+              onClick={(e) => {
+                const rect = e.currentTarget.closest('.chart-tool-group')?.getBoundingClientRect();
+                setFlyoutTop(rect ? rect.top - 4 : 100);
+                setOpenGroup((g) => (g === group.id ? null : group.id));
+              }}
               aria-label={`${group.label} tools`}
             >
               <IconChevronRight size={9} />
             </button>
             {openGroup === group.id && (
-              <div className="chart-tool-flyout" role="menu">
+              <div className="chart-tool-flyout" style={{ top: flyoutTop }} role="menu">
                 <div className="chart-tool-flyout-title">{group.label}</div>
                 {group.tools.map((tool) => {
                   const Icon = TOOL_ICONS[tool.overlay] ?? IconTrendLine;

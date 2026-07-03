@@ -579,7 +579,7 @@ test('chart route renders the core KLine chart surface', async ({ page }) => {
   await page.goto('/chart/BTCUSDT');
 
   const chart = page.locator('.kline-core').first();
-  await expect(page.locator('.ws-symbol')).toContainText('BTCUSDT');
+  await expect(page.locator('.ws-symbol-btn')).toContainText('BTCUSDT');
   await expect(page.getByRole('button', { name: 'Trend line' })).toBeVisible();
   await expect(chart).toHaveAttribute('data-symbol', 'BTCUSDT');
   await expect(chart).toHaveAttribute('data-interval', '1h');
@@ -592,7 +592,7 @@ test('legacy chart aliases collapse to the canonical chart', async ({ page }) =>
   await page.goto('/chart-legacy/BTCUSDT');
 
   await expect(page).toHaveURL(/\/chart\/BTCUSDT$/);
-  await expect(page.locator('.ws-symbol')).toContainText('BTCUSDT');
+  await expect(page.locator('.ws-symbol-btn')).toContainText('BTCUSDT');
   await expect.poll(() => page.locator('canvas').count()).toBeGreaterThan(0);
 });
 
@@ -692,7 +692,7 @@ test('layout page renders saved chart panels', async ({ page }) => {
   await installAppMocks(page);
   await page.goto('/layout');
 
-  await expect(page.getByRole('button', { name: 'Replay' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bar replay' })).toBeVisible();
   await expect(page.locator('.chart-panel')).toHaveCount(2);
   await expect.poll(() => page.locator('.chart-panel canvas').count()).toBeGreaterThan(0);
 });

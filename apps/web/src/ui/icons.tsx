@@ -130,7 +130,7 @@ export const IconRegression = (p: IconProps) => (
 
 export const IconPitchfork = (p: IconProps) => (
   <Svg {...p}>
-    <path d="M3.5 16.5 9.5 10.5M6.9 7.1l6.2 6.2M6.9 7.1 3.4 3.6M13.1 13.3l3.5 3.5M10 4.2 6.5 0.7" transform="translate(0 1.6)" />
+    <path d="M10 17.5V7.5M5.5 3v3.8a4.5 4.5 0 0 0 9 0V3M10 7.5V3" />
   </Svg>
 );
 
@@ -216,9 +216,8 @@ export const IconShortPosition = (p: IconProps) => (
 
 export const IconMagnet = (p: IconProps) => (
   <Svg {...p}>
-    <path d="M6 3.5v6a4 4 0 0 0 8 0v-6" />
-    <path d="M6 3.5h3v3H6M14 3.5h-3v3h3" fill="currentColor" stroke="none" opacity={0.35} />
-    <path d="M6 6.5h3M11 6.5h3" />
+    <path d="M6 4.5v6a4 4 0 0 0 8 0v-6" strokeWidth={2.4} />
+    <path d="M4.9 3.5h2.2v4.2H4.9ZM12.9 3.5h2.2v4.2h-2.2Z" fill="currentColor" stroke="none" />
   </Svg>
 );
 
