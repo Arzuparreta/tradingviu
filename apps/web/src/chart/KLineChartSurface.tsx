@@ -1,11 +1,5 @@
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { dispose, init, type Chart, type KLineData } from 'klinecharts';
 import type { Interval } from '@tv/layout-sync';
 import { api, getToken } from '../api/client';
@@ -66,16 +60,42 @@ export interface KLineChartSurfaceProps {
   live?: boolean;
   onChartReady?: (chart: Chart) => void;
   onDataReady?: (data: KLineData[]) => void;
+  onAppliedKeyChange?: (key: string) => void;
+}
+
+interface ChartDebugState {
+  currentSymbol: string;
+  currentInterval: string;
+  loading: boolean;
+  lastAppliedKey: string | null;
+  barCount: number;
+}
+
+declare global {
+  interface Window {
+    __TV_E2E_CHARTS__?: Record<string, ChartDebugState>;
+  }
 }
 
 export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartSurfaceProps>(
-  function KLineChartSurface({ symbol, interval, live = true, onChartReady, onDataReady }, ref) {
+  function KLineChartSurface(
+    { symbol, interval, live = true, onChartReady, onDataReady, onAppliedKeyChange },
+    ref,
+  ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const chartRef = useRef<Chart | null>(null);
-    const loadSeqRef = useRef(0);
     const [reloadSeq, setReloadSeq] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [lastAppliedKey, setLastAppliedKey] = useState<string | null>(null);
+    const currentKey = `${symbol.id}|${interval}|${reloadSeq}`;
+    const dataQ = useQuery({
+      queryKey: ['chart-bars', symbol.id, interval, reloadSeq],
+      queryFn: ({ signal }) => api.history(symbol.id, interval, 1000, {}, { signal }),
+      placeholderData: keepPreviousData,
+      staleTime: 2_500,
+      refetchOnWindowFocus: false,
+    });
+    const loading = dataQ.isPending || (dataQ.isFetching && lastAppliedKey !== currentKey);
+    const error = dataQ.error instanceof Error ? dataQ.error.message : null;
 
     const emitDataReady = useCallback(() => {
       const chart = chartRef.current;
@@ -122,44 +142,42 @@ export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartS
 
     useEffect(() => {
       const chart = chartRef.current;
-      if (!chart) return;
+      if (!chart || !dataQ.data || dataQ.isPlaceholderData) return;
 
-      const controller = new AbortController();
-      const seq = ++loadSeqRef.current;
-      setLoading(true);
-      setError(null);
-      chart.clearData();
+      const applyKey = currentKey;
+      chart.applyNewData(dataQ.data.bars.map(barToKLine), false, () => {
+        chart.scrollToRealTime();
+        setLastAppliedKey(applyKey);
+        onAppliedKeyChange?.(applyKey);
+        emitDataReady();
+      });
+    }, [currentKey, dataQ.data, dataQ.isPlaceholderData, emitDataReady, onAppliedKeyChange]);
 
-      api
-        .history(symbol.id, interval, 1000, {}, { signal: controller.signal })
-        .then((res) => {
-          if (controller.signal.aborted || seq !== loadSeqRef.current) return;
-          chart.applyNewData(res.bars.map(barToKLine), false, () => {
-            if (controller.signal.aborted || seq !== loadSeqRef.current) return;
-            chart.scrollToRealTime();
-            setLoading(false);
-            emitDataReady();
-          });
-        })
-        .catch((err: unknown) => {
-          if (controller.signal.aborted || seq !== loadSeqRef.current) return;
-          const message = err instanceof Error ? err.message : 'Unable to load chart data';
-          setError(message);
-          setLoading(false);
-          emitDataReady();
-        });
-
-      return () => controller.abort();
-    }, [emitDataReady, interval, reloadSeq, symbol.id]);
+    useEffect(() => {
+      if (!import.meta.env.VITE_E2E) return;
+      const chart = chartRef.current;
+      window.__TV_E2E_CHARTS__ = {
+        ...(window.__TV_E2E_CHARTS__ ?? {}),
+        [symbol.id]: {
+          currentSymbol: symbol.id,
+          currentInterval: interval,
+          loading,
+          lastAppliedKey,
+          barCount: chart?.getDataList().length ?? 0,
+        },
+      };
+    }, [interval, lastAppliedKey, loading, symbol.id]);
 
     useEffect(() => {
       const chart = chartRef.current;
       const token = getToken();
-      if (!chart || !live || !token || loading || error) return;
+      if (!chart || !live || !token || lastAppliedKey !== currentKey || error) return;
 
       const targetSymbol = wsSymbol(symbol);
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${window.location.host}/ws?token=${token}&v=${WS_PROTOCOL_VERSION}`);
+      const ws = new WebSocket(
+        `${proto}://${window.location.host}/ws?token=${token}&v=${WS_PROTOCOL_VERSION}`,
+      );
       let closed = false;
 
       ws.onopen = () => {
@@ -186,7 +204,7 @@ export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartS
           ws.close();
         }
       };
-    }, [emitDataReady, error, interval, live, loading, symbol]);
+    }, [currentKey, emitDataReady, error, interval, lastAppliedKey, live, symbol]);
 
     return (
       <div
@@ -197,9 +215,7 @@ export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartS
       >
         <div ref={containerRef} className="kline-core-canvas" />
         {(loading || error) && (
-          <div className="kline-core-status">
-            {loading ? 'Loading' : error}
-          </div>
+          <div className="kline-core-status">{loading ? 'Loading' : error}</div>
         )}
       </div>
     );

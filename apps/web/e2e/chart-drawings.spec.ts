@@ -137,6 +137,25 @@ const layoutConfig = {
   activePanel: 0,
 } satisfies LayoutConfig;
 
+interface DrawingE2EState {
+  panelId: string;
+  active: boolean;
+  overlayCount: number;
+  selectedId: string | null;
+  hoveredId: string | null;
+  activeTool: string | null;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+interface ExpectedDrawingState {
+  overlayCount?: number;
+  selected?: boolean;
+  hovered?: boolean;
+  canUndo?: boolean;
+  canRedo?: boolean;
+}
+
 interface AppMockOptions {
   watchlists?: readonly Watchlist[];
   watchlistItems?: readonly WatchlistItem[];
@@ -173,6 +192,8 @@ const installAppMocks = async (page: Page, options: AppMockOptions = {}) => {
 
       constructor(url: string | URL) {
         super();
+        const e2eWindow = window as Window & { __TV_E2E_SOCKETS__?: MockWebSocket[] };
+        e2eWindow.__TV_E2E_SOCKETS__ = [...(e2eWindow.__TV_E2E_SOCKETS__ ?? []), this];
         this.url = String(url);
         window.setTimeout(() => {
           this.readyState = MockWebSocket.OPEN;
@@ -471,13 +492,95 @@ const expectContainedVerticalScroll = async (locator: Locator, rightEdgeSelector
   }
 };
 
+const waitForDrawingState = async (page: Page, expected: ExpectedDrawingState) => {
+  await page.waitForFunction((wanted: ExpectedDrawingState) => {
+    const registry = (window as Window & { __TV_E2E_DRAWINGS__?: Record<string, DrawingE2EState> })
+      .__TV_E2E_DRAWINGS__;
+    const state = registry?.active;
+    if (!state) return false;
+    if (wanted.overlayCount !== undefined && state.overlayCount !== wanted.overlayCount) {
+      return false;
+    }
+    if (wanted.selected !== undefined && (state.selectedId != null) !== wanted.selected) {
+      return false;
+    }
+    if (wanted.hovered !== undefined && (state.hoveredId != null) !== wanted.hovered) {
+      return false;
+    }
+    if (wanted.canUndo !== undefined && state.canUndo !== wanted.canUndo) {
+      return false;
+    }
+    if (wanted.canRedo !== undefined && state.canRedo !== wanted.canRedo) {
+      return false;
+    }
+    return true;
+  }, expected);
+};
+
+const chartPoint = async (page: Page, xRatio: number, yRatio: number) => {
+  const box = await page.locator('.kline-core').first().boundingBox();
+  if (box == null) throw new Error('Expected chart bounding box');
+  return {
+    x: box.x + box.width * xRatio,
+    y: box.y + box.height * yRatio,
+  };
+};
+
+const emitMockRealtimeBar = async (page: Page) => {
+  const emitted = await page.evaluate(() => {
+    const e2eWindow = window as Window & {
+      __TV_E2E_SOCKETS__?: Array<
+        EventTarget & {
+          onmessage: ((event: MessageEvent) => void) | null;
+        }
+      >;
+    };
+    const socket = e2eWindow.__TV_E2E_SOCKETS__?.at(-1);
+    if (!socket) return false;
+    const event = new MessageEvent('message', {
+      data: JSON.stringify({
+        type: 'bar',
+        symbol: 'BINANCE:BTCUSDT',
+        interval: '1h',
+        bar: {
+          time: 1_735_689_600 + 181 * 3_600,
+          open: 116,
+          high: 119,
+          low: 113,
+          close: 117,
+          volume: 2_800,
+        },
+      }),
+    });
+    socket.dispatchEvent(event);
+    socket.onmessage?.(event);
+    return true;
+  });
+  expect(emitted).toBe(true);
+};
+
+const drawTwoPointOverlay = async (page: Page, toolName: string) => {
+  await expect(page.locator('.kline-core').first()).toHaveAttribute('data-loading', 'false');
+  await page.getByRole('button', { name: toolName, exact: true }).click();
+  const start = await chartPoint(page, 0.32, 0.36);
+  const end = await chartPoint(page, 0.63, 0.56);
+  await page.mouse.click(start.x, start.y);
+  await page.mouse.click(end.x, end.y);
+  await waitForDrawingState(page, { overlayCount: 1, selected: true, canUndo: true });
+  return {
+    start,
+    end,
+    mid: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+  };
+};
+
 test('chart route renders the core KLine chart surface', async ({ page }) => {
   await installAppMocks(page);
   await page.goto('/chart/BTCUSDT');
 
   const chart = page.locator('.kline-core').first();
   await expect(page.locator('.ws-symbol')).toContainText('BTCUSDT');
-  await expect(page.getByRole('button', { name: 'Trend' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Trend line' })).toBeVisible();
   await expect(chart).toHaveAttribute('data-symbol', 'BTCUSDT');
   await expect(chart).toHaveAttribute('data-interval', '1h');
   await expect(chart).toHaveAttribute('data-loading', 'false');
@@ -528,7 +631,61 @@ test('chart controls keep symbol and interval wired through rapid changes', asyn
 
   expect(historyRequests).toContainEqual({ symbol: 'BTCUSDT', interval: '1m' });
   expect(historyRequests).toContainEqual({ symbol: 'AAPL', interval: '1h' });
-  expect(historyRequests.at(-1)).toEqual({ symbol: 'BTCUSDT', interval: '1h' });
+  expect(historyRequests).toContainEqual({ symbol: 'BTCUSDT', interval: '1h' });
+});
+
+test('drawings undo and redo with keyboard shortcuts', async ({ page }) => {
+  await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+
+  await drawTwoPointOverlay(page, 'Trend line');
+
+  await page.keyboard.press('Control+Z');
+  await waitForDrawingState(page, { overlayCount: 0, canRedo: true });
+
+  await page.keyboard.press('Control+Shift+Z');
+  await waitForDrawingState(page, { overlayCount: 1, selected: false, canUndo: true });
+});
+
+test('realtime chart updates do not cancel an in-progress drawing', async ({ page }) => {
+  await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+
+  await expect(page.locator('.kline-core').first()).toHaveAttribute('data-loading', 'false');
+  await page.getByRole('button', { name: 'Trend line', exact: true }).click();
+  const start = await chartPoint(page, 0.32, 0.36);
+  const end = await chartPoint(page, 0.63, 0.56);
+
+  await page.mouse.click(start.x, start.y);
+  await waitForDrawingState(page, { overlayCount: 1, canUndo: true });
+  await emitMockRealtimeBar(page);
+  await page.mouse.click(end.x, end.y);
+
+  await waitForDrawingState(page, { overlayCount: 1, selected: true, canUndo: true });
+});
+
+test('drawings delete with middle click on the hovered object', async ({ page }) => {
+  await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+
+  const points = await drawTwoPointOverlay(page, 'Trend line');
+  await page.mouse.move(points.mid.x, points.mid.y);
+  await waitForDrawingState(page, { overlayCount: 1, hovered: true });
+  await page.mouse.click(points.mid.x, points.mid.y, { button: 'middle' });
+  await waitForDrawingState(page, { overlayCount: 0, canUndo: true });
+
+  await page.keyboard.press('Control+Z');
+  await waitForDrawingState(page, { overlayCount: 1, canRedo: true });
+});
+
+test('selected drawings expose contextual actions beside the object', async ({ page }) => {
+  await installAppMocks(page);
+  await page.goto('/chart/BTCUSDT');
+
+  await drawTwoPointOverlay(page, 'Trend line');
+  await expect(page.getByRole('button', { name: 'Delete drawing' })).toBeVisible();
+  await page.getByRole('button', { name: 'Delete drawing' }).click();
+  await waitForDrawingState(page, { overlayCount: 0, canUndo: true });
 });
 
 test('layout page renders saved chart panels', async ({ page }) => {
