@@ -21,6 +21,11 @@ export const GridSchema = z.enum(GRID_KEYS as [GridKey, ...GridKey[]]);
 
 export const panelCountFor = (grid: GridKey): number => GRID_PRESETS[grid].count;
 
+/** Candle rendering styles supported by the chart engine (klinecharts CandleType). */
+export const CHART_TYPES = ['candle_solid', 'candle_stroke', 'ohlc', 'area'] as const;
+export const ChartTypeSchema = z.enum(CHART_TYPES);
+export type ChartType = z.infer<typeof ChartTypeSchema>;
+
 let panelSeq = 0;
 const newPanelId = (): string => `p${Date.now().toString(36)}${(panelSeq++).toString(36)}`;
 const newDrawingScopeId = (): string => `draw_${Date.now().toString(36)}${(panelSeq++).toString(36)}`;
@@ -34,7 +39,9 @@ export const PanelSchema = z.object({
   /** Symbol id (from the symbols table). Null = empty panel awaiting a pick. */
   symbolId: z.string().min(1).max(40).nullable(),
   interval: IntervalSchema,
-  /** Indicator ids active on this panel (overlay only, for now). */
+  /** Candle rendering style for this panel. */
+  chartType: ChartTypeSchema.default('candle_solid'),
+  /** Indicator ids active on this panel (main-pane overlays and sub panes). */
   indicators: z.array(z.string().min(1).max(60)).max(20).default([]),
 });
 export type Panel = z.infer<typeof PanelSchema>;
@@ -89,7 +96,8 @@ export const makePanel = (symbolId: string | null = null, interval: Interval = '
   drawingScopeId: newDrawingScopeId(),
   symbolId,
   interval,
-  indicators: [],
+  chartType: 'candle_solid',
+  indicators: ['VOL'],
 });
 
 /** A fresh layout config for a given grid, optionally seeding the first panel's symbol. */
@@ -130,6 +138,7 @@ export const normalizeLayoutConfig = (cfg: LayoutConfig): LayoutConfig => ({
     drawingScopeId: panel.drawingScopeId,
     symbolId: panel.symbolId,
     interval: panel.interval,
+    chartType: panel.chartType ?? 'candle_solid',
     indicators: panel.indicators ?? [],
   })),
 });

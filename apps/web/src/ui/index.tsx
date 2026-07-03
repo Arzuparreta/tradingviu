@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { IconCheck, IconChevronDown } from './icons';
 
 /**
  * Canonical data-ink primitives. Every surface composes these so the terminal
@@ -239,6 +239,109 @@ export function Segmented<T extends string>({
   );
 }
 
+/* ── Menu (anchored dropdown; replaces raw <select> chrome) ────────────── */
+export function Menu({
+  button,
+  title,
+  align = 'left',
+  width,
+  className,
+  children,
+}: {
+  /** Trigger content (rendered inside a button). */
+  button: ReactNode;
+  /** Accessible label + tooltip for the trigger. */
+  title: string;
+  align?: 'left' | 'right';
+  width?: number;
+  className?: string;
+  children: (close: () => void) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className={`ui-menu${className ? ` ${className}` : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        className={`ui-menu-trigger${open ? ' open' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        title={title}
+        aria-label={title}
+        aria-expanded={open}
+      >
+        {button}
+      </button>
+      {open && (
+        <div
+          className={`ui-menu-pop ${align}`}
+          style={width ? { minWidth: width } : undefined}
+          role="menu"
+        >
+          {children(() => setOpen(false))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MenuItem({
+  icon,
+  label,
+  meta,
+  checked,
+  danger,
+  disabled,
+  onSelect,
+}: {
+  icon?: ReactNode | undefined;
+  label: ReactNode;
+  meta?: ReactNode | undefined;
+  checked?: boolean | undefined;
+  danger?: boolean | undefined;
+  disabled?: boolean | undefined;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={`ui-menu-item${danger ? ' danger' : ''}`}
+      disabled={disabled}
+      onClick={onSelect}
+    >
+      <span className="ui-menu-item-icon">{icon}</span>
+      <span className="ui-menu-item-label">{label}</span>
+      {meta != null && <span className="ui-menu-item-meta">{meta}</span>}
+      {checked && <IconCheck size={13} className="ui-menu-item-check" />}
+    </button>
+  );
+}
+
+export function MenuSeparator() {
+  return <div className="ui-menu-sep" role="separator" />;
+}
+
+export function MenuLabel({ children }: { children: ReactNode }) {
+  return <div className="ui-menu-label">{children}</div>;
+}
+
 /* ── Dock (collapsible workspace container) ────────────────────────────── */
 export function Dock({
   title,
@@ -261,7 +364,7 @@ export function Dock({
     <section className={`ui-dock${open ? ' open' : ' collapsed'}${fill && open ? ' fill' : ''}`}>
       <div className="ui-dock-head">
         <button type="button" className="ui-dock-toggle" onClick={onToggle} aria-expanded={open}>
-          <ChevronDown size={14} className="ui-dock-chevron" />
+          <IconChevronDown size={14} className="ui-dock-chevron" />
           <span className="ui-dock-title">
             {icon}
             <span className="ellipsis">{title}</span>

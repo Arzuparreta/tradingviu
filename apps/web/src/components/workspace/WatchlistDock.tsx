@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Star, Trash2, X } from 'lucide-react';
+import { IconClose, IconPlus, IconStar, IconTrash } from '../../ui/icons';
 import { api } from '../../api/client';
 import type { Quote, WatchlistItem } from '../../api/types';
 import { quoteKey, useMarketQuotes, type QuoteSymbol } from '../../hooks/use-market-quotes';
@@ -64,7 +64,7 @@ function WatchRow({
         {change != null && <span className={`ui-row-delta ${tone}`}>{pct.format(change)}</span>}
       </div>
       <button className="icon-btn wl-row-remove" onClick={onRemove} title="Remove" aria-label="Remove">
-        <X size={13} />
+        <IconClose size={13} />
       </button>
     </div>
   );
@@ -129,7 +129,7 @@ export function WatchlistDock() {
   return (
     <Dock
       title="Watchlist"
-      icon={<Star size={14} />}
+      icon={<IconStar size={14} />}
       open={open}
       onToggle={() => setOpen((o) => !o)}
       actions={
@@ -139,7 +139,7 @@ export function WatchlistDock() {
           title="New list"
           aria-label="New list"
         >
-          <Plus size={14} />
+          <IconPlus size={14} />
         </button>
       }
     >
@@ -154,7 +154,7 @@ export function WatchlistDock() {
         </select>
         {activeId && (
           <button className="icon-btn" onClick={() => void deleteList()} title="Delete list">
-            <Trash2 size={14} />
+            <IconTrash size={14} />
           </button>
         )}
       </div>
@@ -169,7 +169,7 @@ export function WatchlistDock() {
             onKeyDown={(e) => e.key === 'Enter' && void createList()}
           />
           <button className="icon-btn" onClick={() => void createList()} title="Create">
-            <Plus size={14} />
+            <IconPlus size={14} />
           </button>
         </div>
       )}
@@ -183,7 +183,7 @@ export function WatchlistDock() {
             onKeyDown={(e) => e.key === 'Enter' && void addSymbol()}
           />
           <button className="icon-btn" onClick={() => void addSymbol()} title="Add">
-            <Plus size={14} />
+            <IconPlus size={14} />
           </button>
         </div>
       )}

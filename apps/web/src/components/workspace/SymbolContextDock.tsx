@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Activity } from 'lucide-react';
+import { IconIndicator } from '../../ui/icons';
 import { api } from '../../api/client';
 import { Badge, DataList, DataRow, Dock } from '../../ui';
 
@@ -39,7 +39,7 @@ export function SymbolContextDock({
   return (
     <Dock
       title={ticker ? `${ticker} context` : 'Context'}
-      icon={<Activity size={14} />}
+      icon={<IconIndicator size={14} />}
       open={open}
       onToggle={() => setOpen((o) => !o)}
     >

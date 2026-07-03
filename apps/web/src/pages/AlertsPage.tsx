@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, Link2, Mail } from 'lucide-react';
+import { IconBell, IconLink, IconMail } from '../ui/icons';
 import { api } from '../api/client';
 import type { AlertCondition, AlertOperator, Symbol } from '../api/types';
 import { Badge, DataTable, EmptyState, Field, Panel, TitleBar, Toolbar } from '../ui';
@@ -78,7 +78,7 @@ export function AlertsPage() {
     <div className="alerts">
       <TitleBar title="Alerts" />
       <div className="alerts-grid">
-        <Panel title="New alert" icon={<Bell size={14} />}>
+        <Panel title="New alert" icon={<IconBell size={14} />}>
           <div className="col">
             <Field label="Symbol">
               <select value={symbolId} onChange={(e) => setSymbolId(e.target.value)}>
@@ -156,7 +156,7 @@ export function AlertsPage() {
                 Loading…
               </p>
             ) : alerts.length === 0 ? (
-              <EmptyState icon={<Bell size={20} />} title="No alerts yet" />
+              <EmptyState icon={<IconBell size={20} />} title="No alerts yet" />
             ) : (
               <DataTable>
                 <thead>
@@ -191,8 +191,8 @@ export function AlertsPage() {
                       <td className="muted">{formatCondition(alert.condition)}</td>
                       <td>
                         <span className="alerts-channels">
-                          {alert.channels.includes('email') && <Mail size={13} aria-label="email" />}
-                          {alert.webhookUrl && <Link2 size={13} aria-label="webhook" />}
+                          {alert.channels.includes('email') && <IconMail size={13} />}
+                          {alert.webhookUrl && <IconLink size={13} />}
                         </span>
                       </td>
                       <td className="num">

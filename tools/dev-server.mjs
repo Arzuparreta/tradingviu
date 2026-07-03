@@ -56,7 +56,6 @@ async function start() {
     '-d',
     'postgres',
     'redis',
-    'minio',
     'meilisearch',
     'mailpit',
   ]);

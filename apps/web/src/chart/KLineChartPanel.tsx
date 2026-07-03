@@ -1,22 +1,11 @@
-import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import {
-  Circle,
-  Crosshair,
-  Eye,
-  EyeOff,
-  Lock,
-  LockOpen,
-  Minus,
-  MousePointer2,
-  MoveHorizontal,
-  Square,
-  Trash2,
-  TrendingUp,
-  Type,
-  Undo2,
-  Redo2,
-  type LucideIcon,
-} from 'lucide-react';
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActionType,
   type Chart,
@@ -30,6 +19,10 @@ import type { Drawing } from '@tv/core';
 import { api } from '../api/client';
 import type { Symbol as TvSymbol } from '../api/types';
 import { KLineChartSurface, type KLineChartSurfaceHandle } from './KLineChartSurface';
+import { alpha, token, type ChartSettings } from './theme';
+import { SEMANTIC_COLOR_OVERLAYS, TEXT_OVERLAYS, FILLED_OVERLAYS } from './overlays';
+import type { DrawingWorkspaceState, MagnetMode } from './ChartToolbar';
+import { DrawingStyleBar, type DrawingStyleValue, type LineStyleKind } from './DrawingStyleBar';
 
 export interface PanelBounds {
   min: number;
@@ -42,16 +35,30 @@ export interface ChartPanelProps {
   symbol: TvSymbol | null;
   active: boolean;
   live: boolean;
+  settings: ChartSettings;
+  activeTool: string | null;
+  /** Bumped by the workspace to re-arm the same tool (stay-in-drawing-mode). */
+  toolNonce: number;
+  magnet: MagnetMode;
+  onToolConsumed: () => void;
   onActivate: () => void;
-  onChange: (patch: Partial<Panel>) => void;
-  replayActive?: boolean;
-  replayCursor?: number | null;
-  onBounds?: (id: string, bounds: PanelBounds | null) => void;
+  onDrawingState: (panelId: string, state: DrawingWorkspaceState) => void;
+  onRequestAlert?: ((price: number) => void) | undefined;
+  replayActive?: boolean | undefined;
+  replayCursor?: number | null | undefined;
+  onBounds?: ((id: string, bounds: PanelBounds | null) => void) | undefined;
 }
 
 export interface KLineChartPanelHandle {
   exportDrawings(): Drawing[];
   importDrawings(drawings: Drawing[]): void;
+  undo(): void;
+  redo(): void;
+  setAllVisible(visible: boolean): void;
+  setAllLocked(locked: boolean): void;
+  removeAll(): void;
+  screenshotUrl(): string | null;
+  lastClose(): number | null;
 }
 
 interface PixelPoint {
@@ -59,10 +66,18 @@ interface PixelPoint {
   y: number;
 }
 
-interface DrawingTool {
-  name: string;
-  label: string;
-  icon: LucideIcon;
+interface ContextMenuState {
+  x: number;
+  y: number;
+  price: number;
+  timestamp: number | null;
+}
+
+interface TextEditorState {
+  overlayId: string;
+  x: number;
+  y: number;
+  draft: string;
 }
 
 interface DrawingDebugState {
@@ -82,94 +97,19 @@ declare global {
   }
 }
 
-const DRAWING_TOOLS: readonly DrawingTool[] = [
-  { name: 'segment', label: 'Trend line', icon: TrendingUp },
-  { name: 'rayLine', label: 'Ray', icon: MoveHorizontal },
-  { name: 'horizontalStraightLine', label: 'Horizontal line', icon: Minus },
-  { name: 'verticalStraightLine', label: 'Vertical line', icon: Crosshair },
-  { name: 'rect', label: 'Rectangle', icon: Square },
-  { name: 'circle', label: 'Circle', icon: Circle },
-  { name: 'fibonacciLine', label: 'Fibonacci', icon: TrendingUp },
-  { name: 'text', label: 'Text', icon: Type },
-  { name: 'priceLine', label: 'Price line', icon: Minus },
-];
+const MAGNET_TO_MODE: Record<MagnetMode, 'normal' | 'weak_magnet' | 'strong_magnet'> = {
+  off: 'normal',
+  weak: 'weak_magnet',
+  strong: 'strong_magnet',
+};
 
-const OVERLAY_NAMES = new Set([
-  'segment',
-  'line',
-  'rayLine',
-  'straightLine',
-  'horizontalSegment',
-  'horizontalRayLine',
-  'horizontalStraightLine',
-  'verticalSegment',
-  'verticalRayLine',
-  'verticalStraightLine',
-  'crossLine',
-  'infoLine',
-  'trendAngle',
-  'arrow',
-  'rect',
-  'circle',
-  'triangle',
-  'ellipse',
-  'arc',
-  'rotatedRectangle',
-  'path',
-  'polyline',
-  'curve',
-  'doubleCurve',
-  'text',
-  'callout',
-  'anchoredText',
-  'note',
-  'priceNote',
-  'priceLabel',
-  'flag',
-  'pin',
-  'comment',
-  'signpost',
-  'fibonacciLine',
-  'fibExtension',
-  'fibChannel',
-  'fibTimeZone',
-  'fibSpeedFan',
-  'fibTimeExtension',
-  'fibCircles',
-  'fibSpiral',
-  'fibArcs',
-  'fibWedge',
-  'pitchfan',
-  'parallelStraightLine',
-  'priceChannelLine',
-  'regressionTrend',
-  'flatTopBottom',
-  'disjointChannel',
-  'priceLine',
-  'priceRange',
-  'dateRange',
-  'datePriceRange',
-  'projection',
-  'forecast',
-  'barsPattern',
-  'longPosition',
-  'shortPosition',
-  'andrewsPitchfork',
-  'schiffPitchfork',
-  'modifiedSchiffPitchfork',
-  'insidePitchfork',
-  'gannBox',
-  'gannFan',
-  'gannSquareFixed',
-  'gannSquare',
-  'brush',
-  'highlighter',
-  'arrowMarker',
-]);
-
-function isDrawingOverlay(ov: Overlay): boolean {
-  return OVERLAY_NAMES.has(ov.name);
-}
+/**
+ * Drawings belong to the symbol — one set shared across intervals, panels,
+ * layouts, and reloads (points are timestamp-anchored, so they render on any
+ * timeframe). The interval slot in the API is pinned to a constant.
+ */
+export const DRAWING_INTERVAL = 'any';
+export const drawingScopeFor = (symbolId: string): string => `symbol:${symbolId}`;
 
 function cloneDrawing(drawing: Drawing): Drawing {
   return {
@@ -186,9 +126,7 @@ function cloneDrawing(drawing: Drawing): Drawing {
   };
 }
 
-function cloneDrawings(drawings: readonly Drawing[]): Drawing[] {
-  return drawings.map(cloneDrawing);
-}
+const cloneDrawings = (drawings: readonly Drawing[]): Drawing[] => drawings.map(cloneDrawing);
 
 function overlayToDrawing(ov: Overlay): Drawing {
   return {
@@ -214,17 +152,36 @@ function overlayToDrawing(ov: Overlay): Drawing {
 
 function boundsFromData(data: readonly KLineData[]): PanelBounds | null {
   if (data.length === 0) return null;
-
   let step = Infinity;
   for (let i = 1; i < data.length; i++) {
     const d = (data[i]!.timestamp - data[i - 1]!.timestamp) / 1000;
     if (d > 0 && d < step) step = d;
   }
-
   return {
     min: Math.floor(data[0]!.timestamp / 1000),
     max: Math.floor(data[data.length - 1]!.timestamp / 1000),
     step: Number.isFinite(step) && step > 0 ? step : 60,
+  };
+}
+
+/** Current editable style of an overlay, for the style bar. */
+function styleValueOf(ov: Overlay): DrawingStyleValue {
+  const line = (ov.styles?.line ?? {}) as {
+    color?: string;
+    size?: number;
+    style?: string;
+    dashedValue?: number[];
+  };
+  const lineStyle: LineStyleKind =
+    line.style === 'dashed' ? ((line.dashedValue?.[0] ?? 4) <= 2 ? 'dotted' : 'dashed') : 'solid';
+  return {
+    color: line.color ?? token('--accent'),
+    size: line.size ?? 1,
+    lineStyle,
+    locked: ov.lock,
+    visible: ov.visible,
+    showPalette: !SEMANTIC_COLOR_OVERLAYS.has(ov.name),
+    hasText: TEXT_OVERLAYS.has(ov.name),
   };
 }
 
@@ -235,7 +192,14 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       symbol,
       active,
       live,
+      settings,
+      activeTool,
+      toolNonce,
+      magnet,
+      onToolConsumed,
       onActivate,
+      onDrawingState,
+      onRequestAlert,
       replayActive = false,
       replayCursor = null,
       onBounds,
@@ -256,18 +220,24 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
     const redoStackRef = useRef<Drawing[][]>([]);
     const selectedIdRef = useRef<string | null>(null);
     const hoveredIdRef = useRef<string | null>(null);
+    const creatingIdRef = useRef<string | null>(null);
+    const loadedSymbolRef = useRef('');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
-    const [activeTool, setActiveTool] = useState<string | null>(null);
+    const [stylePoint, setStylePoint] = useState<PixelPoint | null>(null);
+    const [styleVersion, setStyleVersion] = useState(0);
     const [historyVersion, setHistoryVersion] = useState(0);
-    const [toolbarPoint, setToolbarPoint] = useState<PixelPoint | null>(null);
     const [appliedDataKey, setAppliedDataKey] = useState('');
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+    const [textEditor, setTextEditor] = useState<TextEditorState | null>(null);
 
     const onBoundsRef = useRef(onBounds);
     onBoundsRef.current = onBounds;
     selectedIdRef.current = selectedId;
     hoveredIdRef.current = hoveredId;
+
+    /* ── Export / persistence ─────────────────────────────────────────── */
 
     const exportCurrentDrawings = useCallback((): Drawing[] => {
       const chartApi = chartApiRef.current;
@@ -275,7 +245,7 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       const drawings: Drawing[] = [];
       for (const id of overlayIdsRef.current) {
         const ov = chartApi.getOverlayById(id);
-        if (ov && isDrawingOverlay(ov)) drawings.push(overlayToDrawing(ov));
+        if (ov) drawings.push(overlayToDrawing(ov));
       }
       return drawings;
     }, []);
@@ -284,15 +254,15 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       if (!panel.symbolId) return;
       if (persistTimerRef.current != null) window.clearTimeout(persistTimerRef.current);
       const symbolId = panel.symbolId;
-      const interval = panel.interval;
-      const scope = panel.drawingScopeId;
       const drawings = exportCurrentDrawings();
       persistTimerRef.current = window.setTimeout(() => {
-        void api.saveDrawings(symbolId, interval, drawings, scope).catch(() => {
-          return;
-        });
+        void api
+          .saveDrawings(symbolId, DRAWING_INTERVAL, drawings, drawingScopeFor(symbolId))
+          .catch(() => {
+            return;
+          });
       }, 350);
-    }, [exportCurrentDrawings, panel.drawingScopeId, panel.interval, panel.symbolId]);
+    }, [exportCurrentDrawings, panel.symbolId]);
 
     useEffect(
       () => () => {
@@ -301,9 +271,34 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       [],
     );
 
+    /* ── Drawing state reporting (toolbar) ────────────────────────────── */
+
+    const reportDrawingState = useCallback(() => {
+      const chartApi = chartApiRef.current;
+      const count = overlayIdsRef.current.size;
+      let allHidden = count > 0;
+      let allLocked = count > 0;
+      if (chartApi) {
+        for (const id of overlayIdsRef.current) {
+          const ov = chartApi.getOverlayById(id);
+          if (!ov) continue;
+          if (ov.visible) allHidden = false;
+          if (!ov.lock) allLocked = false;
+        }
+      }
+      onDrawingState(panel.id, {
+        canUndo: undoStackRef.current.length > 0,
+        canRedo: redoStackRef.current.length > 0,
+        allHidden,
+        allLocked,
+        count,
+      });
+    }, [onDrawingState, panel.id]);
+
     const updateHistoryState = useCallback(() => {
       setHistoryVersion((version) => version + 1);
-    }, []);
+      reportDrawingState();
+    }, [reportDrawingState]);
 
     const pushUndoSnapshot = useCallback(() => {
       undoStackRef.current = [
@@ -313,6 +308,8 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       redoStackRef.current = [];
       updateHistoryState();
     }, [exportCurrentDrawings, updateHistoryState]);
+
+    /* ── Selection + style bar ────────────────────────────────────────── */
 
     const overlayPosition = useCallback((id: string | null): PixelPoint | null => {
       const chartApi = chartApiRef.current;
@@ -333,9 +330,9 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       return { x, y };
     }, []);
 
-    const updateToolbarPosition = useCallback(
+    const updateStyleBarPosition = useCallback(
       (id: string | null) => {
-        setToolbarPoint(overlayPosition(id));
+        setStylePoint(overlayPosition(id));
       },
       [overlayPosition],
     );
@@ -344,10 +341,80 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       (id: string | null) => {
         setSelectedId(id);
         selectedIdRef.current = id;
-        updateToolbarPosition(id);
+        updateStyleBarPosition(id);
       },
-      [updateToolbarPosition],
+      [updateStyleBarPosition],
     );
+
+    /* ── Regression trend: deviation from the drawn base line ─────────── */
+
+    const updateRegressionDeviation = useCallback((overlayId: string) => {
+      const chartApi = chartApiRef.current;
+      if (!chartApi) return;
+      const ov = chartApi.getOverlayById(overlayId);
+      if (!ov || ov.name !== 'regressionTrend') return;
+      const [a, b] = [ov.points[0], ov.points[1]];
+      if (
+        a?.timestamp === undefined ||
+        b?.timestamp === undefined ||
+        a.value === undefined ||
+        b.value === undefined ||
+        a.timestamp === b.timestamp
+      ) {
+        return;
+      }
+      const t1 = Math.min(a.timestamp, b.timestamp);
+      const t2 = Math.max(a.timestamp, b.timestamp);
+      const bars = fullDataRef.current.filter((k) => k.timestamp >= t1 && k.timestamp <= t2);
+      if (bars.length < 2) return;
+      const slope = (b.value - a.value) / (b.timestamp - a.timestamp);
+      let sum = 0;
+      for (const k of bars) {
+        const lineValue = a.value + (k.timestamp - a.timestamp) * slope;
+        const d = k.close - lineValue;
+        sum += d * d;
+      }
+      const sd = Math.sqrt(sum / bars.length);
+      suppressEventsRef.current = true;
+      chartApi.overrideOverlay({ id: overlayId, extendData: { deviation: 2 * sd } });
+      suppressEventsRef.current = false;
+    }, []);
+
+    /* ── Text editing (text/callout overlays) ─────────────────────────── */
+
+    const openTextEditor = useCallback(
+      (overlayId: string) => {
+        const chartApi = chartApiRef.current;
+        if (!chartApi) return;
+        const ov = chartApi.getOverlayById(overlayId);
+        if (!ov || !TEXT_OVERLAYS.has(ov.name)) return;
+        const pos = overlayPosition(overlayId);
+        if (!pos) return;
+        const current = (ov.extendData as { text?: string } | undefined)?.text ?? '';
+        setTextEditor({ overlayId, x: pos.x, y: pos.y, draft: current });
+      },
+      [overlayPosition],
+    );
+
+    const commitTextEditor = useCallback(
+      (save: boolean) => {
+        setTextEditor((editor) => {
+          if (editor && save) {
+            const chartApi = chartApiRef.current;
+            const value = editor.draft.trim();
+            chartApi?.overrideOverlay({
+              id: editor.overlayId,
+              extendData: { text: value === '' ? 'Text' : value },
+            });
+            schedulePersist();
+          }
+          return null;
+        });
+      },
+      [schedulePersist],
+    );
+
+    /* ── Overlay event callbacks ──────────────────────────────────────── */
 
     const onOverlaySelected = useCallback(
       (event: OverlayEvent): boolean => {
@@ -379,17 +446,38 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       return true;
     }, []);
 
+    const onOverlayDoubleClick = useCallback(
+      (event: OverlayEvent): boolean => {
+        if (TEXT_OVERLAYS.has(event.overlay.name)) {
+          openTextEditor(event.overlay.id);
+          return true;
+        }
+        return false;
+      },
+      [openTextEditor],
+    );
+
     const onOverlayDrawEnd = useCallback(
       (event: OverlayEvent): boolean => {
         if (suppressEventsRef.current) return true;
         overlayIdsRef.current.add(event.overlay.id);
-        setActiveTool(null);
+        creatingIdRef.current = null;
+        if (event.overlay.name === 'regressionTrend') updateRegressionDeviation(event.overlay.id);
+        onToolConsumed();
         selectOverlay(event.overlay.id);
-        updateToolbarPosition(event.overlay.id);
+        if (TEXT_OVERLAYS.has(event.overlay.name)) openTextEditor(event.overlay.id);
         schedulePersist();
+        reportDrawingState();
         return true;
       },
-      [schedulePersist, selectOverlay, updateToolbarPosition],
+      [
+        onToolConsumed,
+        openTextEditor,
+        reportDrawingState,
+        schedulePersist,
+        selectOverlay,
+        updateRegressionDeviation,
+      ],
     );
 
     const onOverlayPressedMoveStart = useCallback((): boolean => {
@@ -400,26 +488,30 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
     const onOverlayPressedMoveEnd = useCallback(
       (event: OverlayEvent): boolean => {
         if (suppressEventsRef.current) return true;
+        if (event.overlay.name === 'regressionTrend') updateRegressionDeviation(event.overlay.id);
         selectOverlay(event.overlay.id);
-        updateToolbarPosition(event.overlay.id);
         schedulePersist();
         return true;
       },
-      [schedulePersist, selectOverlay, updateToolbarPosition],
+      [schedulePersist, selectOverlay, updateRegressionDeviation],
     );
 
     const onOverlayRemoved = useCallback(
       (event: OverlayEvent): boolean => {
         overlayIdsRef.current.delete(event.overlay.id);
+        if (creatingIdRef.current === event.overlay.id) creatingIdRef.current = null;
         if (selectedIdRef.current === event.overlay.id) selectOverlay(null);
         if (hoveredIdRef.current === event.overlay.id) {
           hoveredIdRef.current = null;
           setHoveredId(null);
         }
-        if (!suppressEventsRef.current) schedulePersist();
+        if (!suppressEventsRef.current) {
+          schedulePersist();
+          reportDrawingState();
+        }
         return true;
       },
-      [schedulePersist, selectOverlay],
+      [reportDrawingState, schedulePersist, selectOverlay],
     );
 
     const overlayCallbacks = useCallback(
@@ -428,6 +520,7 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
         onDeselected: onOverlayDeselected,
         onMouseEnter: onOverlayMouseEnter,
         onMouseLeave: onOverlayMouseLeave,
+        onDoubleClick: onOverlayDoubleClick,
         onDrawEnd: onOverlayDrawEnd,
         onPressedMoveStart: onOverlayPressedMoveStart,
         onPressedMoveEnd: onOverlayPressedMoveEnd,
@@ -435,6 +528,7 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       }),
       [
         onOverlayDeselected,
+        onOverlayDoubleClick,
         onOverlayDrawEnd,
         onOverlayMouseEnter,
         onOverlayMouseLeave,
@@ -471,6 +565,8 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       [overlayCallbacks],
     );
 
+    /* ── Bulk operations ──────────────────────────────────────────────── */
+
     const clearTrackedOverlays = useCallback(() => {
       const chartApi = chartApiRef.current;
       if (!chartApi) return;
@@ -503,8 +599,9 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
         suppressEventsRef.current = false;
         selectOverlay(null);
         schedulePersist();
+        reportDrawingState();
       },
-      [clearTrackedOverlays, managedOverlay, schedulePersist, selectOverlay],
+      [clearTrackedOverlays, managedOverlay, reportDrawingState, schedulePersist, selectOverlay],
     );
 
     const removeOverlay = useCallback(
@@ -542,7 +639,77 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       updateHistoryState();
     }, [exportCurrentDrawings, importSnapshot, updateHistoryState]);
 
-    const toggleLock = useCallback(() => {
+    const setAllVisible = useCallback(
+      (visible: boolean) => {
+        const chartApi = chartApiRef.current;
+        if (!chartApi) return;
+        suppressEventsRef.current = true;
+        for (const id of overlayIdsRef.current) chartApi.overrideOverlay({ id, visible });
+        suppressEventsRef.current = false;
+        schedulePersist();
+        reportDrawingState();
+      },
+      [reportDrawingState, schedulePersist],
+    );
+
+    const setAllLocked = useCallback(
+      (locked: boolean) => {
+        const chartApi = chartApiRef.current;
+        if (!chartApi) return;
+        suppressEventsRef.current = true;
+        for (const id of overlayIdsRef.current) chartApi.overrideOverlay({ id, lock: locked });
+        suppressEventsRef.current = false;
+        schedulePersist();
+        reportDrawingState();
+      },
+      [reportDrawingState, schedulePersist],
+    );
+
+    const removeAll = useCallback(() => {
+      if (overlayIdsRef.current.size === 0) return;
+      pushUndoSnapshot();
+      clearTrackedOverlays();
+      schedulePersist();
+      updateHistoryState();
+    }, [clearTrackedOverlays, pushUndoSnapshot, schedulePersist, updateHistoryState]);
+
+    /* ── Selected-overlay styling ─────────────────────────────────────── */
+
+    const patchSelectedStyles = useCallback(
+      (patch: { color?: string; size?: number; lineStyle?: LineStyleKind }) => {
+        const chartApi = chartApiRef.current;
+        const id = selectedIdRef.current;
+        if (!chartApi || !id) return;
+        const ov = chartApi.getOverlayById(id);
+        if (!ov) return;
+        pushUndoSnapshot();
+        const current = styleValueOf(ov);
+        const color = patch.color ?? current.color;
+        const size = patch.size ?? current.size;
+        const kind = patch.lineStyle ?? current.lineStyle;
+        const line =
+          kind === 'solid'
+            ? { color, size, style: 'solid', dashedValue: [4, 4] }
+            : kind === 'dashed'
+              ? { color, size, style: 'dashed', dashedValue: [5, 5] }
+              : { color, size, style: 'dashed', dashedValue: [2, 4] };
+        const fillAlpha = FILLED_OVERLAYS.has(ov.name) ? 0.14 : 0.1;
+        chartApi.overrideOverlay({
+          id,
+          styles: {
+            line,
+            polygon: { borderColor: color, borderSize: size, color: alpha(color, fillAlpha) },
+            circle: { borderColor: color, borderSize: size, color: alpha(color, fillAlpha) },
+            text: { color },
+          } as never,
+        });
+        setStyleVersion((v) => v + 1);
+        schedulePersist();
+      },
+      [pushUndoSnapshot, schedulePersist],
+    );
+
+    const toggleSelectedLock = useCallback(() => {
       const chartApi = chartApiRef.current;
       const id = selectedIdRef.current;
       if (!chartApi || !id) return;
@@ -550,11 +717,12 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       if (!overlay) return;
       pushUndoSnapshot();
       chartApi.overrideOverlay({ id, lock: !overlay.lock });
+      setStyleVersion((v) => v + 1);
       schedulePersist();
-      updateHistoryState();
-    }, [pushUndoSnapshot, schedulePersist, updateHistoryState]);
+      reportDrawingState();
+    }, [pushUndoSnapshot, reportDrawingState, schedulePersist]);
 
-    const toggleVisible = useCallback(() => {
+    const toggleSelectedVisible = useCallback(() => {
       const chartApi = chartApiRef.current;
       const id = selectedIdRef.current;
       if (!chartApi || !id) return;
@@ -562,16 +730,51 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       if (!overlay) return;
       pushUndoSnapshot();
       chartApi.overrideOverlay({ id, visible: !overlay.visible });
+      setStyleVersion((v) => v + 1);
+      schedulePersist();
+      reportDrawingState();
+    }, [pushUndoSnapshot, reportDrawingState, schedulePersist]);
+
+    const cloneSelected = useCallback(() => {
+      const chartApi = chartApiRef.current;
+      const id = selectedIdRef.current;
+      if (!chartApi || !id) return;
+      const ov = chartApi.getOverlayById(id);
+      if (!ov) return;
+      pushUndoSnapshot();
+      const drawing = overlayToDrawing(ov);
+      const data = fullDataRef.current;
+      const stepMs = data.length > 1 ? data[1]!.timestamp - data[0]!.timestamp : 3_600_000;
+      const copy: Drawing = {
+        ...cloneDrawing(drawing),
+        id: `dr_${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`,
+        points: drawing.points.map((p) => ({
+          ...p,
+          timestamp: p.timestamp !== undefined ? p.timestamp + stepMs * 3 : p.timestamp,
+          dataIndex: undefined,
+        })),
+      };
+      try {
+        const newId = chartApi.createOverlay(managedOverlay(copy));
+        if (typeof newId === 'string') {
+          overlayIdsRef.current.add(newId);
+          selectOverlay(newId);
+        }
+      } catch {
+        return;
+      }
       schedulePersist();
       updateHistoryState();
-    }, [pushUndoSnapshot, schedulePersist, updateHistoryState]);
+    }, [managedOverlay, pushUndoSnapshot, schedulePersist, selectOverlay, updateHistoryState]);
+
+    /* ── Chart lifecycle ──────────────────────────────────────────────── */
 
     const handleChartReady = useCallback(
       (chart: Chart) => {
         for (const cleanup of chartActionCleanupRef.current) cleanup();
         chartActionCleanupRef.current = [];
         chartApiRef.current = chart;
-        const reposition = () => updateToolbarPosition(selectedIdRef.current);
+        const reposition = () => updateStyleBarPosition(selectedIdRef.current);
         chart.subscribeAction(ActionType.OnScroll, reposition);
         chart.subscribeAction(ActionType.OnZoom, reposition);
         chart.subscribeAction(ActionType.OnVisibleRangeChange, reposition);
@@ -581,7 +784,7 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
           () => chart.unsubscribeAction(ActionType.OnVisibleRangeChange, reposition),
         ];
       },
-      [updateToolbarPosition],
+      [updateStyleBarPosition],
     );
 
     useEffect(
@@ -596,39 +799,48 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       (data: KLineData[]) => {
         fullDataRef.current = data;
         onBoundsRef.current?.(panel.id, boundsFromData(data));
-        updateToolbarPosition(selectedIdRef.current);
+        updateStyleBarPosition(selectedIdRef.current);
       },
-      [panel.id, updateToolbarPosition],
+      [panel.id, updateStyleBarPosition],
     );
 
     const handleAppliedKeyChange = useCallback((key: string) => {
       setAppliedDataKey(key);
     }, []);
 
+    // Interval changes keep the overlays (they're timestamp-anchored); only a
+    // symbol change resets the drawing set.
     useEffect(() => {
-      const key = `${panel.symbolId ?? ''}|${panel.interval}|${panel.drawingScopeId}`;
+      const key = panel.symbolId ?? '';
       if (loadKeyRef.current === key) return;
       loadKeyRef.current = key;
+      loadedSymbolRef.current = '';
       drawingLoadSeqRef.current += 1;
       fullDataRef.current = [];
       setAppliedDataKey('');
       hadCursorRef.current = false;
+      setTextEditor(null);
+      setContextMenu(null);
       clearTrackedOverlays();
       onBoundsRef.current?.(panel.id, null);
-    }, [clearTrackedOverlays, panel.drawingScopeId, panel.id, panel.interval, panel.symbolId]);
+    }, [clearTrackedOverlays, panel.id, panel.symbolId]);
 
     const loadDrawings = useCallback(async () => {
       const chartApi = chartApiRef.current;
       if (!chartApi || !panel.symbolId) return;
 
       const requestSeq = ++drawingLoadSeqRef.current;
-      const requestKey = `${panel.symbolId ?? ''}|${panel.interval}|${panel.drawingScopeId}`;
+      const requestKey = panel.symbolId ?? '';
       clearTrackedOverlays();
       undoStackRef.current = [];
       redoStackRef.current = [];
       updateHistoryState();
       try {
-        const res = await api.drawings(panel.symbolId, panel.interval, panel.drawingScopeId);
+        const res = await api.drawings(
+          panel.symbolId,
+          DRAWING_INTERVAL,
+          drawingScopeFor(panel.symbolId),
+        );
         if (requestSeq !== drawingLoadSeqRef.current || requestKey !== loadKeyRef.current) return;
         suppressEventsRef.current = true;
         try {
@@ -647,20 +859,18 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       } catch {
         suppressEventsRef.current = false;
       }
-    }, [
-      clearTrackedOverlays,
-      managedOverlay,
-      panel.drawingScopeId,
-      panel.interval,
-      panel.symbolId,
-      updateHistoryState,
-    ]);
+    }, [clearTrackedOverlays, managedOverlay, panel.symbolId, updateHistoryState]);
 
     useEffect(() => {
       if (appliedDataKey === '') return;
       if (fullDataRef.current.length === 0) return;
+      const sym = panel.symbolId ?? '';
+      if (loadedSymbolRef.current === sym) return;
+      loadedSymbolRef.current = sym;
       void loadDrawings();
-    }, [appliedDataKey, loadDrawings, panel.symbolId, panel.interval, panel.drawingScopeId]);
+    }, [appliedDataKey, loadDrawings, panel.symbolId]);
+
+    /* ── Replay ───────────────────────────────────────────────────────── */
 
     useEffect(() => {
       const chartApi = chartApiRef.current;
@@ -686,30 +896,68 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       }
     }, [replayActive, replayCursor]);
 
-    const createDrawing = useCallback(
-      (name: string) => {
-        const chartApi = chartApiRef.current;
-        if (!chartApi) return;
-        pushUndoSnapshot();
-        setActiveTool(name);
-        const id = chartApi.createOverlay(name);
-        if (typeof id === 'string') {
-          overlayIdsRef.current.add(id);
-          chartApi.overrideOverlay({ id, ...overlayCallbacks() });
-        }
-        updateHistoryState();
-      },
-      [overlayCallbacks, pushUndoSnapshot, updateHistoryState],
-    );
+    /* ── Tool activation (from the workspace toolbar) ─────────────────── */
 
-    const cursorMode = useCallback(() => {
-      setActiveTool(null);
-      selectOverlay(null);
-    }, [selectOverlay]);
+    const cancelCreating = useCallback(() => {
+      const chartApi = chartApiRef.current;
+      const creating = creatingIdRef.current;
+      if (chartApi && creating) {
+        suppressEventsRef.current = true;
+        chartApi.removeOverlay(creating);
+        suppressEventsRef.current = false;
+        overlayIdsRef.current.delete(creating);
+        creatingIdRef.current = null;
+        // The pre-creation snapshot is no longer a state change.
+        undoStackRef.current.pop();
+        updateHistoryState();
+      }
+    }, [updateHistoryState]);
+
+    useEffect(() => {
+      if (!active) return;
+      const chartApi = chartApiRef.current;
+      if (!chartApi) return;
+      cancelCreating();
+      if (!activeTool) return;
+      pushUndoSnapshot();
+      const id = chartApi.createOverlay({
+        name: activeTool,
+        mode: MAGNET_TO_MODE[magnet] as Exclude<OverlayCreate['mode'], undefined>,
+        ...overlayCallbacks(),
+      });
+      if (typeof id === 'string') {
+        overlayIdsRef.current.add(id);
+        creatingIdRef.current = id;
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTool, toolNonce, active]);
+
+    // Magnet applies to existing drawings' point dragging too.
+    useEffect(() => {
+      const chartApi = chartApiRef.current;
+      if (!chartApi) return;
+      suppressEventsRef.current = true;
+      for (const id of overlayIdsRef.current) {
+        chartApi.overrideOverlay({
+          id,
+          mode: MAGNET_TO_MODE[magnet] as Exclude<OverlayCreate['mode'], undefined>,
+        });
+      }
+      suppressEventsRef.current = false;
+    }, [magnet]);
+
+    /* ── Keyboard ─────────────────────────────────────────────────────── */
 
     useEffect(() => {
       if (!active) return;
       const onKeyDown = (event: KeyboardEvent) => {
+        const target = event.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')
+        ) {
+          return;
+        }
         const mod = event.ctrlKey || event.metaKey;
         if (mod && event.key.toLowerCase() === 'z') {
           event.preventDefault();
@@ -724,12 +972,17 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
         }
         if (event.key === 'Escape') {
           event.preventDefault();
-          cursorMode();
+          setContextMenu(null);
+          cancelCreating();
+          onToolConsumed();
+          selectOverlay(null);
         }
       };
       window.addEventListener('keydown', onKeyDown);
       return () => window.removeEventListener('keydown', onKeyDown);
-    }, [active, cursorMode, redo, removeOverlay, undo]);
+    }, [active, cancelCreating, onToolConsumed, redo, removeOverlay, selectOverlay, undo]);
+
+    /* ── Mouse extras ─────────────────────────────────────────────────── */
 
     const handleAuxClick = useCallback(
       (event: React.MouseEvent<HTMLDivElement>) => {
@@ -743,6 +996,54 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       [removeOverlay],
     );
 
+    const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+      const chartApi = chartApiRef.current;
+      if (!chartApi) return;
+      event.preventDefault();
+      const host = event.currentTarget.getBoundingClientRect();
+      const x = event.clientX - host.left;
+      const y = event.clientY - host.top;
+      const converted = chartApi.convertFromPixel([{ x, y }], {
+        paneId: 'candle_pane',
+        absolute: false,
+      });
+      const point = Array.isArray(converted) ? converted[0] : converted;
+      const price = point && typeof point.value === 'number' ? point.value : null;
+      if (price == null) return;
+      const timestamp = point && typeof point.timestamp === 'number' ? point.timestamp : null;
+      setContextMenu({ x, y, price, timestamp });
+    }, []);
+
+    useEffect(() => {
+      if (!contextMenu) return;
+      const close = () => setContextMenu(null);
+      window.addEventListener('mousedown', close);
+      return () => window.removeEventListener('mousedown', close);
+    }, [contextMenu]);
+
+    const addHorizontalLineAt = useCallback(
+      (price: number) => {
+        const chartApi = chartApiRef.current;
+        if (!chartApi) return;
+        pushUndoSnapshot();
+        try {
+          const id = chartApi.createOverlay({
+            name: 'horizontalStraightLine',
+            points: [{ value: price }],
+            ...overlayCallbacks(),
+          });
+          if (typeof id === 'string') overlayIdsRef.current.add(id);
+        } catch {
+          return;
+        }
+        schedulePersist();
+        updateHistoryState();
+      },
+      [overlayCallbacks, pushUndoSnapshot, schedulePersist, updateHistoryState],
+    );
+
+    /* ── Imperative API ───────────────────────────────────────────────── */
+
     useImperativeHandle(
       ref,
       () => ({
@@ -750,9 +1051,29 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
         importDrawings(drawings: Drawing[]): void {
           importSnapshot(drawings);
         },
+        undo,
+        redo,
+        setAllVisible,
+        setAllLocked,
+        removeAll,
+        screenshotUrl(): string | null {
+          try {
+            return (
+              chartApiRef.current?.getConvertPictureUrl(true, 'png', token('--surface-0')) ?? null
+            );
+          } catch {
+            return null;
+          }
+        },
+        lastClose(): number | null {
+          const data = fullDataRef.current;
+          return data.length > 0 ? data[data.length - 1]!.close : null;
+        },
       }),
-      [exportCurrentDrawings, importSnapshot],
+      [exportCurrentDrawings, importSnapshot, redo, removeAll, setAllLocked, setAllVisible, undo],
     );
+
+    /* ── E2E debug bridge ─────────────────────────────────────────────── */
 
     useEffect(() => {
       if (!import.meta.env.VITE_E2E) return;
@@ -773,107 +1094,111 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
       };
     }, [active, activeTool, historyVersion, hoveredId, panel.id, selectedId]);
 
+    /* ── Render ───────────────────────────────────────────────────────── */
+
     if (!symbol) {
       return (
         <div className={`chart-panel${active ? ' active' : ''}`} onMouseDown={onActivate}>
-          <div className="chart-panel-empty">No symbol</div>
+          <div className="chart-panel-empty">
+            <span>No symbol</span>
+            <button
+              type="button"
+              className="sm"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                onActivate();
+                window.dispatchEvent(new CustomEvent('tv:open-cmdk'));
+              }}
+            >
+              Pick symbol
+            </button>
+          </div>
         </div>
       );
     }
 
-    const selectedOverlay = selectedId
-      ? (chartApiRef.current?.getOverlayById(selectedId) ?? null)
-      : null;
-    const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0;
-    const canRedo = historyVersion >= 0 && redoStackRef.current.length > 0;
+    const selectedOverlay =
+      selectedId && styleVersion >= 0
+        ? (chartApiRef.current?.getOverlayById(selectedId) ?? null)
+        : null;
 
     return (
       <div
         className={`chart-panel${active ? ' active' : ''}`}
         onMouseDown={onActivate}
         onAuxClick={handleAuxClick}
+        onContextMenu={handleContextMenu}
       >
-        <div className="chart-panel-tools" onMouseDown={(event) => event.stopPropagation()}>
-          <button
-            type="button"
-            className={`chart-tool-btn${activeTool === null ? ' active' : ''}`}
-            onClick={cursorMode}
-            title="Cursor"
-            aria-label="Cursor"
-          >
-            <MousePointer2 size={16} />
-          </button>
-          <span className="chart-tool-divider" />
-          {DRAWING_TOOLS.map((tool) => {
-            const Icon = tool.icon;
-            return (
-              <button
-                key={tool.name}
-                type="button"
-                className={`chart-tool-btn${activeTool === tool.name ? ' active' : ''}`}
-                onClick={() => createDrawing(tool.name)}
-                title={tool.label}
-                aria-label={tool.label}
-              >
-                <Icon size={16} />
-              </button>
-            );
-          })}
-          <span className="chart-tool-divider" />
-          <button
-            type="button"
-            className="chart-tool-btn"
-            onClick={undo}
-            disabled={!canUndo}
-            title="Undo"
-            aria-label="Undo"
-          >
-            <Undo2 size={16} />
-          </button>
-          <button
-            type="button"
-            className="chart-tool-btn"
-            onClick={redo}
-            disabled={!canRedo}
-            title="Redo"
-            aria-label="Redo"
-          >
-            <Redo2 size={16} />
-          </button>
-        </div>
+        {selectedOverlay && stylePoint && !textEditor && (
+          <DrawingStyleBar
+            value={styleValueOf(selectedOverlay)}
+            position={{ x: stylePoint.x, y: Math.max(8, stylePoint.y - 46) }}
+            onColor={(color) => patchSelectedStyles({ color })}
+            onSize={(size) => patchSelectedStyles({ size })}
+            onLineStyle={(lineStyle) => patchSelectedStyles({ lineStyle })}
+            onEditText={() => openTextEditor(selectedOverlay.id)}
+            onClone={cloneSelected}
+            onToggleLock={toggleSelectedLock}
+            onToggleVisible={toggleSelectedVisible}
+            onDelete={() => removeOverlay(selectedId)}
+          />
+        )}
 
-        {selectedOverlay && toolbarPoint && (
+        {textEditor && (
           <div
-            className="chart-drawing-popover"
-            style={{ left: toolbarPoint.x, top: Math.max(8, toolbarPoint.y - 42) }}
-            onMouseDown={(event) => event.stopPropagation()}
+            className="chart-text-editor"
+            style={{ left: textEditor.x, top: Math.max(8, textEditor.y - 40) }}
+            onMouseDown={(e) => e.stopPropagation()}
           >
+            <input
+              autoFocus
+              value={textEditor.draft}
+              placeholder="Text…"
+              onChange={(e) => setTextEditor((s) => (s ? { ...s, draft: e.target.value } : s))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitTextEditor(true);
+                if (e.key === 'Escape') commitTextEditor(false);
+                e.stopPropagation();
+              }}
+              onBlur={() => commitTextEditor(true)}
+            />
+          </div>
+        )}
+
+        {contextMenu && (
+          <div
+            className="chart-context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {onRequestAlert && (
+              <button
+                type="button"
+                onClick={() => {
+                  setContextMenu(null);
+                  onRequestAlert(contextMenu.price);
+                }}
+              >
+                Alert at {contextMenu.price.toPrecision(6)}
+              </button>
+            )}
             <button
               type="button"
-              className="chart-tool-btn"
-              onClick={toggleLock}
-              title={selectedOverlay.lock ? 'Unlock drawing' : 'Lock drawing'}
-              aria-label={selectedOverlay.lock ? 'Unlock drawing' : 'Lock drawing'}
+              onClick={() => {
+                addHorizontalLineAt(contextMenu.price);
+                setContextMenu(null);
+              }}
             >
-              {selectedOverlay.lock ? <LockOpen size={15} /> : <Lock size={15} />}
+              Horizontal line here
             </button>
             <button
               type="button"
-              className="chart-tool-btn"
-              onClick={toggleVisible}
-              title={selectedOverlay.visible ? 'Hide drawing' : 'Show drawing'}
-              aria-label={selectedOverlay.visible ? 'Hide drawing' : 'Show drawing'}
+              onClick={() => {
+                void navigator.clipboard?.writeText(String(contextMenu.price));
+                setContextMenu(null);
+              }}
             >
-              {selectedOverlay.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-            </button>
-            <button
-              type="button"
-              className="chart-tool-btn danger"
-              onClick={() => removeOverlay(selectedId)}
-              title="Delete drawing"
-              aria-label="Delete drawing"
-            >
-              <Trash2 size={15} />
+              Copy price
             </button>
           </div>
         )}
@@ -883,6 +1208,9 @@ export const KLineChartPanel = forwardRef<KLineChartPanelHandle, ChartPanelProps
             ref={chartHandleRef}
             symbol={symbol}
             interval={panel.interval}
+            chartType={panel.chartType}
+            settings={settings}
+            indicators={panel.indicators}
             live={live}
             onChartReady={handleChartReady}
             onDataReady={handleDataReady}

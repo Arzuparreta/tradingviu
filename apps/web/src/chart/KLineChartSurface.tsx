@@ -1,9 +1,14 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { dispose, init, type Chart, type KLineData } from 'klinecharts';
-import type { Interval } from '@tv/layout-sync';
+import type { ChartType, Interval } from '@tv/layout-sync';
 import { api, getToken } from '../api/client';
 import type { Bar, Symbol as TvSymbol } from '../api/types';
+import { buildChartStyles, inferPrecision, type ChartSettings } from './theme';
+import { registerChartOverlays } from './overlays';
+import { INDICATOR_MAP } from './indicators';
+
+registerChartOverlays();
 
 const WS_PROTOCOL_VERSION = 1;
 
@@ -57,6 +62,10 @@ export interface KLineChartSurfaceHandle {
 export interface KLineChartSurfaceProps {
   symbol: TvSymbol;
   interval: Interval;
+  chartType: ChartType;
+  settings: ChartSettings;
+  /** Indicator ids from the panel config (catalog decides main vs sub pane). */
+  indicators: readonly string[];
   live?: boolean;
   onChartReady?: (chart: Chart) => void;
   onDataReady?: (data: KLineData[]) => void;
@@ -79,11 +88,24 @@ declare global {
 
 export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartSurfaceProps>(
   function KLineChartSurface(
-    { symbol, interval, live = true, onChartReady, onDataReady, onAppliedKeyChange },
+    {
+      symbol,
+      interval,
+      chartType,
+      settings,
+      indicators,
+      live = true,
+      onChartReady,
+      onDataReady,
+      onAppliedKeyChange,
+    },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const chartRef = useRef<Chart | null>(null);
+    // Sub-pane indicators keep their pane ids so removal targets the right pane.
+    const subPanesRef = useRef<Map<string, string>>(new Map());
+    const mainIndicatorsRef = useRef<Set<string>>(new Set());
     const [reloadSeq, setReloadSeq] = useState(0);
     const [lastAppliedKey, setLastAppliedKey] = useState<string | null>(null);
     const currentKey = `${symbol.id}|${interval}|${reloadSeq}`;
@@ -119,15 +141,11 @@ export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartS
       const chart = init(container, {
         locale: 'en-US',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        styles: 'dark',
       });
       if (!chart) return;
 
       chartRef.current = chart;
-      chart.setPriceVolumePrecision(2, 2);
-      chart.setOffsetRightDistance(18);
-      chart.createIndicator('MA', false);
-      chart.createIndicator('VOL');
+      chart.setOffsetRightDistance(72);
       onChartReady?.(chart);
 
       const resizeObserver = new ResizeObserver(() => chart.resize());
@@ -137,15 +155,62 @@ export const KLineChartSurface = forwardRef<KLineChartSurfaceHandle, KLineChartS
         resizeObserver.disconnect();
         dispose(chart);
         chartRef.current = null;
+        subPanesRef.current.clear();
+        mainIndicatorsRef.current.clear();
       };
     }, [onChartReady]);
+
+    // Theme + chart type + axis/grid settings.
+    useEffect(() => {
+      chartRef.current?.setStyles(buildChartStyles(chartType, settings));
+    }, [chartType, settings]);
+
+    // Reconcile the indicator set with what's on the chart.
+    const indicatorKey = indicators.join(',');
+    useEffect(() => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const wanted = indicatorKey === '' ? [] : indicatorKey.split(',');
+      const wantedMain = new Set(wanted.filter((id) => INDICATOR_MAP[id]?.pane === 'main'));
+      const wantedSub = new Set(wanted.filter((id) => INDICATOR_MAP[id]?.pane === 'sub'));
+
+      for (const id of [...mainIndicatorsRef.current]) {
+        if (!wantedMain.has(id)) {
+          chart.removeIndicator('candle_pane', id);
+          mainIndicatorsRef.current.delete(id);
+        }
+      }
+      for (const [id, paneId] of [...subPanesRef.current]) {
+        if (!wantedSub.has(id)) {
+          chart.removeIndicator(paneId, id);
+          subPanesRef.current.delete(id);
+        }
+      }
+      // VOL ships MA(5,10,20) overlays by default — plain volume bars read better.
+      const create = (id: string) => (id === 'VOL' ? { name: 'VOL', calcParams: [] } : id);
+      for (const id of wantedMain) {
+        if (!mainIndicatorsRef.current.has(id)) {
+          chart.createIndicator(create(id), true, { id: 'candle_pane' });
+          mainIndicatorsRef.current.add(id);
+        }
+      }
+      for (const id of wantedSub) {
+        if (!subPanesRef.current.has(id)) {
+          const paneId = chart.createIndicator(create(id), false, { height: 80 });
+          if (paneId) subPanesRef.current.set(id, paneId);
+        }
+      }
+    }, [indicatorKey]);
 
     useEffect(() => {
       const chart = chartRef.current;
       if (!chart || !dataQ.data || dataQ.isPlaceholderData) return;
 
+      const bars = dataQ.data.bars;
+      chart.setPriceVolumePrecision(inferPrecision(bars.map((b) => b.close)), 0);
+
       const applyKey = currentKey;
-      chart.applyNewData(dataQ.data.bars.map(barToKLine), false, () => {
+      chart.applyNewData(bars.map(barToKLine), false, () => {
         chart.scrollToRealTime();
         setLastAppliedKey(applyKey);
         onAppliedKeyChange?.(applyKey);

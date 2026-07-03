@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, CalendarClock, Landmark, Newspaper, Search, Zap } from 'lucide-react';
+import { IconBarChart, IconBolt, IconCalendar, IconLandmark, IconNews, IconSearch } from '../ui/icons';
 import { api } from '../api/client';
 import {
   Badge,
@@ -100,7 +100,7 @@ function AssetRow({ result }: { result: ScreenerResult }) {
 function YieldCurve({ points }: { points: readonly YieldCurvePoint[] }) {
   const max = points.reduce((m, point) => Math.max(m, point.rate), 0);
   if (points.length === 0) {
-    return <EmptyState icon={<Landmark size={18} />} title="No yield curve data" />;
+    return <EmptyState icon={<IconLandmark size={18} />} title="No yield curve data" />;
   }
   return (
     <div className="disc-yield">
@@ -201,7 +201,7 @@ export function DiscoveryPage() {
 
       <div className="disc-controls">
         <div className="disc-search">
-          <Search size={15} />
+          <IconSearch size={15} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -225,7 +225,7 @@ export function DiscoveryPage() {
 
       <div className="disc-cols">
         <div className="disc-col">
-          <Panel title="Headlines" icon={<Newspaper size={15} />} flush>
+          <Panel title="Headlines" icon={<IconNews size={15} />} flush>
             {articles.length > 0 ? (
               <div className="disc-scroll">
                 <DataList>
@@ -246,13 +246,13 @@ export function DiscoveryPage() {
               </div>
             ) : (
               <EmptyState
-                icon={<Newspaper size={18} />}
+                icon={<IconNews size={18} />}
                 title={newsQ.isLoading ? 'Loading news' : 'No indexed news'}
               />
             )}
           </Panel>
 
-          <Panel title="Asset board" icon={<BarChart3 size={15} />} flush>
+          <Panel title="Asset board" icon={<IconBarChart size={15} />} flush>
             {assets.length > 0 ? (
               <div className="disc-scroll">
                 <DataTable>
@@ -273,11 +273,11 @@ export function DiscoveryPage() {
                 </DataTable>
               </div>
             ) : (
-              <EmptyState icon={<BarChart3 size={18} />} title="No tracked assets" />
+              <EmptyState icon={<IconBarChart size={18} />} title="No tracked assets" />
             )}
           </Panel>
 
-          <Panel title="Fundamentals" icon={<Zap size={15} />} flush>
+          <Panel title="Fundamentals" icon={<IconBolt size={15} />} flush>
             {fundamentals.length > 0 ? (
               <DataTable>
                 <thead>
@@ -312,7 +312,7 @@ export function DiscoveryPage() {
               </DataTable>
             ) : (
               <EmptyState
-                icon={<Zap size={18} />}
+                icon={<IconBolt size={18} />}
                 title={fundamentalsQ.isLoading ? 'Loading fundamentals' : 'No fundamental snapshots'}
               />
             )}
@@ -320,7 +320,7 @@ export function DiscoveryPage() {
         </div>
 
         <div className="disc-col">
-          <Panel title="Macro pulse" icon={<Landmark size={15} />} flush>
+          <Panel title="Macro pulse" icon={<IconLandmark size={15} />} flush>
             <YieldCurve points={yieldCurveQ.data?.points ?? []} />
             {macro.length > 0 ? (
               <DataList>
@@ -335,16 +335,16 @@ export function DiscoveryPage() {
               </DataList>
             ) : (
               <EmptyState
-                icon={<Landmark size={18} />}
+                icon={<IconLandmark size={18} />}
                 title={macroQ.isLoading ? 'Loading macro' : 'No macro observations'}
               />
             )}
           </Panel>
 
-          <Panel title="Catalysts" icon={<CalendarClock size={15} />} flush>
+          <Panel title="Catalysts" icon={<IconCalendar size={15} />} flush>
             {noCatalysts ? (
               <EmptyState
-                icon={<CalendarClock size={18} />}
+                icon={<IconCalendar size={18} />}
                 title={
                   economicQ.isLoading || earningsQ.isLoading
                     ? 'Loading catalysts'

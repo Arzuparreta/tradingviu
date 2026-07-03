@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, Compass, CornerDownLeft, LayoutGrid, Search, type LucideIcon } from 'lucide-react';
+import { IconBell, IconCompass, IconSearch, IconWorkspace, type IconProps } from '../ui/icons';
 import { api } from '../api/client';
 import type { Symbol } from '../api/types';
 
 interface Action {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: ComponentType<IconProps>;
   hint: string;
   run: () => void;
 }
@@ -36,9 +36,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const actions = useMemo<Action[]>(
     () => [
-      { id: 'workspace', label: 'Workspace', icon: LayoutGrid, hint: 'go', run: () => navigate('/') },
-      { id: 'discovery', label: 'Discovery', icon: Compass, hint: 'go', run: () => navigate('/discovery') },
-      { id: 'alerts', label: 'Alerts', icon: Bell, hint: 'go', run: () => navigate('/alerts') },
+      { id: 'workspace', label: 'Workspace', icon: IconWorkspace, hint: 'go', run: () => navigate('/') },
+      { id: 'discovery', label: 'Discovery', icon: IconCompass, hint: 'go', run: () => navigate('/discovery') },
+      { id: 'alerts', label: 'Alerts', icon: IconBell, hint: 'go', run: () => navigate('/alerts') },
     ],
     [navigate],
   );
@@ -131,7 +131,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               >
                 <Icon size={15} />
                 <span>{a.label}</span>
-                <CornerDownLeft size={13} className="ui-cmdk-meta" />
+                <span className="ui-cmdk-meta">↵</span>
               </button>
             );
           })}
@@ -149,7 +149,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 onMouseEnter={() => setActive(i)}
                 onClick={() => run(i)}
               >
-                <Search size={15} />
+                <IconSearch size={15} />
                 <span className="mono">
                   {s.exchange}:{s.ticker}
                 </span>

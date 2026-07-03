@@ -1,7 +1,14 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ComponentType } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, Compass, LayoutGrid, LogOut, Search, type LucideIcon } from 'lucide-react';
+import {
+  IconBell,
+  IconCompass,
+  IconLogout,
+  IconSearch,
+  IconWorkspace,
+  type IconProps,
+} from '../ui/icons';
 import { useAuth } from '../stores/auth';
 import { api } from '../api/client';
 import { CommandPalette } from './CommandPalette';
@@ -9,15 +16,15 @@ import { CommandPalette } from './CommandPalette';
 interface NavItem {
   to: string;
   label: string;
-  icon: LucideIcon;
+  icon: ComponentType<IconProps>;
   end?: boolean;
 }
 
 // One terminal, three surfaces. Order = how often the owner reaches for each.
 const NAV_ITEMS: readonly NavItem[] = [
-  { to: '/', label: 'Workspace', icon: LayoutGrid, end: true },
-  { to: '/discovery', label: 'Discovery', icon: Compass },
-  { to: '/alerts', label: 'Alerts', icon: Bell },
+  { to: '/', label: 'Workspace', icon: IconWorkspace, end: true },
+  { to: '/discovery', label: 'Discovery', icon: IconCompass },
+  { to: '/alerts', label: 'Alerts', icon: IconBell },
 ];
 
 function Rail({ alertCount }: { alertCount: number }) {
@@ -35,7 +42,7 @@ function Rail({ alertCount }: { alertCount: number }) {
           data-label={label}
           aria-label={label}
         >
-          <Icon size={18} strokeWidth={1.75} />
+          <Icon size={18} />
           {to === '/alerts' && alertCount > 0 && <span className="rail-badge">{alertCount}</span>}
         </NavLink>
       ))}
@@ -92,7 +99,7 @@ export function Shell() {
       <div className="app-main">
         <header className="ctxbar">
           <button type="button" className="cmdk-trigger" onClick={() => setCmdkOpen(true)}>
-            <Search size={14} />
+            <IconSearch size={14} />
             <span>Search symbols or jump to…</span>
             <kbd>⌘K</kbd>
           </button>
@@ -107,7 +114,7 @@ export function Shell() {
                 title="Sign out"
                 aria-label="Sign out"
               >
-                <LogOut size={15} strokeWidth={1.75} />
+                <IconLogout size={15} />
               </button>
             </div>
           </div>
