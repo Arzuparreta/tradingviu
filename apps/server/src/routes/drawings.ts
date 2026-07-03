@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drawings as drawingsTable } from '@tv/db/schema';
-import { DrawingsSchema } from '@tv/drawing-tools';
+import { DrawingsSchema } from '@tv/core';
 import { tryGetUserContext, type UserContext } from '@tv/core';
 import { drawingToColumns, rowToDrawing } from '../services/drawings.js';
 

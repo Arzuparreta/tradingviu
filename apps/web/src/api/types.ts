@@ -1,5 +1,5 @@
 import type { LayoutConfig } from '@tv/layout-sync';
-import type { Drawing } from '@tv/drawing-tools';
+import type { Drawing } from '@tv/core';
 
 export interface LayoutRow {
   id: string;

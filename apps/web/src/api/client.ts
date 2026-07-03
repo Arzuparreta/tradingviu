@@ -35,7 +35,7 @@ import type {
   AlertCondition,
 } from './types';
 import type { LayoutConfig } from '@tv/layout-sync';
-import type { Drawing } from '@tv/drawing-tools';
+import type { Drawing } from '@tv/core';
 
 const TOKEN_KEY = 'tv_token';
 

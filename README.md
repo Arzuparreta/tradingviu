@@ -15,7 +15,7 @@ See [`docs/PRODUCT.md`](docs/PRODUCT.md) for direction and
 ```bash
 pnpm install
 cp .env.example .env
-pnpm dev:infra            # Postgres, Redis, MinIO, Meilisearch, Mailpit (Docker)
+pnpm dev:infra            # Postgres, Redis, Meilisearch, Mailpit (Docker)
 pnpm db:migrate
 pnpm db:seed
 pnpm tvctl ensure-owner   # creates/repairs the owner login from .env
@@ -36,7 +36,7 @@ Ports (repo-owned): web `5187`, API `3101`. Dev wrapper: `pnpm dev:status`,
 - Web: Vite + React 18 + TanStack Query + Zustand
 - Chart: klinecharts core
 - API: Hono on Bun (HTTP + WebSocket in one process)
-- Data: PostgreSQL 16 + TimescaleDB; Redis, MinIO, Meilisearch, Mailpit
+- Data: PostgreSQL 16 + TimescaleDB; Redis, Meilisearch, Mailpit
 - Market data: native Binance REST/WS plus provider adapter packages
 - Discovery data: provider-backed news, calendars, fundamentals, and macro ingest
 

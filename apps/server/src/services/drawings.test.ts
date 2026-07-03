@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Drawing } from '@tv/drawing-tools';
+import type { Drawing } from '@tv/core';
 import { drawingToColumns, rowToDrawing } from './drawings.js';
 
 const sample = (): Drawing => ({

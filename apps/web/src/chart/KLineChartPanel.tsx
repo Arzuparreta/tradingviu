@@ -26,7 +26,7 @@ import {
   type OverlayEvent,
 } from 'klinecharts';
 import type { Panel } from '@tv/layout-sync';
-import type { Drawing } from '@tv/drawing-tools';
+import type { Drawing } from '@tv/core';
 import { api } from '../api/client';
 import type { Symbol as TvSymbol } from '../api/types';
 import { KLineChartSurface, type KLineChartSurfaceHandle } from './KLineChartSurface';

@@ -9,7 +9,7 @@ API surfaces are out of scope.
 
 ```
 Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest services
-                                                    ->  Postgres + TimescaleDB, Redis, MinIO, Meilisearch
+                                                    ->  Postgres + TimescaleDB, Redis, Meilisearch
                                                     ->  market / news / calendar / fundamentals / macro providers
 ```
 

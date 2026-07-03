@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { getToken } from '../api/client';
 import type { Quote } from '../api/types';
-import type { MarketStatus } from './use-market-stream';
+
+export type MarketStatus = 'idle' | 'connecting' | 'live' | 'reconnecting' | 'down';
 
 export interface QuoteSymbol {
   readonly id: string;
