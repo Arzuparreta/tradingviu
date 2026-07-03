@@ -78,6 +78,15 @@ export function WatchlistDock() {
   const [newName, setNewName] = useState('');
   const [addSym, setAddSym] = useState('');
 
+  const addQuery = addSym.trim();
+  const suggestQ = useQuery({
+    queryKey: ['wl-suggest', addQuery],
+    queryFn: () => api.search(addQuery, { limit: 6 }),
+    enabled: addQuery.length > 0,
+    staleTime: 30_000,
+  });
+  const suggestions = addQuery.length > 0 ? (suggestQ.data?.results ?? []) : [];
+
   const listsQ = useQuery({ queryKey: ['watchlists'], queryFn: () => api.watchlists() });
   const lists = listsQ.data?.watchlists ?? [];
   const activeId = listId ?? lists[0]?.id ?? null;
@@ -113,10 +122,14 @@ export function WatchlistDock() {
     setListId(null);
     await reloadLists();
   };
-  const addSymbol = async () => {
-    const sym = addSym.trim();
+  const addSymbol = async (symbolId?: string) => {
+    const sym = symbolId ?? suggestions[0]?.id ?? addSym.trim();
     if (!sym || !activeId) return;
-    await api.addToWatchlist(activeId, sym);
+    try {
+      await api.addToWatchlist(activeId, sym);
+    } catch {
+      return;
+    }
     setAddSym('');
     await reloadItems();
   };
@@ -188,11 +201,26 @@ export function WatchlistDock() {
             value={addSym}
             placeholder="Add symbol…"
             onChange={(e) => setAddSym(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void addSymbol()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void addSymbol();
+              if (e.key === 'Escape') setAddSym('');
+            }}
           />
           <button className="icon-btn" onClick={() => void addSymbol()} title="Add">
             <IconPlus size={14} />
           </button>
+          {suggestions.length > 0 && (
+            <div className="wl-suggest">
+              {suggestions.map((s) => (
+                <button key={s.id} type="button" onClick={() => void addSymbol(s.id)}>
+                  <span className="mono">
+                    {s.exchange}:{s.ticker}
+                  </span>
+                  <span className="muted ellipsis">{s.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

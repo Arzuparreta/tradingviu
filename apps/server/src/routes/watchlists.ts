@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, sql } from 'drizzle-orm';
 import { watchlists, watchlistItems, symbols, exchanges } from '@tv/db/schema';
 import { ulid } from 'ulid';
 import { NotFoundError, ValidationError, tryGetUserContext, type UserContext } from '@tv/core';
@@ -86,7 +86,17 @@ export const watchlistRoutes = new Hono()
       .where(and(eq(watchlists.id, id), eq(watchlists.userId, tenant.userId)));
     if (!list) throw new NotFoundError('Watchlist not found');
 
-    const [sym] = await db.select().from(symbols).where(eq(symbols.id, body.symbol));
+    // Accept a symbol id, a bare ticker, or EXCHANGE:TICKER.
+    let [sym] = await db.select().from(symbols).where(eq(symbols.id, body.symbol));
+    if (!sym) {
+      const ticker = (body.symbol.includes(':') ? body.symbol.split(':').pop()! : body.symbol)
+        .trim()
+        .toUpperCase();
+      [sym] = await db
+        .select()
+        .from(symbols)
+        .where(sql`upper(${symbols.ticker}) = ${ticker}`);
+    }
     if (!sym) throw new ValidationError('Symbol not found');
 
     const count = await db
@@ -101,7 +111,7 @@ export const watchlistRoutes = new Hono()
     const insertValues: typeof watchlistItems.$inferInsert = {
       id: itemId,
       watchlistId: id,
-      symbolId: body.symbol,
+      symbolId: sym.id,
       sortOrder: count.length,
     };
     if (body.color !== undefined) insertValues.color = body.color;
