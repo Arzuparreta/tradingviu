@@ -15,10 +15,10 @@ import {
 import { api } from '../api/client';
 import { useAuth } from '../stores/auth';
 import {
-  KLineProChartPanel,
-  type KLineProChartPanelHandle,
+  KLineChartPanel,
+  type KLineChartPanelHandle,
   type PanelBounds,
-} from '../chart/KLineProChartPanel';
+} from '../chart/KLineChartPanel';
 import {
   clampTime,
   defaultReplayTime,
@@ -30,8 +30,10 @@ import {
   defaultLayoutConfig,
   GRID_KEYS,
   GRID_PRESETS,
+  INTERVALS,
   reflowToGrid,
   type GridKey,
+  type Interval,
   type LayoutConfig,
   type Panel,
 } from '@tv/layout-sync';
@@ -42,7 +44,7 @@ import { MarketRibbon } from '../components/workspace/MarketRibbon';
 
 /**
  * Chart-first workspace — the home of the terminal. Built on the layout-sync
- * grid engine + KLineProChartPanel: grid `1` is the single-chart surface, the
+ * grid engine + KLineChartPanel: grid `1` is the single-chart surface, the
  * larger grids tile multiple symbols. Saved layouts are presets. The right
  * docks and bottom ribbon supply context without leaving the chart.
  */
@@ -60,7 +62,7 @@ export function WorkspacePage() {
   const [showDock, setShowDock] = useState(true);
   const [showRibbon, setShowRibbon] = useState(true);
 
-  const panelRefs = useRef<Map<string, KLineProChartPanelHandle>>(new Map());
+  const panelRefs = useRef<Map<string, KLineChartPanelHandle>>(new Map());
 
   // ── Replay (synced across panels by cursor time) ──────────────────────
   const bounds = useRef<Map<string, PanelBounds>>(new Map());
@@ -198,6 +200,14 @@ export function WorkspacePage() {
     });
   }, []);
 
+  const setActiveInterval = useCallback((interval: Interval) => {
+    setConfig((cfg) => {
+      const idx = Math.min(cfg.activePanel, cfg.panels.length - 1);
+      const panels = cfg.panels.map((p, i) => (i === idx ? { ...p, interval } : p));
+      return { ...cfg, panels };
+    });
+  }, []);
+
   const persistDrawings = useCallback(async () => {
     for (const p of config.panels) {
       if (!p.symbolId) continue;
@@ -262,6 +272,7 @@ export function WorkspacePage() {
   const preset = GRID_PRESETS[config.grid];
   const multiPanel = config.panels.length > 1;
   const gridOptions = useMemo(() => GRID_KEYS.map((g) => ({ value: g, label: g })), []);
+  const intervalOptions = useMemo(() => INTERVALS.map((i) => ({ value: i, label: i })), []);
 
   return (
     <div className={`ws${showRibbon ? ' has-ribbon' : ''}`}>
@@ -274,6 +285,17 @@ export function WorkspacePage() {
         <span className="ws-divider" />
 
         <Segmented value={config.grid} onChange={setGrid} options={gridOptions} />
+
+        {activePanel && (
+          <>
+            <span className="ws-divider" />
+            <Segmented
+              value={activePanel.interval}
+              onChange={setActiveInterval}
+              options={intervalOptions}
+            />
+          </>
+        )}
 
         <select
           value={currentId ?? ''}
@@ -379,13 +401,14 @@ export function WorkspacePage() {
             }}
           >
             {config.panels.map((p, i) => (
-              <KLineProChartPanel
+              <KLineChartPanel
                 key={p.id}
                 ref={(r) => {
                   if (r) panelRefs.current.set(p.id, r);
                   else panelRefs.current.delete(p.id);
                 }}
                 panel={p}
+                symbol={p.symbolId ? symbolsQ.data?.results.find((s) => s.id === p.symbolId) ?? null : null}
                 active={config.activePanel === i}
                 live={config.activePanel === i && !replayActive}
                 onActivate={() => setConfig((cfg) => ({ ...cfg, activePanel: i }))}

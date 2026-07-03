@@ -50,11 +50,14 @@ Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest 
 
 ## Charting
 
-- `/chart` and `/chart/:symbol` render `ChartProPage` -> `KLineProChart`
-  (KLineChart Pro) over `klinepro-datafeed.ts`, which adapts `/api/symbols`,
-  `/api/chart/history`, and `/ws`.
-- `/layout` tiles `KLineProChartPanel` with independent panel state and only
-  explicitly useful synchronization.
+- `/chart` and `/chart/:symbol` render `WorkspacePage`, which tiles
+  `KLineChartPanel` instances over a direct `klinecharts` core surface.
+- React layout state is the source of truth for chart symbol and interval.
+  Each panel explicitly loads `/api/chart/history` and subscribes to `/ws` for
+  the current `{ symbol, interval }`; stale requests/subscriptions are discarded
+  on change.
+- `/layout` aliases into the same workspace model, with independent panel state
+  and only explicitly useful synchronization.
 - Drawing persistence lives through `@tv/drawing-tools`.
 
 ## API
@@ -77,7 +80,8 @@ Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest 
 | `apps/server/src/services/market-store.ts` | live upstream + ring buffer |
 | `apps/server/src/services/market-data.ts` | freshness-aware history |
 | `apps/web/src/App.tsx` | web shell + active routes |
-| `apps/web/src/chart/KLineProChart.tsx` | KLineChart Pro wrapper |
+| `apps/web/src/chart/KLineChartSurface.tsx` | Direct klinecharts core wrapper |
+| `apps/web/src/chart/KLineChartPanel.tsx` | Panel-owned chart, drawing, replay integration |
 | `apps/web/src/pages/*` | active product surfaces |
 | `apps/web/src/pages/DiscoveryPage.tsx` | news/macro/catalyst/asset discovery |
 | `apps/web/src/styles/index.css` | global styles / design tokens |

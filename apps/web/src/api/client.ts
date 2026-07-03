@@ -124,6 +124,7 @@ export const api = {
     interval = '1h',
     limit = 500,
     range: { from?: number; to?: number; before?: number; after?: number } = {},
+    init?: RequestInit,
   ) =>
     request<{
       symbol: { id: string; exchange: string; ticker: string; name: string };
@@ -132,7 +133,7 @@ export const api = {
       source?: 'barstore' | 'exchange';
       asOf?: number | null;
       fresh?: boolean;
-    }>(`/api/chart/history${queryString({ symbol, interval, limit, ...range })}`),
+    }>(`/api/chart/history${queryString({ symbol, interval, limit, ...range })}`, init),
   dom: (symbol: string, levels = 16) =>
     request<{
       symbol: {

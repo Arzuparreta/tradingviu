@@ -34,7 +34,7 @@ Ports (repo-owned): web `5187`, API `3101`. Dev wrapper: `pnpm dev:status`,
 
 - Monorepo: pnpm workspaces + Turbo
 - Web: Vite + React 18 + TanStack Query + Zustand
-- Chart: KLineChart Pro
+- Chart: klinecharts core
 - API: Hono on Bun (HTTP + WebSocket in one process)
 - Data: PostgreSQL 16 + TimescaleDB; Redis, MinIO, Meilisearch, Mailpit
 - Market data: native Binance REST/WS plus provider adapter packages

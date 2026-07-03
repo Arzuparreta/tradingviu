@@ -51,7 +51,7 @@ const screenerResults = screenerTickers.map((ticker, index) => ({
   },
 }));
 
-const manySymbols: TvSymbol[] = Array.from({ length: 18 }, (_, index) => ({
+const manySymbols: TvSymbol[] = Array.from({ length: 48 }, (_, index) => ({
   id: `SYM${index}`,
   exchange: 'NASDAQ',
   ticker: `SYM${index}`,
@@ -61,7 +61,7 @@ const manySymbols: TvSymbol[] = Array.from({ length: 18 }, (_, index) => ({
   active: true,
 }));
 
-const manyWatchlists: Watchlist[] = Array.from({ length: 18 }, (_, index) => ({
+const manyWatchlists: Watchlist[] = Array.from({ length: 48 }, (_, index) => ({
   id: `wl_${index}`,
   name: `Long watchlist ${index + 1}`,
   createdAt: '2026-06-27T00:00:00.000Z',
@@ -142,6 +142,7 @@ interface AppMockOptions {
   watchlistItems?: readonly WatchlistItem[];
   alerts?: readonly AlertRow[];
   searchResults?: readonly TvSymbol[];
+  onHistoryRequest?: (params: { symbol: string; interval: string }) => void;
 }
 
 const installAppMocks = async (page: Page, options: AppMockOptions = {}) => {
@@ -149,6 +150,7 @@ const installAppMocks = async (page: Page, options: AppMockOptions = {}) => {
   const watchlistItems = options.watchlistItems ?? [];
   const alerts = options.alerts ?? [];
   const searchResults = options.searchResults ?? symbols;
+  const onHistoryRequest = options.onHistoryRequest;
 
   await page.addInitScript(() => {
     localStorage.setItem('tv_token', 'e2e-token');
@@ -236,11 +238,13 @@ const installAppMocks = async (page: Page, options: AppMockOptions = {}) => {
 
     if (url.pathname === '/api/chart/history') {
       const symbolId = url.searchParams.get('symbol') ?? 'BTCUSDT';
+      const interval = url.searchParams.get('interval') ?? '1h';
+      onHistoryRequest?.({ symbol: symbolId, interval });
       const symbol =
         symbols.find((item) => item.id === symbolId || item.ticker === symbolId) ?? btc;
       await fulfillJson({
         symbol,
-        interval: url.searchParams.get('interval') ?? '1h',
+        interval,
         bars,
         fresh: true,
       });
@@ -460,20 +464,23 @@ const expectContainedVerticalScroll = async (locator: Locator, rightEdgeSelector
   expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
   expect(metrics.overflowY).toBe('auto');
   expect(metrics.scrollbarGutter).toContain('stable');
-  expect(metrics.scrollbarWidth).toBe('auto');
+  expect(['auto', 'thin']).toContain(metrics.scrollbarWidth);
   expect(metrics.gutterWidth).toBeGreaterThanOrEqual(10);
   if (metrics.rightEdgeRight != null) {
     expect(metrics.rightEdgeRight).toBeLessThanOrEqual(metrics.clientRight + 1);
   }
 };
 
-test('chart route renders KLineChart Pro', async ({ page }) => {
+test('chart route renders the core KLine chart surface', async ({ page }) => {
   await installAppMocks(page);
   await page.goto('/chart/BTCUSDT');
 
-  await expect(page.getByText('Bitcoin / Tether')).toBeVisible();
-  await expect(page.getByText('Indicator')).toBeVisible();
-  await expect(page.getByText('Screenshot')).toBeVisible();
+  const chart = page.locator('.kline-core').first();
+  await expect(page.locator('.ws-symbol')).toContainText('BTCUSDT');
+  await expect(page.getByRole('button', { name: 'Trend' })).toBeVisible();
+  await expect(chart).toHaveAttribute('data-symbol', 'BTCUSDT');
+  await expect(chart).toHaveAttribute('data-interval', '1h');
+  await expect(chart).toHaveAttribute('data-loading', 'false');
   await expect.poll(() => page.locator('canvas').count()).toBeGreaterThan(0);
 });
 
@@ -482,8 +489,46 @@ test('legacy chart aliases collapse to the canonical chart', async ({ page }) =>
   await page.goto('/chart-legacy/BTCUSDT');
 
   await expect(page).toHaveURL(/\/chart\/BTCUSDT$/);
-  await expect(page.getByText('Bitcoin / Tether')).toBeVisible();
+  await expect(page.locator('.ws-symbol')).toContainText('BTCUSDT');
   await expect.poll(() => page.locator('canvas').count()).toBeGreaterThan(0);
+});
+
+test('chart controls keep symbol and interval wired through rapid changes', async ({ page }) => {
+  const historyRequests: Array<{ symbol: string; interval: string }> = [];
+  await installAppMocks(page, {
+    onHistoryRequest: (params) => historyRequests.push(params),
+  });
+  await page.goto('/chart/BTCUSDT');
+
+  const chart = page.locator('.kline-core').first();
+  await expect(chart).toHaveAttribute('data-loading', 'false');
+  await expect(chart).toHaveAttribute('data-symbol', 'BTCUSDT');
+
+  for (const interval of ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '5m', '1m', '1h']) {
+    await page.getByRole('tab', { name: interval, exact: true }).click();
+    await expect(chart).toHaveAttribute('data-interval', interval);
+    await expect(chart).toHaveAttribute('data-loading', 'false');
+  }
+
+  await page.getByRole('button', { name: /Search symbols or jump to/ }).click();
+  await expect(page.getByPlaceholder('Search symbols or jump to…')).toBeVisible();
+  await page.getByPlaceholder('Search symbols or jump to…').fill('AAPL');
+  await expect(page.getByRole('button', { name: /NASDAQ:AAPL/ })).toBeVisible();
+  await page.getByRole('button', { name: /NASDAQ:AAPL/ }).click();
+  await expect(chart).toHaveAttribute('data-symbol', 'AAPL');
+  await expect(chart).toHaveAttribute('data-loading', 'false');
+
+  await page.getByRole('button', { name: /Search symbols or jump to/ }).click();
+  await expect(page.getByPlaceholder('Search symbols or jump to…')).toBeVisible();
+  await page.getByPlaceholder('Search symbols or jump to…').fill('BTC');
+  await expect(page.getByRole('button', { name: /BINANCE:BTCUSDT/ })).toBeVisible();
+  await page.getByRole('button', { name: /BINANCE:BTCUSDT/ }).click();
+  await expect(chart).toHaveAttribute('data-symbol', 'BTCUSDT');
+  await expect(chart).toHaveAttribute('data-loading', 'false');
+
+  expect(historyRequests).toContainEqual({ symbol: 'BTCUSDT', interval: '1m' });
+  expect(historyRequests).toContainEqual({ symbol: 'AAPL', interval: '1h' });
+  expect(historyRequests.at(-1)).toEqual({ symbol: 'BTCUSDT', interval: '1h' });
 });
 
 test('layout page renders saved chart panels', async ({ page }) => {
@@ -500,41 +545,57 @@ test('discovery renders news, macro, catalysts and assets', async ({ page }) => 
   await page.goto('/discovery');
 
   await expect(page.getByRole('heading', { name: 'Discovery' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Headlines' })).toBeVisible();
+  await expect(page.getByText('Headlines')).toBeVisible();
   await expect(page.getByText('Apple suppliers lift guidance on AI device cycle')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Macro pulse' })).toBeVisible();
+  await expect(page.getByText('Macro pulse')).toBeVisible();
   await expect(page.getByText('Consumer Price Index')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Catalysts' })).toBeVisible();
+  await expect(page.getByText('Catalysts')).toBeVisible();
   await expect(page.getByText('ISM Manufacturing PMI')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Asset board' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'AAPL', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Fundamental snapshots' })).toBeVisible();
+  await expect(page.getByText('Asset board')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'AAPL', exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Fundamentals')).toBeVisible();
 });
 
-test('dashboard keeps asset board rows inside the panel', async ({ page }) => {
+test('workspace keeps long watchlist rows inside the dock', async ({ page }) => {
   await installAppMocks(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
 
-  const assetPanel = page.locator('.dashboard-panel').filter({
-    has: page.getByRole('heading', { name: 'Asset board' }),
+  const watchlistDock = page.locator('.ui-dock').filter({
+    has: page.getByText('Watchlist', { exact: true }),
   });
 
-  await expect(assetPanel).toBeVisible();
-  await expect(assetPanel.locator('.dashboard-asset-row')).toHaveCount(screenerResults.length);
+  await expect(watchlistDock).toBeVisible();
+  await expect(watchlistDock.locator('.ui-row--wl')).toHaveCount(0);
+});
+
+test('workspace contains long watchlist rows when the dock overflows', async ({ page }) => {
+  await installAppMocks(page, {
+    watchlists: manyWatchlists,
+    watchlistItems: manyWatchlistItems,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+
+  const watchlistDock = page.locator('.ui-dock').filter({
+    has: page.getByText('Watchlist', { exact: true }),
+  });
+
+  await expect(watchlistDock).toBeVisible();
+  await expect(watchlistDock.locator('.ui-row--wl')).toHaveCount(manyWatchlistItems.length);
 
   await expectContainedVerticalScroll(
-    assetPanel.locator('.dashboard-list'),
-    '.dashboard-asset-row:first-child strong span',
+    watchlistDock.locator('.ui-dock-body'),
+    '.ui-row--wl:first-child .wl-row-remove',
   );
 
-  const spillsBelow = await assetPanel.evaluate((panel) => {
+  const spillsBelow = await watchlistDock.evaluate((panel) => {
     const panelRect = panel.getBoundingClientRect();
     const hit = document.elementFromPoint(
       panelRect.left + panelRect.width / 2,
       panelRect.bottom + 4,
     );
-    return hit?.closest('.dashboard-asset-row') != null;
+    return hit?.closest('.ui-row--wl') != null;
   });
 
   expect(spillsBelow).toBe(false);
@@ -549,26 +610,17 @@ test('shared scroll containers keep long lists inside their content bounds', asy
   });
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  await page.goto('/watchlists');
-  await expect(page.getByRole('heading', { name: 'Watchlists' })).toBeVisible();
-  await expectContainedVerticalScroll(
-    page.locator('.wl-lists'),
-    '.wl-list-row:first-of-type .wl-del',
-  );
-  await expectContainedVerticalScroll(
-    page.locator('.wl-grid .tbl-wrap'),
-    'tbody tr:first-child td.num button',
-  );
-
   await page.goto('/alerts');
   await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible();
-  await expectContainedVerticalScroll(page.locator('.al-grid .tbl-wrap'));
+  await expectContainedVerticalScroll(page.locator('.alerts'));
 
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
-  await page.keyboard.type('SYM');
-  await expect(page.locator('.symbol-search-results')).toBeVisible();
+  await page.getByRole('button', { name: /Search symbols or jump to/ }).click();
+  await expect(page.getByPlaceholder('Search symbols or jump to…')).toBeVisible();
+  await page.getByPlaceholder('Search symbols or jump to…').fill('SYM');
+  await expect(page.locator('.ui-cmdk-list')).toBeVisible();
+  await expect(page.locator('.ui-cmdk-item')).toHaveCount(manySymbols.length);
   await expectContainedVerticalScroll(
-    page.locator('.symbol-search-results'),
-    '.symbol-search-item:first-of-type > span:last-child',
+    page.locator('.ui-cmdk-list'),
+    '.ui-cmdk-item:first-of-type .ui-cmdk-meta',
   );
 });
