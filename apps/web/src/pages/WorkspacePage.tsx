@@ -13,6 +13,14 @@ import {
 } from '../chart/KLineChartPanel';
 import { ChartToolbar, type DrawingWorkspaceState, type MagnetMode } from '../chart/ChartToolbar';
 import { TOOL_SHORTCUTS } from '../chart/tools';
+import { IntervalPicker } from '../chart/IntervalPicker';
+import {
+  loadFavoriteIntervals,
+  loadWorkspaceState,
+  saveFavoriteIntervals,
+  saveWorkspaceState,
+  type WorkspaceState,
+} from '../chart/workspace';
 import {
   CHART_TYPE_LABELS,
   loadChartSettings,
@@ -41,7 +49,7 @@ import {
   type LayoutConfig,
   type Panel,
 } from '@tv/layout-sync';
-import { Menu, MenuItem, MenuLabel, MenuSeparator, Segmented } from '../ui';
+import { Menu, MenuItem, MenuLabel, MenuSeparator } from '../ui';
 import {
   IconArea,
   IconBarsOHLC,
@@ -116,9 +124,19 @@ export function WorkspacePage() {
   const qc = useQueryClient();
   const { symbol: routeSymbol } = useParams<{ symbol?: string }>();
 
-  const [config, setConfig] = useState<LayoutConfig>(() => defaultLayoutConfig('1'));
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [currentName, setCurrentName] = useState<string>('Untitled');
+  // Last working session (symbol, interval, chart type, indicators, grid) —
+  // restored synchronously so the terminal reopens where you left off.
+  const restored = useRef<WorkspaceState | null>(loadWorkspaceState());
+  const [config, setConfig] = useState<LayoutConfig>(
+    () => restored.current?.config ?? defaultLayoutConfig('1'),
+  );
+  const [currentId, setCurrentId] = useState<string | null>(() => restored.current?.layoutId ?? null);
+  const [currentName, setCurrentName] = useState<string>(
+    () => restored.current?.layoutName ?? 'Untitled',
+  );
+  // Gate autosave until the initial state is settled so we never persist the
+  // transient default over a real saved layout on a cold first load.
+  const [hydrated, setHydrated] = useState<boolean>(() => restored.current != null);
   const initialized = useRef(false);
   const appliedSymbol = useRef<string | null>(null);
 
@@ -135,6 +153,19 @@ export function WorkspacePage() {
       const next = { ...prev, ...patch };
       saveChartSettings(next);
       return next;
+    });
+  }, []);
+
+  const [favoriteIntervals, setFavoriteIntervals] = useState<Interval[]>(loadFavoriteIntervals);
+  const toggleFavoriteInterval = useCallback((interval: Interval) => {
+    setFavoriteIntervals((prev) => {
+      const next = prev.includes(interval)
+        ? prev.filter((i) => i !== interval)
+        : [...prev, interval];
+      // Keep at least one favorite so the inline switcher never empties out.
+      const resolved = next.length > 0 ? next : prev;
+      saveFavoriteIntervals(resolved);
+      return resolved;
     });
   }, []);
 
@@ -210,21 +241,25 @@ export function WorkspacePage() {
     staleTime: 120_000,
   });
 
-  // Load the default (or first) saved layout once — unless deep-linking a symbol.
+  // Choose the initial layout once. Precedence: deep-linked symbol → restored
+  // last session → default saved layout → cold-start BTCUSDT.
   useEffect(() => {
     if (initialized.current || !layoutsQ.data || !symbolsQ.data) return;
     initialized.current = true;
-    if (routeSymbol) return;
+    if (routeSymbol) return; // deep-link effect handles it (and flips hydrated)
+    if (restored.current) return; // already restored synchronously at init
     const pick = layoutsQ.data.layouts.find((l) => l.isDefault) ?? layoutsQ.data.layouts[0];
     if (pick) {
       setConfig(pick.config);
       setCurrentId(pick.id);
       setCurrentName(pick.name);
+      setHydrated(true);
       return;
     }
     const rows = symbolsQ.data.results;
     const def = rows.find((r) => r.ticker === 'BTCUSDT') ?? rows[0];
     if (def) setConfig(defaultLayoutConfig('1', def.id));
+    setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutsQ.data, symbolsQ.data, routeSymbol]);
 
@@ -237,6 +272,7 @@ export function WorkspacePage() {
     if (!found || appliedSymbol.current === found.id) return;
     appliedSymbol.current = found.id;
     initialized.current = true;
+    setHydrated(true);
     setConfig((cfg) => {
       const idx = Math.min(cfg.activePanel, cfg.panels.length - 1);
       if (cfg.panels[idx]?.symbolId === found.id) return cfg;
@@ -245,6 +281,15 @@ export function WorkspacePage() {
       return { ...cfg, panels };
     });
   }, [routeSymbol, symbolsQ.data]);
+
+  // Autosave the working session (debounced) so a reload restores it verbatim.
+  useEffect(() => {
+    if (!hydrated) return;
+    const id = window.setTimeout(() => {
+      saveWorkspaceState({ config, layoutId: currentId, layoutName: currentName });
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [config, currentId, currentName, hydrated]);
 
   // Advance the cursor while playing.
   useEffect(() => {
@@ -330,6 +375,33 @@ export function WorkspacePage() {
     },
     [activeIdx, activePanel?.indicators, updatePanel],
   );
+
+  // Step the active panel's timeframe with [ (shorter) / ] (longer).
+  const activeInterval = activePanel?.interval ?? '1h';
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || (e.key !== '[' && e.key !== ']')) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const idx = INTERVALS.indexOf(activeInterval);
+      if (idx === -1) return;
+      const nextIdx =
+        e.key === ']' ? Math.min(idx + 1, INTERVALS.length - 1) : Math.max(idx - 1, 0);
+      if (nextIdx === idx) return;
+      e.preventDefault();
+      setActiveInterval(INTERVALS[nextIdx]!);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeInterval, setActiveInterval]);
 
   /* ── Layout persistence ────────────────────────────────────────────── */
 
@@ -459,7 +531,6 @@ export function WorkspacePage() {
 
   const preset = GRID_PRESETS[config.grid];
   const multiPanel = config.panels.length > 1;
-  const intervalOptions = useMemo(() => INTERVALS.map((i) => ({ value: i, label: i })), []);
 
   const ChartTypeIcon = CHART_TYPE_ICONS[activePanel?.chartType ?? 'candle_solid'];
   const GridIcon = GRID_ICONS[config.grid];
@@ -483,7 +554,12 @@ export function WorkspacePage() {
 
         <span className="ws-divider" />
 
-        <Segmented value={activePanel?.interval ?? '1h'} onChange={setActiveInterval} options={intervalOptions} />
+        <IntervalPicker
+          value={activeInterval}
+          onChange={setActiveInterval}
+          favorites={favoriteIntervals}
+          onToggleFavorite={toggleFavoriteInterval}
+        />
 
         <Menu title="Chart type" button={<ChartTypeIcon size={17} />}>
           {(close) => (

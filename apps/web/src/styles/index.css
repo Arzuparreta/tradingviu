@@ -1421,6 +1421,101 @@ button.ui-row {
   font-size: 10px;
   font-weight: 600;
 }
+/* ── Timeframe switcher ──────────────────────────────────────────────── */
+.ws-tf {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ws-tf-seg {
+  font-family: var(--mono);
+}
+.ws-tf-seg button {
+  min-width: 30px;
+}
+/* Current interval that isn't a favorite — active, but accent-tinted so it
+   reads as an ad-hoc pick rather than a pinned one. */
+.ws-tf-adhoc.active {
+  color: var(--accent);
+}
+.ws-tf .ui-menu-trigger {
+  padding: 5px 4px;
+  color: var(--text-muted);
+}
+.ws-tf-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ws-tf-row-select {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+.ws-tf-row-select:hover {
+  background: var(--surface-2);
+  color: var(--text-bright);
+}
+.ws-tf-row-code {
+  min-width: 28px;
+  font-family: var(--mono);
+  color: var(--text-bright);
+}
+.ws-tf-row.active .ws-tf-row-code {
+  color: var(--accent);
+}
+.ws-tf-row-name {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.ws-tf-star {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+}
+.ws-tf-star:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.ws-tf-star.on {
+  color: var(--warn);
+}
+.ws-tf-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 6px 8px 4px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+.ws-tf-hint kbd {
+  margin-left: 3px;
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
 .ws-replay {
   display: inline-flex;
   align-items: center;

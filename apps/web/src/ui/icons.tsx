@@ -542,8 +542,11 @@ export const IconBolt = (p: IconProps) => (
   </Svg>
 );
 
-export const IconStar = (p: IconProps) => (
+export const IconStar = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
   <Svg {...p}>
-    <path d="m10 3 2.1 4.3 4.7.7-3.4 3.3.8 4.7L10 13.8 5.8 16l.8-4.7L3.2 8l4.7-.7L10 3Z" />
+    <path
+      d="m10 3 2.1 4.3 4.7.7-3.4 3.3.8 4.7L10 13.8 5.8 16l.8-4.7L3.2 8l4.7-.7L10 3Z"
+      fill={filled ? 'currentColor' : 'none'}
+    />
   </Svg>
 );
