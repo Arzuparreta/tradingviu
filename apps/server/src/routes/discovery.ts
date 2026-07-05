@@ -239,8 +239,10 @@ export const discoveryRoutes = new Hono()
       )`);
     }
 
+    // DISTINCT ON (country, tenor) so overlapping sources (e.g. two providers
+    // publishing the same curve) collapse to one point per tenor.
     const rows = await db
-      .select({
+      .selectDistinctOn([yieldCurves.country, yieldCurves.tenorMonths], {
         id: yieldCurves.id,
         country: yieldCurves.country,
         curveDate: yieldCurves.curveDate,
@@ -252,7 +254,12 @@ export const discoveryRoutes = new Hono()
       })
       .from(yieldCurves)
       .where(maybeWhere(filters))
-      .orderBy(asc(yieldCurves.country), desc(yieldCurves.curveDate), asc(yieldCurves.tenorMonths))
+      .orderBy(
+        asc(yieldCurves.country),
+        asc(yieldCurves.tenorMonths),
+        desc(yieldCurves.curveDate),
+        desc(yieldCurves.fetchedAt),
+      )
       .limit(q.limit);
 
     return c.json({ points: rows });
@@ -268,27 +275,46 @@ export const discoveryRoutes = new Hono()
     if (q.from) filters.push(gte(macroSeriesObservations.observedAt, q.from));
     if (q.to) filters.push(lte(macroSeriesObservations.observedAt, q.to));
 
-    const rows = await db
-      .select({
-        id: macroSeriesObservations.id,
-        country: macroSeriesObservations.country,
-        metricCode: macroSeriesObservations.metricCode,
-        metricName: macroSeriesObservations.metricName,
-        observedAt: macroSeriesObservations.observedAt,
-        value: macroSeriesObservations.value,
-        unit: macroSeriesObservations.unit,
-        frequency: macroSeriesObservations.frequency,
-        source: macroSeriesObservations.source,
-        fetchedAt: macroSeriesObservations.fetchedAt,
-      })
-      .from(macroSeriesObservations)
-      .where(maybeWhere(filters))
-      .orderBy(
-        asc(macroSeriesObservations.country),
-        asc(macroSeriesObservations.metricCode),
-        desc(macroSeriesObservations.observedAt),
-      )
-      .limit(q.limit);
+    const columns = {
+      id: macroSeriesObservations.id,
+      country: macroSeriesObservations.country,
+      metricCode: macroSeriesObservations.metricCode,
+      metricName: macroSeriesObservations.metricName,
+      observedAt: macroSeriesObservations.observedAt,
+      value: macroSeriesObservations.value,
+      unit: macroSeriesObservations.unit,
+      frequency: macroSeriesObservations.frequency,
+      source: macroSeriesObservations.source,
+      fetchedAt: macroSeriesObservations.fetchedAt,
+    };
+
+    // latestOnly: one row per (country, metric) — the freshest observation —
+    // so overlapping sources never show the same indicator twice.
+    const rows = q.latestOnly
+      ? await db
+          .selectDistinctOn(
+            [macroSeriesObservations.country, macroSeriesObservations.metricCode],
+            columns,
+          )
+          .from(macroSeriesObservations)
+          .where(maybeWhere(filters))
+          .orderBy(
+            asc(macroSeriesObservations.country),
+            asc(macroSeriesObservations.metricCode),
+            desc(macroSeriesObservations.observedAt),
+            desc(macroSeriesObservations.fetchedAt),
+          )
+          .limit(q.limit)
+      : await db
+          .select(columns)
+          .from(macroSeriesObservations)
+          .where(maybeWhere(filters))
+          .orderBy(
+            asc(macroSeriesObservations.country),
+            asc(macroSeriesObservations.metricCode),
+            desc(macroSeriesObservations.observedAt),
+          )
+          .limit(q.limit);
 
     return c.json({ observations: rows });
   });

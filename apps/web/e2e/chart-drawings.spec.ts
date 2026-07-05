@@ -596,6 +596,25 @@ test('legacy chart aliases collapse to the canonical chart', async ({ page }) =>
   await expect.poll(() => page.locator('canvas').count()).toBeGreaterThan(0);
 });
 
+/**
+ * Switch timeframe the way a user does: inline favorite chips when present
+ * (labeled 1D/1W for day/week), otherwise through the "All timeframes" menu.
+ */
+const pickInterval = async (page: Page, interval: string) => {
+  const chipLabel = interval === '1d' ? '1D' : interval === '1w' ? '1W' : interval;
+  const chip = page.getByRole('tab', { name: chipLabel, exact: true });
+  if ((await chip.count()) > 0) {
+    await chip.click();
+    return;
+  }
+  await page.getByRole('button', { name: 'All timeframes' }).click();
+  await page
+    .locator('.ws-tf-row-select', {
+      has: page.locator('.ws-tf-row-code', { hasText: new RegExp(`^${chipLabel}$`) }),
+    })
+    .click();
+};
+
 test('chart controls keep symbol and interval wired through rapid changes', async ({ page }) => {
   const historyRequests: Array<{ symbol: string; interval: string }> = [];
   await installAppMocks(page, {
@@ -608,7 +627,7 @@ test('chart controls keep symbol and interval wired through rapid changes', asyn
   await expect(chart).toHaveAttribute('data-symbol', 'BTCUSDT');
 
   for (const interval of ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '5m', '1m', '1h']) {
-    await page.getByRole('tab', { name: interval, exact: true }).click();
+    await pickInterval(page, interval);
     await expect(chart).toHaveAttribute('data-interval', interval);
     await expect(chart).toHaveAttribute('data-loading', 'false');
   }

@@ -351,6 +351,7 @@ export const api = {
       source?: string;
       from?: string;
       to?: string;
+      latestOnly?: boolean;
       limit?: number;
     } = {},
   ) =>

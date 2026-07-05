@@ -896,17 +896,6 @@ label {
   width: auto;
 }
 
-.ui-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--gap);
-  flex-wrap: wrap;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-2);
-}
-
 .ui-seg {
   display: inline-flex;
   gap: 2px;
@@ -2024,6 +2013,11 @@ button.ui-row {
   display: inline-flex;
   gap: var(--space-1);
   justify-content: flex-end;
+}
+.alerts-test-price {
+  width: 180px;
+  font-size: var(--fs-xs);
+  padding: 3px var(--space-2);
 }
 @media (max-width: 860px) {
   .alerts-grid {

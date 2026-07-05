@@ -98,7 +98,7 @@ export const alertRoutes = new Hono()
     const rows = await db
       .update(alerts)
       .set(patch)
-      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)))
+      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId)))
       .returning({ id: alerts.id });
     if (rows.length === 0) throw new NotFoundError('Alert not found');
     return c.json({ ok: true });
@@ -109,7 +109,7 @@ export const alertRoutes = new Hono()
     const id = c.req.param('id');
     await db
       .delete(alerts)
-      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)));
+      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId)));
     return c.json({ ok: true });
   })
   .get('/alerts/:id/history', async (c) => {
@@ -143,7 +143,7 @@ export const alertRoutes = new Hono()
       .from(alerts)
       .innerJoin(symbols, eq(symbols.id, alerts.symbolId))
       .innerJoin(exchanges, eq(exchanges.id, symbols.exchangeId))
-      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId), eq(alerts.userId, tenant.userId)))
+      .where(and(eq(alerts.id, id), eq(alerts.userId, tenant.userId)))
       .limit(1);
     if (!row) throw new NotFoundError('Alert not found');
     if (!row.active) throw new ValidationError('Cannot evaluate inactive alert');

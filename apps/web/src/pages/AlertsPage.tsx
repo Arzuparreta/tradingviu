@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconBell, IconLink, IconMail } from '../ui/icons';
 import { api } from '../api/client';
 import type { AlertCondition, AlertOperator, Symbol } from '../api/types';
-import { Badge, DataTable, EmptyState, Field, Panel, TitleBar, Toolbar } from '../ui';
+import { Badge, DataTable, EmptyState, Field, Panel, TitleBar } from '../ui';
 
 const operators: AlertOperator[] = ['above', 'below', 'crosses_above', 'crosses_below', 'equals'];
 
@@ -141,16 +141,20 @@ export function AlertsPage() {
         </Panel>
 
         <div className="alerts-col">
-          <Toolbar>
-            <input
-              value={manualPrice}
-              onChange={(e) => setManualPrice(e.target.value)}
-              placeholder="Manual price for evaluate"
-              inputMode="decimal"
-              style={{ maxWidth: 220 }}
-            />
-          </Toolbar>
-          <Panel title="Your alerts" flush>
+          <Panel
+            title="Your alerts"
+            flush
+            action={
+              <input
+                className="alerts-test-price"
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder="Test price (blank = live)"
+                title="Evaluate uses the live market price; enter a price here to test a condition manually"
+                inputMode="decimal"
+              />
+            }
+          >
             {alertsQ.isLoading ? (
               <p className="muted small" style={{ padding: 'var(--space-3)' }}>
                 Loading…

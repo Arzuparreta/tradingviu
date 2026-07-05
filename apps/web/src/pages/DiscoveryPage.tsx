@@ -49,8 +49,8 @@ const compact = (value: number | undefined): string =>
 const ratio = (value: number | undefined): string =>
   value == null ? '–' : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 
-const percent = (value: number | undefined): string =>
-  value == null ? '–' : `${(value * 100).toFixed(1)}%`;
+const percent = (value: number | undefined, digits = 1): string =>
+  value == null ? '–' : `${(value * 100).toFixed(digits)}%`;
 
 const textOrDash = (value: string | null): string => value ?? '–';
 
@@ -98,16 +98,22 @@ function AssetRow({ result }: { result: ScreenerResult }) {
 }
 
 function YieldCurve({ points }: { points: readonly YieldCurvePoint[] }) {
-  const max = points.reduce((m, point) => Math.max(m, point.rate), 0);
   if (points.length === 0) {
     return <EmptyState icon={<IconLandmark size={18} />} title="No yield curve data" />;
   }
+  const sorted = [...points].sort((a, b) => a.tenorMonths - b.tenorMonths);
+  // Scale bars across the curve's own min–max band so its shape (steepening,
+  // inversion) is readable; a 0-based scale renders every tenor near-identical.
+  const min = Math.min(...sorted.map((p) => p.rate));
+  const max = Math.max(...sorted.map((p) => p.rate));
+  const span = max - min;
+  const height = (rate: number) => (span > 0 ? 25 + ((rate - min) / span) * 75 : 60);
   return (
     <div className="disc-yield">
-      {points.map((point) => (
+      {sorted.map((point) => (
         <div key={point.id} className="disc-yield-point">
           <div className="disc-yield-track">
-            <span style={{ height: `${Math.max(8, (point.rate / Math.max(max, 1)) * 100)}%` }} />
+            <span style={{ height: `${height(point.rate)}%` }} />
           </div>
           <strong>{point.rate.toFixed(2)}%</strong>
           <span>
@@ -171,7 +177,7 @@ export function DiscoveryPage() {
   });
   const macroQ = useQuery({
     queryKey: ['discovery-macro', country],
-    queryFn: () => api.macroSeries({ country, limit: 8 }),
+    queryFn: () => api.macroSeries({ country, latestOnly: true, limit: 8 }),
   });
   const fundamentalsQ = useQuery({
     queryKey: ['discovery-fundamentals', focusSymbol],
@@ -283,9 +289,10 @@ export function DiscoveryPage() {
                 <thead>
                   <tr>
                     <th>Symbol</th>
-                    <th className="num">Market cap</th>
-                    <th className="num">P/E</th>
-                    <th className="num">Growth</th>
+                    <th className="num">EPS</th>
+                    <th className="num">ROE</th>
+                    <th className="num">Div yield</th>
+                    <th className="num">Beta</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -297,15 +304,10 @@ export function DiscoveryPage() {
                         </Link>
                         <div className="muted small">{s.symbol.name}</div>
                       </td>
-                      <td className="num">{compact(s.marketCap ?? undefined)}</td>
-                      <td className="num">{ratio(s.peRatio ?? undefined)}</td>
-                      <td
-                        className={`num ${
-                          s.revenueGrowth != null && s.revenueGrowth >= 0 ? 'up' : 'down'
-                        }`}
-                      >
-                        {percent(s.revenueGrowth ?? undefined)}
-                      </td>
+                      <td className="num">{ratio(s.eps ?? undefined)}</td>
+                      <td className="num">{percent(s.roe ?? undefined, 0)}</td>
+                      <td className="num">{percent(s.dividendYield ?? undefined, 2)}</td>
+                      <td className="num">{ratio(s.beta ?? undefined)}</td>
                     </tr>
                   ))}
                 </tbody>

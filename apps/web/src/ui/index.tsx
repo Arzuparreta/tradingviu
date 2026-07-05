@@ -206,11 +206,6 @@ export function Field({
   );
 }
 
-/* ── Toolbar ───────────────────────────────────────────────────────────── */
-export function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="ui-toolbar">{children}</div>;
-}
-
 /* ── Segmented ─────────────────────────────────────────────────────────── */
 export function Segmented<T extends string>({
   value,

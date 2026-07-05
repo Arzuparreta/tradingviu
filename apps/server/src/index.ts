@@ -27,7 +27,7 @@ import { errorHandler } from './middleware/error.js';
 import { wsHandlers } from './services/ws.js';
 import { authenticateWsToken } from './services/ws-auth.js';
 import { indexAllSymbols, searchEnabled } from './services/search.js';
-import { initBarStore, getBarStore, shutdownBarStore } from './services/data.js';
+import { initBarStore, shutdownBarStore } from './services/data.js';
 import { shutdownMarketStore } from './services/market-store.js';
 
 const env = loadEnv();
@@ -132,9 +132,6 @@ const shutdown = async (): Promise<void> => {
 };
 process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
-
-// Avoid unused-import warning when getBarStore is not called here directly.
-void getBarStore;
 
 export default server;
 

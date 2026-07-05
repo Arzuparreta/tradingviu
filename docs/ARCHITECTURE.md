@@ -68,9 +68,9 @@ Web (apps/web)  ->  Hono API on Bun (apps/server)  ->  domain packages + ingest 
 
 ## API
 
-- The Hono app mounts everything active under `/api`
-  (`apps/server/src/index.ts`), one route module per active domain in
-  `apps/server/src/routes/`.
+- The Hono app mounts authenticated domains under `/api` and keeps `/auth` and
+  `/health` public at the top level (`apps/server/src/index.ts`), one route
+  module per active domain in `apps/server/src/routes/`.
 - Active route domains: auth, health, symbols/chart, search, indicators,
   patterns, chart patterns, volume profile, TPO profile, Ichimoku, pivot points,
   watchlists, layouts, drawings, alerts, discovery, and screener.

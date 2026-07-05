@@ -180,6 +180,7 @@ export const MacroSeriesQuerySchema = z.object({
   source: z.string().trim().min(1).max(80).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  latestOnly: z.coerce.boolean().default(false),
   limit: z.coerce.number().int().positive().max(500).default(100),
 });
 export type MacroSeriesQuery = z.infer<typeof MacroSeriesQuerySchema>;
